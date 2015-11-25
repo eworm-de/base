@@ -66,6 +66,8 @@ int permissions_apply(int devfd, const char *devname, const char *subsystem, con
                 if (device_permissions[i].mode > 0)
                         if (fchmodat(devfd, devname, device_permissions[i].mode & 07777, 0) < 0)
                                 return -errno;
+
+                break;
         }
 
         return 0;
