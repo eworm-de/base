@@ -16,6 +16,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+int uevent_coldplug(int devfd, int (* cb)(int devfd,
+                                          const char *subsystem, const char *devtype,
+                                          const char *devname, const char *modalias));
 int uevent_connect(void);
 int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
                            char **devname, char **modalias);
