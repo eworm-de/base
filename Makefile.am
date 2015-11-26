@@ -31,6 +31,22 @@ AM_LDFLAGS = $(OUR_LDFLAGS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
+	org.bus1.init
+
+org_bus1_init_SOURCES = \
+	src/init/main.c
+
+org_bus1_init_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(KMOD_CFLAGS) \
+	$(BLKID_CFLAGS)
+
+org_bus1_init_LDADD = \
+	$(KMOD_LIBS) \
+	$(BLKID_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
 	org.bus1.devices
 
 org_bus1_devices_SOURCES = \

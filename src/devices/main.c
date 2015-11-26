@@ -33,14 +33,12 @@ static int uevent_cb(int devfd, const char *subsystem, const char *devtype, cons
         int r;
 
         if (devname) {
-                printf("/dev/%s (%s)\n", devname, subsystem);
                 r = permissions_apply(devfd, devname, subsystem, devtype);
                 if (r < 0)
                         return r;
         }
 
         if (modalias) {
-                printf("modprobe %s (%s)\n", modalias, subsystem);
                 r = module_load(modalias);
                 if (r < 0)
                         return r;
@@ -110,14 +108,12 @@ int main(int argc, char **argv) {
 
                         if (action && strcmp(action, "add") == 0) {
                                 if (devname) {
-                                        printf("/dev/%s (%s)\n", devname, subsystem);
                                         r = permissions_apply(devfd, devname, subsystem, devtype);
                                         if (r < 0)
                                                 return EXIT_FAILURE;
                                 }
 
                                 if (modalias) {
-                                        printf("modprobe %s (%s)\n", modalias, subsystem);
                                         r = module_load(modalias);
                                         if (r < 0)
                                                 return EXIT_FAILURE;

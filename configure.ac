@@ -114,7 +114,11 @@ AC_SUBST([OUR_LDFLAGS], "$with_ldflags")
 ------------------------------------------------------------------------------
 PKG_CHECK_MODULES(KMOD, [ libkmod >= 15 ],
         [AC_DEFINE(HAVE_KMOD, 1, [Define if kmod is available])],
-        AC_MSG_ERROR([*** kmod version >= 15 not found]))
+        AC_MSG_ERROR([*** libkmod not found]))
+
+PKG_CHECK_MODULES(BLKID, [ blkid >= 2.24 ],
+        [AC_DEFINE(HAVE_BLKID, 1, [Define if blkid is available])],
+        AC_MSG_ERROR([*** libblkid not found]))
 
 # ------------------------------------------------------------------------------
 # system features

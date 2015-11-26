@@ -44,7 +44,7 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
         /* /sys/bus, /sys/class */
         dfd = openat(AT_FDCWD, path, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
         if (dfd < 0)
-                return dfd;
+                return -errno;
 
         dir = fdopendir(dfd);
         if (!dir)
@@ -60,7 +60,7 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
 
                 dfd = openat(dirfd(dir), dent->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
                 if (dfd < 0)
-                        return dfd;
+                        return -errno;
 
                 /* /sys/bus/pci/devices */
                 if (subdir) {
@@ -68,7 +68,7 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
 
                         fd = openat(dfd, subdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
                         if (fd < 0)
-                                return fd;
+                                return -errno;
 
                         close(dfd);
                         dfd = fd;
@@ -117,7 +117,7 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
 
                         fd = openat(dfd, "uevent", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
                         if (fd < 0)
-                                return fd;
+                                return -errno;
 
                         f = fdopen(fd, "re");
                         if (!f)
