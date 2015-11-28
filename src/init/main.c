@@ -31,7 +31,7 @@
 
 #include <libkmod.h>
 
-#define ELEMENTSOF(x) (sizeof(x) / sizeof((x)[0]))
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 static const struct mountpoint {
         const char *what;
@@ -57,7 +57,7 @@ static int filesystem_mount(void) {
         unsigned int i;
         int r;
 
-        for (i = 0; i < ELEMENTSOF(mountpoints); i++) {
+        for (i = 0; i < ARRAY_SIZE(mountpoints); i++) {
                 r = mkdir(mountpoints[i].where, 0700);
                 if (r < 0 && errno != EEXIST)
                         return -errno;
@@ -79,7 +79,7 @@ static int modules_load(void) {
         struct kmod_ctx *ctx = NULL;
         int r;
 
-        for (i = 0; i < ELEMENTSOF(modules); i++) {
+        for (i = 0; i < ARRAY_SIZE(modules); i++) {
                 struct kmod_module *mod;
 
                 if (modules[i].path && access(modules[i].path, F_OK) >= 0)
@@ -109,7 +109,68 @@ static int modules_load(void) {
         return 0;
 }
 
-static int exec_bash(void) {
+static int basedirs_create(const char *base) {
+        int basefd;
+        static const char *dirs[] = {
+                "dev",
+                "proc",
+                "sys",
+                "usr",
+                "var",
+                "lib64",
+        };
+        static const struct link {
+                const char *file;
+                const char *target;
+        } links[] = {
+                { "etc",                        "usr/etc" },
+                { "bin",                        "usr/bin" },
+                { "sbin",                       "usr/bin" },
+                { "lib64/ld-linux-x86-64.so.2", "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" },
+        };
+        unsigned int i;
+        int r;
+
+        r = mkdir(base, 0755);
+        if (r < 0)
+                return -errno;
+
+        basefd = openat(AT_FDCWD, base, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (basefd < 0)
+                return -errno;
+
+        for (i = 0; i < ARRAY_SIZE(dirs); i++) {
+                r = mkdirat(basefd, dirs[i], 0755);
+                if (r < 0)
+                        return -errno;
+        }
+
+        for (i = 0; i < ARRAY_SIZE(links); i++) {
+                r = symlinkat(links[i].target, basefd, links[i].file);
+                if (r < 0)
+                        return -errno;
+        }
+
+        close(basefd);
+        return 0;
+}
+
+static int bus1_disk_mount(const char *dir) {
+        int r;
+
+        r = mkdir(dir, 0755);
+        if (r < 0)
+                return -errno;
+
+        r = mount("/dev/sda2", dir, "xfs", 0, NULL);
+        if (r < 0)
+                return -errno;
+
+        return 0;
+}
+
+
+static int bash(void) {
         const char *argv[] = {
                 "/bin/bash",
                 NULL
@@ -145,7 +206,7 @@ static int exec_bash(void) {
         return 0;
 }
 
-static pid_t exec_service(const char *prog) {
+static pid_t service_start(const char *prog) {
         const char *argv[] = {
                 prog,
                 NULL
@@ -172,11 +233,71 @@ static pid_t exec_service(const char *prog) {
         return p;
 }
 
+static int root_switch(const char *root) {
+        static const char *mounts[] = {
+                "/dev",
+                "/proc",
+                "/sys",
+        };
+        unsigned i;
+        int rootfd;
+        int r;
+
+        rootfd = openat(AT_FDCWD, "/", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (rootfd < 0)
+                return -errno;
+
+        for (i = 0; i< ARRAY_SIZE(mounts); i++) {
+                char *target = NULL;
+
+                if (asprintf(&target, "%s%s", root, mounts[i]) < 0)
+                        return -ENOMEM;
+
+                r = mount(mounts[i], target, NULL, MS_MOVE, NULL);
+                if (r < 0)
+                        return -errno;
+
+                free(target);
+        }
+
+        r  = chdir(root);
+        if (r < 0)
+                return -errno;
+
+        r = mount(root, "/", NULL, MS_MOVE, NULL);
+        if (r < 0)
+                return -errno;
+
+        r = chroot(".");
+        if (r < 0)
+                return -errno;
+
+        r = chdir("/");
+                return -errno;
+
+        // cleanup leftover /
+        close(rootfd);
+
+        return 0;
+}
+
+static int init_execute(void) {
+        const char *argv[] = {
+                "/usr/bin/org.bus1.init",
+                NULL
+        };
+        const char *env[] = {
+                NULL
+        };
+
+        execve(argv[0], (char **)argv, (char **)env);
+        return -errno;
+}
+
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.init";
         struct timezone tz = {};
-
-        int rootfd;
+        pid_t pid_devices = 0;
         int r;
 
         argv[0] = name;
@@ -199,52 +320,35 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        if (mkdir("/sysroot", 0755) < 0 ||
-            mkdir("/sysroot/dev", 0755) < 0 ||
-            mkdir("/sysroot/proc", 0755) < 0 ||
-            mkdir("/sysroot/sys", 0755) < 0 ||
-            mkdir("/sysroot/usr", 0755) < 0)
+        pid_devices = service_start("/usr/bin/org.bus1.devices");
+        if (pid_devices < 0)
                 return EXIT_FAILURE;
 
-        if (symlink("usr/etc", "/sysroot/etc") < 0 ||
-            symlink("usr/bin", "/sysroot/bin") < 0 ||
-            symlink("usr/bin", "/sysroot/sbin") < 0)
+        r = basedirs_create("/sysroot");
+        if (r < 0)
                 return EXIT_FAILURE;
 
-        if (mkdir("/sysroot/lib64", 0755) < 0 ||
-            symlink("../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2", "/sysroot/lib64/ld-linux-x86-64.so.2") < 0)
+        r = bus1_disk_mount("/bus1");
+        if (r < 0)
                 return EXIT_FAILURE;
-
-        if (mkdir("/bus1", 0755) < 0)
-                return EXIT_FAILURE;
-
-        // read gpt, find bus1 part
-        if (mount("/dev/sda2", "/bus1", "xfs", 0, NULL) < 0)
-                return EXIT_FAILURE;
-
-        exec_service("/usr/bin/org.bus1.devices");
-        exec_bash();
 
         // create loopdev, attach /bus1/system/system.img
-        // mount /sysroot/usr, mount /sysroot/var
+        // mount loop /sysroot/usr
 
-        if (mount("/dev", "/sysroot/dev", NULL, MS_MOVE, NULL) < 0||
-            mount("/proc", "/sysroot/dev", NULL, MS_MOVE, NULL) < 0 ||
-            mount("/sys", "/sysroot/sys", NULL, MS_MOVE, NULL) < 0)
+        r = mount("/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL);
+        if (r < 0)
                 return EXIT_FAILURE;
 
-        rootfd = openat(AT_FDCWD, "/", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (rootfd < 0)
+        bash();
+
+        r = kill(pid_devices, SIGTERM);
+        if (r < 0)
                 return EXIT_FAILURE;
 
-        if (chdir("/sysroot") ||
-            mount("/sysroot", "/", NULL, MS_MOVE, NULL) ||
-            chroot(".") ||
-            chdir("/"))
+        r = root_switch("/sysroot");
+        if (r < 0)
                 return EXIT_FAILURE;
 
-        // cleanup leftover /
-        close(rootfd);
-
+        init_execute();
         return EXIT_FAILURE;
 }
