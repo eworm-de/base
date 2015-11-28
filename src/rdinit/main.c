@@ -112,9 +112,9 @@ static int modules_load(void) {
 static int basedirs_create(const char *base) {
         int basefd;
         static const char *dirs[] = {
-                "dev",
                 "proc",
                 "sys",
+                "dev",
                 "usr",
                 "var",
                 "lib64",
@@ -295,7 +295,7 @@ static int init_execute(void) {
 }
 
 int main(int argc, char **argv) {
-        static char name[] = "org.bus1.init";
+        static char name[] = "org.bus1.rdnit";
         struct timezone tz = {};
         pid_t pid_devices = 0;
         int r;

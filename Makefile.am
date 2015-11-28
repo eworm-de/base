@@ -31,17 +31,17 @@ AM_LDFLAGS = $(OUR_LDFLAGS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
-	org.bus1.init
+	org.bus1.rdinit
 
-org_bus1_init_SOURCES = \
-	src/init/main.c
+org_bus1_rdinit_SOURCES = \
+	src/rdinit/main.c
 
-org_bus1_init_CFLAGS = \
+org_bus1_rdinit_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(KMOD_CFLAGS) \
 	$(BLKID_CFLAGS)
 
-org_bus1_init_LDADD = \
+org_bus1_rdinit_LDADD = \
 	$(KMOD_LIBS) \
 	$(BLKID_LIBS)
 
