@@ -23,11 +23,13 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <dirent.h>
 #include <sys/prctl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
+#include <linux/loop.h>
 
 #include <libkmod.h>
 
@@ -109,14 +111,13 @@ static int modules_load(void) {
         return 0;
 }
 
-static int basedirs_create(const char *base) {
-        int basefd;
+static int newroot_create(const char *root) {
+        int rootfd;
         static const char *dirs[] = {
                 "proc",
                 "sys",
                 "dev",
                 "usr",
-                "var",
                 "lib64",
         };
         static const struct link {
@@ -129,80 +130,72 @@ static int basedirs_create(const char *base) {
                 { "lib64/ld-linux-x86-64.so.2", "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" },
         };
         unsigned int i;
-        int r;
 
-        r = mkdir(base, 0755);
-        if (r < 0)
+        if (mkdir(root, 0755) < 0)
                 return -errno;
 
-        basefd = openat(AT_FDCWD, base, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (basefd < 0)
+        rootfd = openat(AT_FDCWD, root, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (rootfd < 0)
                 return -errno;
 
-        for (i = 0; i < ARRAY_SIZE(dirs); i++) {
-                r = mkdirat(basefd, dirs[i], 0755);
-                if (r < 0)
+        for (i = 0; i < ARRAY_SIZE(dirs); i++)
+                if (mkdirat(rootfd, dirs[i], 0755) < 0)
                         return -errno;
-        }
 
-        for (i = 0; i < ARRAY_SIZE(links); i++) {
-                r = symlinkat(links[i].target, basefd, links[i].file);
-                if (r < 0)
+        for (i = 0; i < ARRAY_SIZE(links); i++)
+                if (symlinkat(links[i].target, rootfd, links[i].file) < 0)
                         return -errno;
-        }
 
-        close(basefd);
+        close(rootfd);
         return 0;
 }
 
 static int bus1_disk_mount(const char *dir) {
-        int r;
-
-        r = mkdir(dir, 0755);
-        if (r < 0)
+        if (mkdir(dir, 0755) < 0)
                 return -errno;
 
-        r = mount("/dev/sda2", dir, "xfs", 0, NULL);
-        if (r < 0)
+        if (mount("/dev/sda2", dir, "xfs", 0, NULL) < 0)
                 return -errno;
 
         return 0;
 }
 
+static int bus1_system_mount(const char *image, const char *dir) {
+        int fd_loopctl;
+        int fd_loop;
+        int fd_image;
+        char *loopdev = NULL;
+        int n;
 
-static int bash(void) {
-        const char *argv[] = {
-                "/bin/bash",
-                NULL
-        };
-        const char *env[] = {
-                "TERM=linux",
-                NULL
-        };
-        pid_t p;
-        int r;
-
-        p = fork();
-        if (p < 0)
+        fd_loopctl = open("/dev/loop-control", O_RDWR|O_CLOEXEC);
+        if (fd_loopctl < 0)
                 return -errno;
 
-        if (p == 0) {
-                r = setsid();
-                if (r < 0)
-                        return -errno;
-
-                r = ioctl(STDIN_FILENO, TIOCSCTTY, 1);
-                if (r < 0)
-                        return -errno;
-
-                execve(argv[0], (char **)argv, (char **)env);
-                return -errno;
-        }
-
-        p = waitpid(p, NULL, 0);
-        if (p < 0)
+        n = ioctl(fd_loopctl, LOOP_CTL_GET_FREE);
+        if (n < 0)
                 return -errno;
 
+        if (asprintf(&loopdev, "/dev/loop%d", n) < 0)
+                return -ENOMEM;
+
+        fd_loop = open(loopdev, O_RDWR|O_CLOEXEC);
+        if (fd_loop < 0)
+                return -errno;
+
+        fd_image = open(image, O_RDONLY|O_CLOEXEC);
+        if (fd_image < 0)
+                return -errno;
+
+        if (ioctl(fd_loop, LOOP_SET_FD, fd_image) < 0)
+                return -errno;
+
+        if (mount(loopdev, dir, "squashfs", MS_RDONLY, NULL) < 0)
+                return -errno;
+
+        close(fd_image);
+        close(fd_loop);
+        free(loopdev);
+        close(fd_loopctl);
         return 0;
 }
 
@@ -215,15 +208,13 @@ static pid_t service_start(const char *prog) {
                 NULL
         };
         pid_t p;
-        int r;
 
         p = fork();
         if (p < 0)
                 return -errno;
 
         if (p == 0) {
-                r = setsid();
-                if (r < 0)
+                if (setsid() < 0)
                         return -errno;
 
                 execve(argv[0], (char **)argv, (char **)env);
@@ -233,7 +224,59 @@ static pid_t service_start(const char *prog) {
         return p;
 }
 
-static int root_switch(const char *root) {
+static int directory_delete(int dfd, const char *exclude) {
+        DIR *dir;
+        struct stat st;
+        struct dirent *d;
+        int r;
+
+        dir = fdopendir(dfd);
+        if (!dir)
+                return -errno;
+
+        if (fstat(dirfd(dir), &st) < 0)
+                return -errno;
+
+        for (d = readdir(dir); d; d = readdir(dir)) {
+                if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)
+                        continue;
+
+                if (exclude && strcmp(d->d_name, exclude) == 0)
+                        continue;
+
+                if (d->d_type == DT_DIR) {
+                        struct stat st2;
+                        int dfd2;
+
+                        if (fstatat(dirfd(dir), d->d_name, &st2, AT_SYMLINK_NOFOLLOW) < 0)
+                                return -errno;
+
+                        if (st.st_dev != st2.st_dev)
+                                continue;
+
+                        dfd2 = openat(dirfd(dir), d->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                        if (dfd2 < 0)
+                                return -errno;
+
+                        r = directory_delete(dfd2, NULL);
+                        if (r < 0)
+                                return r;
+
+                        if (unlinkat(dirfd(dir), d->d_name, AT_REMOVEDIR) < 0)
+                                return -errno;
+
+                        continue;
+                }
+
+                if (unlinkat(dfd, d->d_name, 0) < 0)
+                        return -errno;
+        }
+
+        closedir(dir);
+        return 0;
+}
+
+static int root_switch(const char *newroot) {
         static const char *mounts[] = {
                 "/dev",
                 "/proc",
@@ -243,41 +286,39 @@ static int root_switch(const char *root) {
         int rootfd;
         int r;
 
-        rootfd = openat(AT_FDCWD, "/", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        rootfd = openat(AT_FDCWD, "/", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
         if (rootfd < 0)
                 return -errno;
 
         for (i = 0; i< ARRAY_SIZE(mounts); i++) {
                 char *target = NULL;
 
-                if (asprintf(&target, "%s%s", root, mounts[i]) < 0)
+                if (asprintf(&target, "%s%s", newroot, mounts[i]) < 0)
                         return -ENOMEM;
 
-                r = mount(mounts[i], target, NULL, MS_MOVE, NULL);
-                if (r < 0)
+                if (mount(mounts[i], target, NULL, MS_MOVE, NULL) < 0)
                         return -errno;
 
                 free(target);
         }
 
-        r  = chdir(root);
+        if (chdir(newroot) < 0)
+                return -errno;
+
+        if (mount(newroot, "/", NULL, MS_BIND, NULL) < 0)
+                return -errno;
+
+        if (chroot(".") < 0)
+                return -errno;
+
+        if (chdir("/") < 0)
+                return -errno;
+
+        r = directory_delete(rootfd, newroot + 1);
         if (r < 0)
-                return -errno;
+                return r;
 
-        r = mount(root, "/", NULL, MS_MOVE, NULL);
-        if (r < 0)
-                return -errno;
-
-        r = chroot(".");
-        if (r < 0)
-                return -errno;
-
-        r = chdir("/");
-                return -errno;
-
-        // cleanup leftover /
         close(rootfd);
-
         return 0;
 }
 
@@ -294,14 +335,40 @@ static int init_execute(void) {
         return -errno;
 }
 
+static int bash_execute(void) {
+        const char *argv[] = {
+                "/usr/bin/bash",
+                NULL
+        };
+        const char *env[] = {
+                "TERM=linux",
+                NULL
+        };
+
+        if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
+                return -errno;
+
+        printf("Welcome to bus1!\n\n");
+
+        execve(argv[0], (char **)argv, (char **)env);
+        return -errno;
+}
+
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdnit";
+        struct sigaction sa = {
+                .sa_handler = SIG_IGN,
+                .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
+        };
         struct timezone tz = {};
         pid_t pid_devices = 0;
         int r;
 
         argv[0] = name;
         prctl(PR_SET_NAME, name);
+
+        if (sigaction(SIGCHLD, &sa, NULL) < 0)
+                return -errno;
 
         r = filesystem_mount();
         if (r < 0)
@@ -324,25 +391,22 @@ int main(int argc, char **argv) {
         if (pid_devices < 0)
                 return EXIT_FAILURE;
 
-        r = basedirs_create("/sysroot");
+        r = newroot_create("/sysroot");
         if (r < 0)
                 return EXIT_FAILURE;
 
-        r = bus1_disk_mount("/bus1");
+        r = bus1_disk_mount("/sysroot/bus1");
         if (r < 0)
                 return EXIT_FAILURE;
 
-        // create loopdev, attach /bus1/system/system.img
-        // mount loop /sysroot/usr
-
-        r = mount("/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL);
+        r = bus1_system_mount("/sysroot/bus1/system/system.img", "/sysroot/usr");
         if (r < 0)
                 return EXIT_FAILURE;
 
-        bash();
+        if (symlink("bus1/data", "/sysroot/var") < 0)
+                return EXIT_FAILURE;
 
-        r = kill(pid_devices, SIGTERM);
-        if (r < 0)
+        if (kill(pid_devices, SIGTERM) < 0)
                 return EXIT_FAILURE;
 
         r = root_switch("/sysroot");
@@ -350,5 +414,6 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         init_execute();
+        bash_execute();
         return EXIT_FAILURE;
 }

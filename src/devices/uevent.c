@@ -38,7 +38,7 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
                                      const char *devname, const char *modalias)) {
         int dfd;
         DIR *dir;
-        struct dirent *dent;
+        struct dirent *d;
         int r;
 
         /* /sys/bus, /sys/class */
@@ -51,14 +51,14 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
                 return -errno;
 
         /* /sys/bus/pci, /sys/class/block */
-        for (dent = readdir(dir); dent; dent = readdir(dir)) {
+        for (d = readdir(dir); d; d = readdir(dir)) {
                 DIR *dir2;
-                struct dirent *dent2;
+                struct dirent *d2;
 
-                if (dent->d_name[0] == '.')
+                if (d->d_name[0] == '.')
                         continue;
 
-                dfd = openat(dirfd(dir), dent->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                dfd = openat(dirfd(dir), d->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
                 if (dfd < 0)
                         return -errno;
 
@@ -79,7 +79,7 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
                         return -errno;
 
                 /* /sys/bus/pci/0000:00:00.0, /sys/class/block/sda */
-                for (dent2 = readdir(dir2); dent2; dent2 = readdir(dir2)) {
+                for (d2 = readdir(dir2); d2; d2 = readdir(dir2)) {
                         int fd;
                         FILE *f;
                         char line[4096];
@@ -90,10 +90,10 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
                         char *devname = NULL;
                         char *modalias = NULL;
 
-                        if (dent2->d_name[0] == '.')
+                        if (d2->d_name[0] == '.')
                                 continue;
 
-                        dfd = openat(dirfd(dir2), dent2->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                        dfd = openat(dirfd(dir2), d2->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
                         if (dfd < 0) {
                                 if (errno == ENOTDIR)
                                         continue;
@@ -196,24 +196,20 @@ int uevent_connect(void) {
         struct sockaddr_nl nl = {};
         const int on = 1;
         const int size = 16 * 1024 * 1024;
-        int r;
 
         sk = socket(PF_NETLINK, SOCK_RAW|SOCK_CLOEXEC|SOCK_NONBLOCK, NETLINK_KOBJECT_UEVENT);
         if (sk < 0)
                 return sk;
 
-        r = setsockopt(sk, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
-        if (r < 0)
+        if (setsockopt(sk, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on)) < 0)
                 return -errno;
 
-        r = setsockopt(sk, SOL_SOCKET, SO_RCVBUFFORCE, &size, sizeof(size));
-        if (r < 0)
+        if (setsockopt(sk, SOL_SOCKET, SO_RCVBUFFORCE, &size, sizeof(size)) < 0)
                 return -errno;
 
         nl.nl_family = AF_NETLINK;
         nl.nl_groups = UEVENT_BROADCAST_KERNEL;
-        r = bind(sk, (struct sockaddr *)&nl, sizeof(struct sockaddr_nl));
-        if (r < 0)
+        if (bind(sk, (struct sockaddr *)&nl, sizeof(struct sockaddr_nl)) < 0)
                 return -errno;
 
         return sk;
