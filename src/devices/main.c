@@ -25,6 +25,7 @@
 #include <sys/signalfd.h>
 #include <sys/epoll.h>
 
+#include "bus1/c-shared.h"
 #include "uevent.h"
 #include "permissions.h"
 #include "module.h"
@@ -48,13 +49,13 @@ static int uevent_cb(int devfd, const char *subsystem, const char *devtype, cons
 }
 
 int main(int argc, char **argv) {
-        int fd_uevent;
-        int fd_signal;
-        int fd_ep;
+        _c_cleanup_(c_closep) int fd_uevent = -1;
+        _c_cleanup_(c_closep) int fd_signal = -1;
+        _c_cleanup_(c_closep) int fd_ep = -1;
         sigset_t mask;
         struct epoll_event ep_monitor = { .events = EPOLLIN };
         struct epoll_event ep_signal = { .events = EPOLLIN };
-        int devfd;
+        _c_cleanup_(c_closep) int devfd = -1;
         int r;
 
         devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
@@ -100,7 +101,11 @@ int main(int argc, char **argv) {
                 }
 
                 if (ev.data.fd == fd_uevent && ev.events & EPOLLIN) {
-                        char *action = NULL, *subsystem = NULL, *devtype = NULL, *devname = NULL, *modalias = NULL;
+                        _c_cleanup_(c_freep) char *action = NULL;
+                        _c_cleanup_(c_freep) char *subsystem = NULL;
+                        _c_cleanup_(c_freep) char *devtype = NULL;
+                        _c_cleanup_(c_freep) char *devname = NULL;
+                        _c_cleanup_(c_freep) char *modalias = NULL;
 
                         r = uevent_receive(fd_uevent, &action, &subsystem, &devtype, &devname, &modalias);
                         if (r < 0)
@@ -120,12 +125,6 @@ int main(int argc, char **argv) {
                                 }
                         }
 
-                        free(action);
-                        free(subsystem);
-                        free(devtype);
-                        free(devname);
-                        free(modalias);
-
                         continue;
                 }
 
@@ -141,9 +140,5 @@ int main(int argc, char **argv) {
                 }
         }
 
-        close(fd_signal);
-        close(fd_uevent);
-        close(fd_ep);
-        close(devfd);
         return EXIT_SUCCESS;
 }

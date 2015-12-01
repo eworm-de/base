@@ -33,7 +33,7 @@
 
 #include <libkmod.h>
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#include "bus1/c-shared.h"
 
 static const struct mountpoint {
         const char *what;
@@ -59,7 +59,7 @@ static int filesystem_mount(void) {
         unsigned int i;
         int r;
 
-        for (i = 0; i < ARRAY_SIZE(mountpoints); i++) {
+        for (i = 0; i < C_ARRAY_SIZE(mountpoints); i++) {
                 r = mkdir(mountpoints[i].where, 0700);
                 if (r < 0 && errno != EEXIST)
                         return -errno;
@@ -79,9 +79,9 @@ static void module_log(void *data, int priority, const char *file, int line, con
 static int modules_load(void) {
         unsigned int i;
         struct kmod_ctx *ctx = NULL;
-        int r;
+        int r = 0;
 
-        for (i = 0; i < ARRAY_SIZE(modules); i++) {
+        for (i = 0; i < C_ARRAY_SIZE(modules); i++) {
                 struct kmod_module *mod;
 
                 if (modules[i].path && access(modules[i].path, F_OK) >= 0)
@@ -89,13 +89,15 @@ static int modules_load(void) {
 
                 if (!ctx) {
                         ctx = kmod_new(NULL, NULL);
-                        if (!ctx)
-                                return -ENOMEM;
+                        if (!ctx) {
+                                r = -ENOMEM;
+                                goto err;
+                        }
 
                         kmod_set_log_fn(ctx, module_log, NULL);
                         r = kmod_load_resources(ctx);
                         if (r < 0)
-                                return r;
+                                goto err;
                 }
 
                 r = kmod_module_new_from_name(ctx, modules[i].name, &mod);
@@ -106,13 +108,13 @@ static int modules_load(void) {
                 kmod_module_unref(mod);
         }
 
+err:
         kmod_unref(ctx);
-
-        return 0;
+        return r;
 }
 
 static int newroot_create(const char *root) {
-        int rootfd;
+        _c_cleanup_(c_closep) int rootfd = -1;
         static const char *dirs[] = {
                 "proc",
                 "sys",
@@ -138,15 +140,14 @@ static int newroot_create(const char *root) {
         if (rootfd < 0)
                 return -errno;
 
-        for (i = 0; i < ARRAY_SIZE(dirs); i++)
+        for (i = 0; i < C_ARRAY_SIZE(dirs); i++)
                 if (mkdirat(rootfd, dirs[i], 0755) < 0)
                         return -errno;
 
-        for (i = 0; i < ARRAY_SIZE(links); i++)
+        for (i = 0; i < C_ARRAY_SIZE(links); i++)
                 if (symlinkat(links[i].target, rootfd, links[i].file) < 0)
                         return -errno;
 
-        close(rootfd);
         return 0;
 }
 
@@ -161,10 +162,10 @@ static int bus1_disk_mount(const char *dir) {
 }
 
 static int bus1_system_mount(const char *image, const char *dir) {
-        int fd_loopctl;
-        int fd_loop;
-        int fd_image;
-        char *loopdev = NULL;
+        _c_cleanup_(c_closep) int fd_loopctl = -1;
+        _c_cleanup_(c_closep) int fd_loop = -1;
+        _c_cleanup_(c_closep) int fd_image = -1;
+        _c_cleanup_(c_freep) char *loopdev = NULL;
         int n;
 
         fd_loopctl = open("/dev/loop-control", O_RDWR|O_CLOEXEC);
@@ -192,10 +193,6 @@ static int bus1_system_mount(const char *image, const char *dir) {
         if (mount(loopdev, dir, "squashfs", MS_RDONLY, NULL) < 0)
                 return -errno;
 
-        close(fd_image);
-        close(fd_loop);
-        free(loopdev);
-        close(fd_loopctl);
         return 0;
 }
 
@@ -224,15 +221,16 @@ static pid_t service_start(const char *prog) {
         return p;
 }
 
-static int directory_delete(int dfd, const char *exclude) {
-        DIR *dir;
+static int directory_delete(int *dfd, const char *exclude) {
+        _c_cleanup_(c_closedirp) DIR *dir = NULL;
         struct stat st;
         struct dirent *d;
         int r;
 
-        dir = fdopendir(dfd);
+        dir = fdopendir(*dfd);
         if (!dir)
                 return -errno;
+        *dfd = -1;
 
         if (fstat(dirfd(dir), &st) < 0)
                 return -errno;
@@ -246,10 +244,10 @@ static int directory_delete(int dfd, const char *exclude) {
 
                 if (d->d_type == DT_DIR) {
                         struct stat st2;
-                        int dfd2;
+                        _c_cleanup_(c_closep) int dfd2 = -1;
 
                         if (fstatat(dirfd(dir), d->d_name, &st2, AT_SYMLINK_NOFOLLOW) < 0)
-                                return -errno;
+                                continue;
 
                         if (st.st_dev != st2.st_dev)
                                 continue;
@@ -258,7 +256,7 @@ static int directory_delete(int dfd, const char *exclude) {
                         if (dfd2 < 0)
                                 return -errno;
 
-                        r = directory_delete(dfd2, NULL);
+                        r = directory_delete(&dfd2, NULL);
                         if (r < 0)
                                 return r;
 
@@ -268,11 +266,10 @@ static int directory_delete(int dfd, const char *exclude) {
                         continue;
                 }
 
-                if (unlinkat(dfd, d->d_name, 0) < 0)
+                if (unlinkat(dirfd(dir), d->d_name, 0) < 0)
                         return -errno;
         }
 
-        closedir(dir);
         return 0;
 }
 
@@ -283,23 +280,21 @@ static int root_switch(const char *newroot) {
                 "/sys",
         };
         unsigned i;
-        int rootfd;
+        _c_cleanup_(c_closep) int rootfd = -1;
         int r;
 
         rootfd = openat(AT_FDCWD, "/", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
         if (rootfd < 0)
                 return -errno;
 
-        for (i = 0; i< ARRAY_SIZE(mounts); i++) {
-                char *target = NULL;
+        for (i = 0; i< C_ARRAY_SIZE(mounts); i++) {
+                _c_cleanup_(c_freep) char *target = NULL;
 
                 if (asprintf(&target, "%s%s", newroot, mounts[i]) < 0)
                         return -ENOMEM;
 
                 if (mount(mounts[i], target, NULL, MS_MOVE, NULL) < 0)
                         return -errno;
-
-                free(target);
         }
 
         if (chdir(newroot) < 0)
@@ -314,11 +309,10 @@ static int root_switch(const char *newroot) {
         if (chdir("/") < 0)
                 return -errno;
 
-        r = directory_delete(rootfd, newroot + 1);
+        r = directory_delete(&rootfd, newroot + 1);
         if (r < 0)
                 return r;
 
-        close(rootfd);
         return 0;
 }
 
@@ -367,6 +361,10 @@ int main(int argc, char **argv) {
         argv[0] = name;
         prctl(PR_SET_NAME, name);
 
+        umask(0);
+        if (setsid() < 0)
+                return EXIT_FAILURE;
+
         if (sigaction(SIGCHLD, &sa, NULL) < 0)
                 return -errno;
 
@@ -377,10 +375,6 @@ int main(int argc, char **argv) {
         /* do a dummy call to disable the time zone warping magic */
         r  = settimeofday(NULL, &tz);
         if (r < 0)
-                return EXIT_FAILURE;
-
-        umask(0);
-        if (setsid() < 0)
                 return EXIT_FAILURE;
 
         r = modules_load();

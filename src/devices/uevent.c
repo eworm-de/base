@@ -26,6 +26,7 @@
 #include <linux/netlink.h>
 #include <sys/socket.h>
 
+#include "bus1/c-shared.h"
 #include "uevent.h"
 
 enum {
@@ -36,8 +37,8 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
                           int (* cb)(int devfd,
                                      const char *subsystem, const char *devtype,
                                      const char *devname, const char *modalias)) {
-        int dfd;
-        DIR *dir;
+        _c_cleanup_(c_closep) int dfd = -1;
+        _c_cleanup_(c_closedirp) DIR *dir = NULL;
         struct dirent *d;
         int r;
 
@@ -49,79 +50,80 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
         dir = fdopendir(dfd);
         if (!dir)
                 return -errno;
+        dfd = -1;
 
         /* /sys/bus/pci, /sys/class/block */
         for (d = readdir(dir); d; d = readdir(dir)) {
-                DIR *dir2;
+                _c_cleanup_(c_closep) int dfd2 = -1;
+                _c_cleanup_(c_closedirp) DIR *dir2 = NULL;
                 struct dirent *d2;
 
                 if (d->d_name[0] == '.')
                         continue;
 
-                dfd = openat(dirfd(dir), d->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
-                if (dfd < 0)
-                        return -errno;
+                dfd2 = openat(dirfd(dir), d->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                if (dfd2 < 0)
+                        continue;
 
                 /* /sys/bus/pci/devices */
                 if (subdir) {
-                        int fd;
+                        _c_cleanup_(c_closep) int dfd3 = -1;
 
-                        fd = openat(dfd, subdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
-                        if (fd < 0)
-                                return -errno;
+                        dfd3 = openat(dfd2, subdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                        if (dfd3 < 0)
+                                continue;
 
-                        close(dfd);
-                        dfd = fd;
+                        close(dfd2);
+                        dfd2 = dfd3;
+                        dfd3 = -1;
                 }
 
-                dir2 = fdopendir(dfd);
+                dir2 = fdopendir(dfd2);
                 if (!dir2)
                         return -errno;
+                dfd2 = -1;
 
                 /* /sys/bus/pci/0000:00:00.0, /sys/class/block/sda */
                 for (d2 = readdir(dir2); d2; d2 = readdir(dir2)) {
+                        _c_cleanup_(c_closep) int dfd3 = -1;
                         int fd;
-                        FILE *f;
+                        _c_cleanup_(c_fclosep) FILE *f = NULL;
                         char line[4096];
                         char *s;
                         ssize_t len;
-                        char *subsystem = NULL;
-                        char *devtype = NULL;
-                        char *devname = NULL;
-                        char *modalias = NULL;
+                        _c_cleanup_(c_freep) char *subsystem = NULL;
+                        _c_cleanup_(c_freep) char *devtype = NULL;
+                        _c_cleanup_(c_freep) char *devname = NULL;
+                        _c_cleanup_(c_freep) char *modalias = NULL;
 
                         if (d2->d_name[0] == '.')
                                 continue;
 
-                        dfd = openat(dirfd(dir2), d2->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
-                        if (dfd < 0) {
-                                if (errno == ENOTDIR)
-                                        continue;
+                        dfd3 = openat(dirfd(dir2), d2->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                        if (dfd3 < 0)
+                                continue;
 
-                                return dfd;
-                        }
-
-                        len = readlinkat(dfd, "subsystem", line, sizeof(line));
+                        len = readlinkat(dfd3, "subsystem", line, sizeof(line));
                         if (len < 0)
-                                return -EINVAL;
+                                continue;
                         if (len <= 0 || len == (ssize_t)sizeof(line))
-                                return -EINVAL;
+                                continue;
                         line[len] = '\0';
 
                         s = strrchr(line, '/');
                         if (!s)
-                                return -EINVAL;
+                                continue;
                         subsystem = strdup(s + 1);
                         if (!subsystem)
                                 return -ENOMEM;
 
-                        fd = openat(dfd, "uevent", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
+                        fd = openat(dfd3, "uevent", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
                         if (fd < 0)
-                                return -errno;
+                                continue;
 
                         f = fdopen(fd, "re");
                         if (!f)
-                                return -errno;
+                                continue;
 
                         while (fgets(line, sizeof(line), f) != NULL) {
                                 char *value;
@@ -133,13 +135,13 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
 
                                 value = strchr(line, '=');
                                 if (!value)
-                                        return -EINVAL;
+                                        continue;
                                 *value = '\0';
                                 value++;
 
                                 end = strchr(value, '\n');
                                 if (!end)
-                                        return -EINVAL;
+                                        continue;
                                 *end = '\0';
 
                                 if (strcmp(line, "DEVTYPE") == 0) {
@@ -160,20 +162,8 @@ static int sysfs_coldplug(int devfd, const char *path, const char *subdir,
                         r = cb(devfd, subsystem, devtype, devname, modalias);
                         if (r < 0)
                                 return r;
-
-                        free(subsystem);
-                        free(devtype);
-                        free(devname);
-                        free(modalias);
-
-                        fclose(f);
-                        close(dfd);
                 }
-
-                closedir(dir2);
         }
-
-        closedir(dir);
 
         return 0;
 }
@@ -226,7 +216,11 @@ int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
         char buf[4096];
         ssize_t buflen;
         const char *s;
-        char *ac = NULL, *ss = NULL, *dt = NULL, *dn = NULL, *ma = NULL;
+        _c_cleanup_(c_freep) char *ac = NULL;
+        _c_cleanup_(c_freep) char *ss = NULL;
+        _c_cleanup_(c_freep) char *dt = NULL;
+        _c_cleanup_(c_freep) char *dn = NULL;
+        _c_cleanup_(c_freep) char *ma = NULL;
         unsigned int i;
 
         iov.iov_base = buf;
@@ -284,49 +278,59 @@ int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
                 *value = '\0';
                 value++;
 
-                if (strcmp(key, "ACTION") == 0)
-                        ac = value;
-                if (strcmp(key, "SUBSYSTEM") == 0)
-                        ss = value;
-                else if (strcmp(key, "DEVTYPE") == 0)
-                        dt = value;
-                else if (strcmp(key, "DEVNAME") == 0)
-                        dn = value;
-                else if (strcmp(key, "MODALIAS") == 0)
-                        ma = value;
+                if (strcmp(key, "ACTION") == 0) {
+                        ac = strdup(value);
+                        if (!ac)
+                                return -ENOMEM;
+                } else if (strcmp(key, "SUBSYSTEM") == 0) {
+                        free(ss);
+                        ss = strdup(value);
+                        if (!ss)
+                                return -ENOMEM;
+                } else if (strcmp(key, "DEVTYPE") == 0) {
+                        free(dt);
+                        dt = strdup(value);
+                        if (!dt)
+                                return -ENOMEM;
+                } else if (strcmp(key, "DEVNAME") == 0) {
+                        free(dn);
+                        dn = strdup(value);
+                        if (!dn)
+                                return -ENOMEM;
+                } else if (strcmp(key, "MODALIAS") == 0) {
+                        free(ma);
+                        ma = strdup(value);
+                        if (!ma)
+                                return -ENOMEM;
+                }
         }
 
         if (!ac || !ss)
                 return -EBADMSG;
 
-        if (action && ac) {
-                *action = strdup(ac);
-                if (!*action)
-                        return -ENOMEM;
+        if (action) {
+                *action = ac;
+                ac = NULL;
         }
 
-        if (subsystem && ss) {
-                *subsystem = strdup(ss);
-                if (!*subsystem)
-                        return -ENOMEM;
+        if (subsystem) {
+                *subsystem = ss;
+                ss = NULL;
         }
 
-        if (devtype && dt) {
-                *devtype = strdup(dt);
-                if (!*devtype)
-                        return -ENOMEM;
+        if (devtype) {
+                *devtype = dt;
+                 dt = NULL;
         }
 
-        if (devname && dn) {
-                *devname = strdup(dn);
-                if (!*devname)
-                        return -ENOMEM;
+        if (devname) {
+                *devname = dn;
+                dn = NULL;
         }
 
-        if (modalias && ma) {
-                *modalias = strdup(ma);
-                if (!*modalias)
-                        return -ENOMEM;
+        if (modalias) {
+                *modalias = ma;
+                ma = NULL;
         }
 
         return 0;

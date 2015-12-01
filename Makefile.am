@@ -34,6 +34,7 @@ bin_PROGRAMS += \
 	org.bus1.rdinit
 
 org_bus1_rdinit_SOURCES = \
+	src/bus1/c-shared.h \
 	src/rdinit/main.c
 
 org_bus1_rdinit_CFLAGS = \
@@ -50,7 +51,8 @@ bin_PROGRAMS += \
 	org.bus1.devices
 
 org_bus1_devices_SOURCES = \
-	src/bus1/bus1-platform.h \
+	src/bus1/identity.h \
+	src/bus1/c-shared.h \
 	src/devices/uevent.h \
 	src/devices/uevent.c \
 	src/devices/permissions.h \

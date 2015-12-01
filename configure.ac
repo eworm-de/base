@@ -133,7 +133,7 @@ AC_CONFIG_FILES([Makefile])
 
 AC_OUTPUT
 AC_MSG_RESULT([
-        $PACKAGE_NAME $VERSION ($LIBRARY_CURRENT.$LIBRARY_AGE.$LIBRARY_REVISION)
+        $PACKAGE_NAME $VERSION
         debug:                  ${enable_debug}
 
         prefix:                 ${prefix}
