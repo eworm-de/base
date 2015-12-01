@@ -338,14 +338,30 @@ static int bash_execute(void) {
                 "TERM=linux",
                 NULL
         };
+        pid_t p;
 
-        if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
+        p = fork();
+        if (p < 0)
                 return -errno;
 
-        printf("Welcome to bus1!\n\n");
+        if (p == 0) {
+                if (setsid() < 0)
+                        return -errno;
 
-        execve(argv[0], (char **)argv, (char **)env);
-        return -errno;
+                if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
+                        return -errno;
+
+                printf("Welcome to bus1!\n\n");
+
+                execve(argv[0], (char **)argv, (char **)env);
+                return -errno;
+        }
+
+        p = waitpid(p, NULL, 0);
+        if (p < 0)
+                return errno;
+
+        return 0;
 }
 
 int main(int argc, char **argv) {

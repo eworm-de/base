@@ -31,6 +31,17 @@ AM_LDFLAGS = $(OUR_LDFLAGS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
+	org.bus1.init
+
+org_bus1_init_SOURCES = \
+	src/bus1/c-shared.h \
+	src/init/main.c
+
+org_bus1_init_CFLAGS = \
+	$(AM_CFLAGS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
 	org.bus1.rdinit
 
 org_bus1_rdinit_SOURCES = \
