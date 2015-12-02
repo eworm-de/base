@@ -1,0 +1,17 @@
+org.bus1.rdinit: /init to use in the initrd:
+ - mouts /dev, /sys, /proc
+ - starts org.bus1.devices
+ - mounts the bus1 disk partition to /bus1
+ - mounts the system squashfs image in /bus1/system/ to /usr
+ - mounts /bus1/data to /var
+ - executes org.bus1.init
+
+org.bus1.devices: hotplug device manager and kernel module loader
+ - listens to kernel uevents
+ - crawls /sys for coldplug
+ - adjusts platform permissions in /dev
+ - loads kernel modules for plugged devices
+
+org.bus1.init
+ - starts org.bus1.devices
+ - starts bash
