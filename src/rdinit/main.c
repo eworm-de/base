@@ -351,7 +351,8 @@ static int bash_execute(void) {
                 if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
                         return -errno;
 
-                printf("Welcome to bus1!\n\n");
+                printf("Welcome to org.bus1.rdinit.\n\n"
+                       "Type exit to continue.\n\n");
 
                 execve(argv[0], (char **)argv, (char **)env);
                 return -errno;
@@ -362,6 +363,33 @@ static int bash_execute(void) {
                 return errno;
 
         return 0;
+}
+
+static int kernel_cmdline_option(const char *key) {
+        _c_cleanup_(c_fclosep) FILE *f = NULL;
+        char line[4096];
+        char *s;
+        size_t l;
+
+        f = fopen("/proc/cmdline", "re");
+        if (!f)
+                return false;
+
+        if (fgets(line, sizeof(line), f) == NULL)
+                return false;
+
+        s = strstr(line, key);
+        if (!s)
+                return false;
+
+        if (s > line && s[-1] != ' ')
+                return false;
+
+        l = strlen(key);
+        if (s[l] != ' ' && s[l] != '\0' && s[l] != '\n')
+                return false;
+
+        return true;
 }
 
 int main(int argc, char **argv) {
@@ -416,6 +444,9 @@ int main(int argc, char **argv) {
         if (symlink("bus1/data", "/sysroot/var") < 0)
                 return EXIT_FAILURE;
 
+        if (kernel_cmdline_option("rd.shell"))
+                bash_execute();
+
         if (kill(pid_devices, SIGTERM) < 0)
                 return EXIT_FAILURE;
 
@@ -424,6 +455,5 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         init_execute();
-        bash_execute();
         return EXIT_FAILURE;
 }
