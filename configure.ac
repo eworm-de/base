@@ -111,7 +111,9 @@ AC_SUBST([OUR_CFLAGS], "$with_cflags")
 AC_SUBST([OUR_CPPFLAGS], "$with_cppflags")
 AC_SUBST([OUR_LDFLAGS], "$with_ldflags")
 
-------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# dependencies
+
 PKG_CHECK_MODULES(KMOD, [ libkmod >= 15 ],
         [AC_DEFINE(HAVE_KMOD, 1, [Define if kmod is available])],
         AC_MSG_ERROR([*** libkmod not found]))
