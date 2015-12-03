@@ -33,7 +33,7 @@
 
 #include <libkmod.h>
 
-#include "bus1/c-shared.h"
+#include "c-shared.h"
 
 static const struct mountpoint {
         const char *what;

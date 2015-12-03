@@ -24,7 +24,7 @@
 #include <libkmod.h>
 #include <sys/prctl.h>
 
-#include "bus1/c-shared.h"
+#include "c-shared.h"
 #include "module.h"
 
 static void module_log(void *data, int priority, const char *file, int line, const char *fn, const char *format, va_list args) {}

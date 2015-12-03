@@ -27,7 +27,7 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 
-#include "bus1/c-shared.h"
+#include "c-shared.h"
 
 static pid_t service_start(const char *prog) {
         const char *argv[] = {

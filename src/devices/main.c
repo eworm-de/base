@@ -25,7 +25,7 @@
 #include <sys/signalfd.h>
 #include <sys/epoll.h>
 
-#include "bus1/c-shared.h"
+#include "c-shared.h"
 #include "uevent.h"
 #include "permissions.h"
 #include "module.h"

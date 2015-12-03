@@ -23,7 +23,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include "bus1/identity.h"
+#include "bus1/b1-identity.h"
 #include "permissions.h"
 
 #define ELEMENTSOF(x) (sizeof(x) / sizeof((x)[0]))

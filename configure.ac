@@ -9,7 +9,7 @@ AC_INIT([init],
         [libbus1],
         [http://www.github.com/bus1/init])
 
-AC_CONFIG_SRCDIR([src/bus1/identity.h])
+AC_CONFIG_SRCDIR([src/include/bus1/b1-identity.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
