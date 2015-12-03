@@ -27,10 +27,13 @@
 
 #include "c-shared.h"
 #include "uevent.h"
+#include "sysfs.h"
 #include "permissions.h"
 #include "module.h"
 
-static int uevent_cb(int devfd, const char *subsystem, const char *devtype, const char *devname, const char *modalias) {
+static int uevent_cb(int sysfd, const char *subsystem, const char *devtype,
+                     int devfd, const char *devname, const char *modalias,
+                     void *userdata) {
         int r;
 
         if (devname) {
@@ -55,11 +58,16 @@ int main(int argc, char **argv) {
         sigset_t mask;
         struct epoll_event ep_monitor = { .events = EPOLLIN };
         struct epoll_event ep_signal = { .events = EPOLLIN };
+        _c_cleanup_(c_closep) int sysfd = -1;
         _c_cleanup_(c_closep) int devfd = -1;
         int r;
 
         devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (devfd < 0)
+                return EXIT_FAILURE;
+
+        sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (sysfd < 0)
                 return EXIT_FAILURE;
 
         fd_ep = epoll_create1(EPOLL_CLOEXEC);
@@ -85,7 +93,7 @@ int main(int argc, char **argv) {
             epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_signal, &ep_signal) < 0)
                 return EXIT_FAILURE;
 
-        r = uevent_coldplug(devfd, uevent_cb);
+        r = sysfs_enumerate(sysfd, NULL, NULL, devfd, uevent_cb, NULL);
         if (r < 0)
                 return EXIT_FAILURE;
 

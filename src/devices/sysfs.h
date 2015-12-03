@@ -16,6 +16,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int uevent_connect(void);
-int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
-                           char **devname, char **modalias);
+int sysfs_enumerate(int sysfd, const char *subsystem, const char *devtype,
+                    int devfd,
+                    int (*cb)(int sysfd, const char *subsystem, const char *devtype,
+                              int devfd, const char *devname, const char *modalias,
+                              void *userdata),
+                    void *userdata);

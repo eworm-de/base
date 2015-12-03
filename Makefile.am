@@ -65,6 +65,8 @@ org_bus1_devices_SOURCES = \
 	src/include/c-shared.h \
 	src/devices/uevent.h \
 	src/devices/uevent.c \
+	src/devices/sysfs.h \
+	src/devices/sysfs.c \
 	src/devices/permissions.h \
 	src/devices/permissions.c \
 	src/devices/module.h \
