@@ -24,8 +24,9 @@
 #include <fcntl.h>
 #include <sys/signalfd.h>
 #include <sys/epoll.h>
+#include <c-macro.h>
+#include <c-cleanup.h>
 
-#include "c-shared.h"
 #include "uevent.h"
 #include "sysfs.h"
 #include "permissions.h"

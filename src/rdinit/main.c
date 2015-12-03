@@ -30,10 +30,10 @@
 #include <sys/mount.h>
 #include <sys/wait.h>
 #include <linux/loop.h>
-
 #include <libkmod.h>
 
-#include "c-shared.h"
+#include <c-macro.h>
+#include <c-cleanup.h>
 
 static const struct mountpoint {
         const char *what;

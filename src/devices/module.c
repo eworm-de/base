@@ -23,8 +23,9 @@
 #include <pthread.h>
 #include <libkmod.h>
 #include <sys/prctl.h>
+#include <c-macro.h>
+#include <c-cleanup.h>
 
-#include "c-shared.h"
 #include "module.h"
 
 static void module_log(void *data, int priority, const char *file, int line, const char *fn, const char *format, va_list args) {}

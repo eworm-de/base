@@ -22,8 +22,9 @@
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <c-macro.h>
+#include <c-cleanup.h>
 
-#include "c-shared.h"
 #include "sysfs.h"
 
 static int enumerate_devices(int sysfd, const char *devicesdir, const char *devtype,

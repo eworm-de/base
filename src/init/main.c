@@ -26,8 +26,8 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
-
-#include "c-shared.h"
+#include <c-macro.h>
+#include <c-cleanup.h>
 
 static pid_t service_start(const char *prog) {
         const char *argv[] = {

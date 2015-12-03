@@ -24,8 +24,9 @@
 #include <linux/filter.h>
 #include <linux/netlink.h>
 #include <sys/socket.h>
+#include <c-macro.h>
+#include <c-cleanup.h>
 
-#include "c-shared.h"
 #include "uevent.h"
 
 enum {
