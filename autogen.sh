@@ -14,7 +14,10 @@ fi
 
 cd $oldpwd
 
-if [ "x$1" = "xc" ]; then
+if [ "x$1" = "xb" ]; then
+        $topdir/configure --enable-debug --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib/x86_64-linux-gnu
+        make clean
+elif [ "x$1" = "xc" ]; then
         $topdir/configure --enable-debug $args
         make clean
 elif [ "x$1" = "xl" ]; then
