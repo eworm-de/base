@@ -366,7 +366,7 @@ static int bash_execute(void) {
         return 0;
 }
 
-static int kernel_cmdline_option(const char *key) {
+static bool kernel_cmdline_option(const char *key) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         char line[4096];
         char *s;
@@ -393,6 +393,32 @@ static int kernel_cmdline_option(const char *key) {
         return true;
 }
 
+static int bus1_release(char **release) {
+        _c_cleanup_(c_fclosep) FILE *f = NULL;
+        char line[4096];
+        size_t len;
+
+        f = fopen("/etc/bus1-release", "re");
+        if (!f)
+                return -errno;
+
+        if (fgets(line, sizeof(line), f) == NULL)
+                return -errno;
+
+        len = strlen(line);
+        if (len < 1)
+                return -EINVAL;
+
+        if (line[len - 1] == '\n')
+                line[len - 1] = '\0';
+
+        *release = strdup(line);
+        if (!*release)
+                return -ENOMEM;
+
+        return 0;
+}
+
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdnit";
         struct sigaction sa = {
@@ -401,6 +427,9 @@ int main(int argc, char **argv) {
         };
         struct timezone tz = {};
         pid_t pid_devices = 0;
+        bool shell;
+        _c_cleanup_(c_freep) char *release = NULL;
+        _c_cleanup_(c_freep) char *system = NULL;
         int r;
 
         argv[0] = name;
@@ -422,6 +451,13 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
+        shell = kernel_cmdline_option("rd.shell");
+        if (shell)
+                bash_execute();
+
+        if (bus1_release(&release) < 0)
+                return EXIT_FAILURE;
+
         r = modules_load();
         if (r < 0)
                 return EXIT_FAILURE;
@@ -438,14 +474,17 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        r = bus1_system_mount("/sysroot/bus1/system/system.img", "/sysroot/usr");
+        if (asprintf(&system, "/sysroot/bus1/system/%s.img", release) < 0)
+                return EXIT_FAILURE;
+
+        r = bus1_system_mount(system, "/sysroot/usr");
         if (r < 0)
                 return EXIT_FAILURE;
 
         if (symlink("bus1/data", "/sysroot/var") < 0)
                 return EXIT_FAILURE;
 
-        if (kernel_cmdline_option("rd.shell"))
+        if (shell)
                 bash_execute();
 
         if (kill(pid_devices, SIGTERM) < 0)
