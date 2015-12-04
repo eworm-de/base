@@ -126,8 +126,9 @@ static int newroot_create(const char *root) {
                 const char *file;
                 const char *target;
         } links[] = {
-                { "etc",                        "usr/etc" },
                 { "bin",                        "usr/bin" },
+                { "etc",                        "usr/etc" },
+                { "lib",                        "usr/lib" },
                 { "sbin",                       "usr/bin" },
                 { "lib64/ld-linux-x86-64.so.2", "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" },
         };
