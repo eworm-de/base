@@ -23,7 +23,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <signal.h>
-#include <dirent.h>
+#include <ctype.h>
 #include <sys/prctl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -31,9 +31,13 @@
 #include <sys/mount.h>
 #include <linux/loop.h>
 #include <libkmod.h>
+#include <blkid/blkid.h>
 #include <c-macro.h>
 #include <c-cleanup.h>
 
+#include <bus1/b1-platform.h>
+//FIXME: use bus
+#include <../devices/sysfs.h>
 #include <util.h>
 
 static const struct mountpoint {
@@ -153,11 +157,144 @@ static int newroot_create(const char *root) {
         return 0;
 }
 
-static int bus1_disk_mount(const char *dir) {
+C_DEFINE_CLEANUP_FUNC(blkid_probe, blkid_free_probe);
+
+static int bus1_disk_probe(const char *disk, const char *disk_uuid, char **partition) {
+        const char *s;
+        _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
+        blkid_partlist pl;
+        int i;
+        int r;
+
+        b = blkid_new_probe_from_filename(disk);
+        if (!b)
+                return -EIO;
+
+        blkid_probe_enable_partitions(b, 1);
+        blkid_probe_set_partitions_flags(b, BLKID_PARTS_ENTRY_DETAILS);
+        r = blkid_do_safeprobe(b);
+        if (r < 0)
+                return r;
+
+        r = blkid_probe_lookup_value(b, "PTTYPE", &s, NULL);
+        if (r < 0)
+                return r;
+
+        if (strcmp(s, "gpt") != 0)
+                return -ENODEV;
+
+        r = blkid_probe_lookup_value(b, "PTUUID", &s, NULL);
+        if (r < 0)
+                return r;
+
+        if (disk_uuid && strcmp(s, disk_uuid) != 0)
+                return -ENODEV;
+
+        pl = blkid_probe_get_partitions(b);
+        if(!pl)
+                return -EIO;
+
+        for (i = 0; i < blkid_partlist_numof_partitions(pl); i++) {
+                blkid_partition p;
+
+                p = blkid_partlist_get_partition(pl, i);
+                s = blkid_partition_get_type_string(p);
+                if (!s)
+                        continue;
+
+                if (strcmp(s, BUS1_GPT_DISK_UUID) == 0) {
+                        if (isdigit(disk[strlen(disk) - 1])) {
+                                if (asprintf(partition, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
+                                        return -ENOMEM;
+                        } else {
+                                if (asprintf(partition, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
+                                        return -ENOMEM;
+                        }
+
+                        return 0;
+                }
+        }
+
+        return -ENODEV;
+}
+
+static int bus1_partition_probe(const char *partition, char **fstype) {
+        _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
+        const char *s;
+        int r;
+
+        b = blkid_new_probe_from_filename(partition);
+        if (!b)
+                return -EIO;
+
+        r = blkid_do_safeprobe(b);
+        if (r < 0)
+                return r;
+
+        r = blkid_probe_lookup_value(b, "TYPE", &s, NULL);
+        if (r < 0)
+                return r;
+
+        *fstype = strdup(s);
+        if (!*fstype)
+                return -ENOMEM;
+
+        return 0;
+}
+
+static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
+                    int devfd, const char *devname, const char *modalias,
+                    const void *in, void *out) {
+        _c_cleanup_(c_freep) char *device = NULL;
+        const char *disk_uuid = in;
+        char **partition = out;
+        int r;
+
+        if (asprintf(&device, "/dev/%s", devname) < 0)
+                return -ENOMEM;
+
+        r = bus1_disk_probe(device, disk_uuid, partition);
+        if (r < 0)
+                return 0;
+
+        return 1;
+}
+
+static int bus1_disk_find(const char *disk_uuid, char **partition) {
+        _c_cleanup_(c_closep) int sysfd = -1;
+        int r;
+
+        sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (sysfd < 0)
+                return -errno;
+
+        r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, disk_uuid, partition);
+        if (r < 0)
+                return r;
+        if (r == 1)
+                return 0;
+
+        //FIXME: wait for events and retry
+        return -ENOENT;
+}
+
+static int bus1_disk_mount(const char *disk_uuid, const char *dir) {
+        _c_cleanup_(c_freep) char *partition = NULL;
+        _c_cleanup_(c_freep) char *fstype = NULL;
+        int r;
+
+        r = bus1_disk_find(disk_uuid, &partition);
+        if (r < 0)
+                return r;
+
+        r = bus1_partition_probe(partition, &fstype);
+        if (r < 0)
+                return r;
+
         if (mkdir(dir, 0755) < 0)
                 return -errno;
 
-        if (mount("/dev/sda2", dir, "xfs", 0, NULL) < 0)
+        if (mount(partition, dir, fstype, 0, NULL) < 0)
                 return -errno;
 
         return 0;
@@ -308,6 +445,7 @@ static int init_execute(void) {
 
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdinit";
+        _c_cleanup_(c_freep) char *disk = NULL;
         struct sigaction sa = {
                 .sa_handler = SIG_IGN,
                 .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
@@ -341,7 +479,7 @@ int main(int argc, char **argv) {
         if (bus1_release(&release) < 0)
                 return EXIT_FAILURE;
 
-        shell = kernel_cmdline_option("rd.shell");
+        shell = kernel_cmdline_option("rd.shell", NULL);
         if (shell)
                 bash_execute(release);
 
@@ -357,7 +495,10 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        r = bus1_disk_mount("/sysroot/bus1");
+        if (!kernel_cmdline_option("disk", &disk))
+                return EXIT_FAILURE;
+
+        r = bus1_disk_mount(disk, "/sysroot/bus1");
         if (r < 0)
                 return EXIT_FAILURE;
 

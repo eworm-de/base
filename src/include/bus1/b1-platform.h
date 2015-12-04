@@ -16,7 +16,4 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int bus1_release(char **release);
-pid_t service_start(const char *prog);
-int bash_execute(const char *release);
-bool kernel_cmdline_option(const char *key, char **value);
+#define BUS1_GPT_DISK_UUID "e0243462-d2d0-4c3b-ad28-b365f2da3b4d"

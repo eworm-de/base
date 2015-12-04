@@ -91,10 +91,10 @@ pid_t service_start(const char *prog) {
         return p;
 }
 
-bool kernel_cmdline_option(const char *key) {
+bool kernel_cmdline_option(const char *key, char **value) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         char line[4096];
-        char *s;
+        char *s, *e;
         size_t l;
 
         f = fopen("/proc/cmdline", "re");
@@ -112,7 +112,22 @@ bool kernel_cmdline_option(const char *key) {
                 return false;
 
         l = strlen(key);
-        if (s[l] != ' ' && s[l] != '\0' && s[l] != '\n')
+        if (s[l] == ' ' || s[l] == '\n')
+                return true;
+
+        if (s[l] != '=')
+                return false;
+
+        s = s + l + 1;
+        e = strchr(s, ' ');
+        if (!e)
+                e = strchr(s, '\n');
+        if (!e)
+                return false;
+
+        e[0] = '\0';
+        *value = strdup(s);
+        if (!*value)
                 return false;
 
         return true;

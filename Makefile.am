@@ -25,11 +25,14 @@ AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I $(top_srcdir)/src/include \
 	-I $(top_srcdir)/src/shared \
-	-I $(top_srcdir)/../libbus1/src/include \
 	$(OUR_CPPFLAGS)
 
 AM_CFLAGS = $(OUR_CFLAGS)
 AM_LDFLAGS = $(OUR_LDFLAGS)
+
+# ------------------------------------------------------------------------------
+BUS1_CFLAGS = -I $(top_srcdir)/../libbus1/src/include
+BUS1_LIBS = -L $(top_srcdir)/../libbus1/.libs
 
 # ------------------------------------------------------------------------------
 noinst_LIBRARIES += \
@@ -39,6 +42,10 @@ libshared_a_SOURCES = \
 	src/shared/util.h \
 	src/shared/util.c
 
+libshared_a_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
+
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
 	org.bus1.init
@@ -47,25 +54,31 @@ org_bus1_init_SOURCES = \
 	src/init/main.c
 
 org_bus1_init_CFLAGS = \
-	$(AM_CFLAGS)
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
 
 org_bus1_init_LDADD = \
-	libshared.a
+	libshared.a \
+	$(BUS1_LIBS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
 	org.bus1.rdinit
 
 org_bus1_rdinit_SOURCES = \
+	src/devices/sysfs.h \
+	src/devices/sysfs.c \
 	src/rdinit/main.c
 
 org_bus1_rdinit_CFLAGS = \
 	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS) \
 	$(KMOD_CFLAGS) \
 	$(BLKID_CFLAGS)
 
 org_bus1_rdinit_LDADD = \
 	libshared.a \
+	$(BUS1_LIBS) \
 	$(KMOD_LIBS) \
 	$(BLKID_LIBS)
 
@@ -87,11 +100,13 @@ org_bus1_devices_SOURCES = \
 
 org_bus1_devices_CFLAGS = \
 	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS) \
 	$(KMOD_CFLAGS) \
 	-pthread
 
 org_bus1_devices_LDADD = \
 	libshared.a \
+	$(BUS1_LIBS) \
 	$(KMOD_LIBS)
 
 # ------------------------------------------------------------------------------

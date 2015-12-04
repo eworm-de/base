@@ -32,9 +32,9 @@
 #include "permissions.h"
 #include "module.h"
 
-static int uevent_cb(int sysfd, const char *subsystem, const char *devtype,
-                     int devfd, const char *devname, const char *modalias,
-                     void *userdata) {
+static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
+                    int devfd, const char *devname, const char *modalias,
+                    const void *in, void *out) {
         int r;
 
         if (devname) {
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
             epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_signal, &ep_signal) < 0)
                 return EXIT_FAILURE;
 
-        r = sysfs_enumerate(sysfd, NULL, NULL, devfd, uevent_cb, NULL);
+        r = sysfs_enumerate(sysfd, NULL, NULL, devfd, sysfs_cb, NULL, NULL);
         if (r < 0)
                 return EXIT_FAILURE;
 
