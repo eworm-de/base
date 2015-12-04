@@ -19,15 +19,25 @@ SUBDIRS = .
 
 CLEANFILES = $(BUILT_SOURCES)
 bin_PROGRAMS =
+noinst_LIBRARIES =
 
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I $(top_srcdir)/src/include \
+	-I $(top_srcdir)/src/shared \
 	-I $(top_srcdir)/../libbus1/src/include \
 	$(OUR_CPPFLAGS)
 
 AM_CFLAGS = $(OUR_CFLAGS)
 AM_LDFLAGS = $(OUR_LDFLAGS)
+
+# ------------------------------------------------------------------------------
+noinst_LIBRARIES += \
+	libshared.a
+
+libshared_a_SOURCES = \
+	src/shared/util.h \
+	src/shared/util.c
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
@@ -38,6 +48,9 @@ org_bus1_init_SOURCES = \
 
 org_bus1_init_CFLAGS = \
 	$(AM_CFLAGS)
+
+org_bus1_init_LDADD = \
+	libshared.a
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
@@ -52,6 +65,7 @@ org_bus1_rdinit_CFLAGS = \
 	$(BLKID_CFLAGS)
 
 org_bus1_rdinit_LDADD = \
+	libshared.a \
 	$(KMOD_LIBS) \
 	$(BLKID_LIBS)
 
@@ -77,6 +91,7 @@ org_bus1_devices_CFLAGS = \
 	-pthread
 
 org_bus1_devices_LDADD = \
+	libshared.a \
 	$(KMOD_LIBS)
 
 # ------------------------------------------------------------------------------

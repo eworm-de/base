@@ -29,65 +29,7 @@
 #include <c-macro.h>
 #include <c-cleanup.h>
 
-static pid_t service_start(const char *prog) {
-        const char *argv[] = {
-                prog,
-                NULL
-        };
-        const char *env[] = {
-                NULL
-        };
-        pid_t p;
-
-        p = fork();
-        if (p < 0)
-                return -errno;
-
-        if (p == 0) {
-                if (setsid() < 0)
-                        return -errno;
-
-                execve(argv[0], (char **)argv, (char **)env);
-                return -errno;
-        }
-
-        return p;
-}
-
-static int bash_execute(void) {
-        const char *argv[] = {
-                "/usr/bin/bash",
-                NULL
-        };
-        const char *env[] = {
-                "TERM=linux",
-                NULL
-        };
-        pid_t p;
-
-        p = fork();
-        if (p < 0)
-                return -errno;
-
-        if (p == 0) {
-                if (setsid() < 0)
-                        return -errno;
-
-                if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
-                        return -errno;
-
-                printf("Welcome to bus1!\n\n");
-
-                execve(argv[0], (char **)argv, (char **)env);
-                return -errno;
-        }
-
-        p = waitpid(p, NULL, 0);
-        if (p < 0)
-                return errno;
-
-        return 0;
-}
+#include "util.h"
 
 int main(int argc, char **argv) {
         struct sigaction sa = {
@@ -95,16 +37,20 @@ int main(int argc, char **argv) {
                 .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
         };
         pid_t pid_devices = 0;
+        _c_cleanup_(c_freep) char *release = NULL;
 
         umask(0);
 
         if (sigaction(SIGCHLD, &sa, NULL) < 0)
-                return -errno;
+                return EXIT_FAILURE;
+
+        if (bus1_release(&release) < 0)
+                return EXIT_FAILURE;
 
         pid_devices = service_start("/usr/bin/org.bus1.devices");
         if (pid_devices < 0)
                 return EXIT_FAILURE;
 
-        bash_execute();
+        bash_execute(release);
         return EXIT_FAILURE;
 }

@@ -28,6 +28,7 @@ AC_PROG_SED
 AC_PROG_GREP
 AC_PROG_AWK
 AC_PROG_CC_C99
+AC_PROG_RANLIB
 
 # ------------------------------------------------------------------------------
 # arguments

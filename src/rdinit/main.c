@@ -27,13 +27,14 @@
 #include <sys/prctl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <sys/mount.h>
-#include <sys/wait.h>
 #include <linux/loop.h>
 #include <libkmod.h>
-
 #include <c-macro.h>
 #include <c-cleanup.h>
+
+#include <util.h>
 
 static const struct mountpoint {
         const char *what;
@@ -197,31 +198,6 @@ static int bus1_system_mount(const char *image, const char *dir) {
         return 0;
 }
 
-static pid_t service_start(const char *prog) {
-        const char *argv[] = {
-                prog,
-                NULL
-        };
-        const char *env[] = {
-                NULL
-        };
-        pid_t p;
-
-        p = fork();
-        if (p < 0)
-                return -errno;
-
-        if (p == 0) {
-                if (setsid() < 0)
-                        return -errno;
-
-                execve(argv[0], (char **)argv, (char **)env);
-                return -errno;
-        }
-
-        return p;
-}
-
 static int directory_delete(int *dfd, const char *exclude) {
         _c_cleanup_(c_closedirp) DIR *dir = NULL;
         struct stat st;
@@ -330,97 +306,8 @@ static int init_execute(void) {
         return -errno;
 }
 
-static int bash_execute(void) {
-        const char *argv[] = {
-                "/usr/bin/bash",
-                NULL
-        };
-        const char *env[] = {
-                "TERM=linux",
-                NULL
-        };
-        pid_t p;
-
-        p = fork();
-        if (p < 0)
-                return -errno;
-
-        if (p == 0) {
-                if (setsid() < 0)
-                        return -errno;
-
-                if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
-                        return -errno;
-
-                printf("Welcome to org.bus1.rdinit.\n\n"
-                       "Type exit to continue.\n\n");
-
-                execve(argv[0], (char **)argv, (char **)env);
-                return -errno;
-        }
-
-        p = waitpid(p, NULL, 0);
-        if (p < 0)
-                return errno;
-
-        return 0;
-}
-
-static bool kernel_cmdline_option(const char *key) {
-        _c_cleanup_(c_fclosep) FILE *f = NULL;
-        char line[4096];
-        char *s;
-        size_t l;
-
-        f = fopen("/proc/cmdline", "re");
-        if (!f)
-                return false;
-
-        if (fgets(line, sizeof(line), f) == NULL)
-                return false;
-
-        s = strstr(line, key);
-        if (!s)
-                return false;
-
-        if (s > line && s[-1] != ' ')
-                return false;
-
-        l = strlen(key);
-        if (s[l] != ' ' && s[l] != '\0' && s[l] != '\n')
-                return false;
-
-        return true;
-}
-
-static int bus1_release(char **release) {
-        _c_cleanup_(c_fclosep) FILE *f = NULL;
-        char line[4096];
-        size_t len;
-
-        f = fopen("/etc/bus1-release", "re");
-        if (!f)
-                return -errno;
-
-        if (fgets(line, sizeof(line), f) == NULL)
-                return -errno;
-
-        len = strlen(line);
-        if (len < 1)
-                return -EINVAL;
-
-        if (line[len - 1] == '\n')
-                line[len - 1] = '\0';
-
-        *release = strdup(line);
-        if (!*release)
-                return -ENOMEM;
-
-        return 0;
-}
-
 int main(int argc, char **argv) {
-        static char name[] = "org.bus1.rdnit";
+        static char name[] = "org.bus1.rdinit";
         struct sigaction sa = {
                 .sa_handler = SIG_IGN,
                 .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
@@ -432,7 +319,7 @@ int main(int argc, char **argv) {
         _c_cleanup_(c_freep) char *system = NULL;
         int r;
 
-        argv[0] = name;
+        program_invocation_short_name = name;
         prctl(PR_SET_NAME, name);
 
         umask(0);
@@ -451,12 +338,12 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        shell = kernel_cmdline_option("rd.shell");
-        if (shell)
-                bash_execute();
-
         if (bus1_release(&release) < 0)
                 return EXIT_FAILURE;
+
+        shell = kernel_cmdline_option("rd.shell");
+        if (shell)
+                bash_execute(release);
 
         r = modules_load();
         if (r < 0)
@@ -485,7 +372,7 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         if (shell)
-                bash_execute();
+                bash_execute(release);
 
         if (kill(pid_devices, SIGTERM) < 0)
                 return EXIT_FAILURE;
