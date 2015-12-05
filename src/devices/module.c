@@ -33,34 +33,42 @@ static void module_log(void *data, int priority, const char *file, int line, con
 static void *module_thread(void *p) {
         struct kmod_ctx *ctx;
         _c_cleanup_(c_freep) char *modalias = p;
-        struct kmod_module *mod = NULL;
+        struct kmod_list *list = NULL;
         int r;
 
         prctl(PR_SET_NAME, (unsigned long) "module");
 
         ctx = kmod_new(NULL, NULL);
-        if (!ctx) {
-                r = -ENOMEM;
-                goto err;
-        }
+        if (!ctx)
+                return NULL;
 
         kmod_set_log_fn(ctx, module_log, NULL);
 
         r = kmod_load_resources(ctx);
         if (r < 0)
-                goto err;
+                goto out;
 
-        r = kmod_module_new_from_name(ctx, modalias, &mod);
+        r = kmod_module_new_from_lookup(ctx, modalias, &list);
         if (r < 0)
-                goto err;
+                goto out;
 
-        r = kmod_module_probe_insert_module(mod,
-                                            KMOD_PROBE_APPLY_BLACKLIST|KMOD_PROBE_IGNORE_COMMAND,
-                                            NULL, NULL, NULL, NULL);
-err:
-        kmod_module_unref(mod);
+        if (list) {
+                struct kmod_list *l;
+
+                kmod_list_foreach(l, list) {
+                        struct kmod_module *mod;
+
+                        mod = kmod_module_get_module(l);
+                        kmod_module_probe_insert_module(mod, KMOD_PROBE_APPLY_BLACKLIST|KMOD_PROBE_IGNORE_COMMAND,
+                                                        NULL, NULL, NULL, NULL);
+                        kmod_module_unref(mod);
+                }
+
+                kmod_module_unref_list(list);
+        }
+
+out:
         kmod_unref(ctx);
-
         return NULL;
 }
 

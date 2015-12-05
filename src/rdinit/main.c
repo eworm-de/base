@@ -109,7 +109,8 @@ static int modules_load(void) {
                 if (r < 0)
                         continue;
 
-                kmod_module_probe_insert_module(mod, KMOD_PROBE_APPLY_BLACKLIST, NULL, NULL, NULL, NULL);
+                kmod_module_probe_insert_module(mod, KMOD_PROBE_APPLY_BLACKLIST|KMOD_PROBE_IGNORE_COMMAND,
+                                                NULL, NULL, NULL, NULL);
                 kmod_module_unref(mod);
         }
 
@@ -262,19 +263,24 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
 
 static int bus1_disk_find(const char *disk_uuid, char **partition) {
         _c_cleanup_(c_closep) int sysfd = -1;
+        unsigned int i;
         int r;
 
         sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (sysfd < 0)
                 return -errno;
 
-        r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, disk_uuid, partition);
-        if (r < 0)
-                return r;
-        if (r == 1)
-                return 0;
+        for (i = 0; i < 10; i++) {
+                r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, disk_uuid, partition);
+                if (r < 0)
+                        return r;
+                if (r == 1)
+                        return 0;
 
-        //FIXME: wait for events and retry
+                //FIXME: wait for events and retry
+                sleep(1);
+        }
+
         return -ENOENT;
 }
 
