@@ -203,17 +203,18 @@ static int bus1_disk_probe(const char *disk, const char *disk_uuid, char **parti
                 if (!s)
                         continue;
 
-                if (strcmp(s, BUS1_GPT_DISK_UUID) == 0) {
-                        if (isdigit(disk[strlen(disk) - 1])) {
-                                if (asprintf(partition, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
-                                        return -ENOMEM;
-                        } else {
-                                if (asprintf(partition, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
-                                        return -ENOMEM;
-                        }
+                if (strcmp(s, BUS1_GPT_DISK_UUID) != 0)
+                        continue;
 
-                        return 0;
+                if (isdigit(disk[strlen(disk) - 1])) {
+                        if (asprintf(partition, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
+                                return -ENOMEM;
+                } else {
+                        if (asprintf(partition, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
+                                return -ENOMEM;
                 }
+
+                return 0;
         }
 
         return -ENODEV;
@@ -270,7 +271,7 @@ static int bus1_disk_find(const char *disk_uuid, char **partition) {
         if (sysfd < 0)
                 return -errno;
 
-        for (i = 0; i < 10; i++) {
+        for (i = 0; i < 15; i++) {
                 r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, disk_uuid, partition);
                 if (r < 0)
                         return r;
