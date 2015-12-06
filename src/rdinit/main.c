@@ -203,7 +203,7 @@ static int bus1_disk_probe(const char *disk, const char *disk_uuid, char **parti
                 if (!s)
                         continue;
 
-                if (strcmp(s, BUS1_GPT_DISK_UUID) != 0)
+                if (strcmp(s, BUS1_GPT_PARTITION_TYPE_UUID) != 0)
                         continue;
 
                 if (isdigit(disk[strlen(disk) - 1])) {
@@ -285,14 +285,9 @@ static int bus1_disk_find(const char *disk_uuid, char **partition) {
         return -ENOENT;
 }
 
-static int bus1_disk_mount(const char *disk_uuid, const char *dir) {
-        _c_cleanup_(c_freep) char *partition = NULL;
+static int bus1_disk_mount(const char *partition, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
-
-        r = bus1_disk_find(disk_uuid, &partition);
-        if (r < 0)
-                return r;
 
         r = bus1_partition_probe(partition, &fstype);
         if (r < 0)
@@ -453,6 +448,7 @@ static int init_execute(void) {
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdinit";
         _c_cleanup_(c_freep) char *disk = NULL;
+        _c_cleanup_(c_freep) char *partition = NULL;
         struct sigaction sa = {
                 .sa_handler = SIG_IGN,
                 .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
@@ -486,7 +482,7 @@ int main(int argc, char **argv) {
         if (bus1_release(&release) < 0)
                 return EXIT_FAILURE;
 
-        shell = kernel_cmdline_option("rd.shell", NULL);
+        shell = kernel_cmdline_option("rdshell", NULL);
         if (shell)
                 bash_execute(release);
 
@@ -502,10 +498,16 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        if (!kernel_cmdline_option("disk", &disk))
+        if (!kernel_cmdline_option("root", &partition) && !kernel_cmdline_option("disk", &disk))
                 return EXIT_FAILURE;
 
-        r = bus1_disk_mount(disk, "/sysroot/bus1");
+        if (!partition) {
+                r = bus1_disk_find(disk, &partition);
+                if (r < 0)
+                        return r;
+        }
+
+        r = bus1_disk_mount(partition, "/sysroot/bus1");
         if (r < 0)
                 return EXIT_FAILURE;
 

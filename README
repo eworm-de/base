@@ -1,7 +1,13 @@
 org.bus1.rdinit: /init to use in the initrd:
  - mouts /dev, /sys, /proc
  - starts org.bus1.devices
- - mounts the bus1 disk partition to /bus1
+ - reads the kernel commandline:
+   - "disk=UUID" searches and finds the disk with the given GPT UUID,
+     searches and finds the first GPT partition with the GPT partition
+     type UUID of e0243462-d2d0-4c3b-ad28-b365f2da3b4d
+   - root=<partition device node> specifies the partition device node
+     to mount
+ - mounts the bus1 partition to /bus1
  - mounts the system squashfs image in /bus1/system/ to /usr
  - mounts /bus1/data to /var
  - executes org.bus1.init

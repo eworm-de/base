@@ -23,7 +23,7 @@ noinst_LIBRARIES =
 
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
-	-I $(top_srcdir)/src/include \
+	-I $(top_srcdir)/src \
 	-I $(top_srcdir)/src/shared \
 	$(OUR_CPPFLAGS)
 
