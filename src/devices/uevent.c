@@ -24,8 +24,8 @@
 #include <linux/filter.h>
 #include <linux/netlink.h>
 #include <sys/socket.h>
-#include <c-macro.h>
-#include <c-cleanup.h>
+#include <bus1/c-macro.h>
+#include <bus1/c-cleanup.h>
 
 #include "uevent.h"
 

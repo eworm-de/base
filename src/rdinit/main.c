@@ -32,8 +32,8 @@
 #include <linux/loop.h>
 #include <libkmod.h>
 #include <blkid/blkid.h>
-#include <c-macro.h>
-#include <c-cleanup.h>
+#include <bus1/c-macro.h>
+#include <bus1/c-cleanup.h>
 
 #include <bus1/b1-platform.h>
 //FIXME: use bus

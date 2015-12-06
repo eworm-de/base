@@ -31,7 +31,7 @@ AM_CFLAGS = $(OUR_CFLAGS)
 AM_LDFLAGS = $(OUR_LDFLAGS)
 
 # ------------------------------------------------------------------------------
-BUS1_CFLAGS = -I $(top_srcdir)/../libbus1/src/include
+BUS1_CFLAGS = -I $(top_srcdir)/../libbus1/src
 BUS1_LIBS = -L $(top_srcdir)/../libbus1/.libs
 
 # ------------------------------------------------------------------------------

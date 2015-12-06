@@ -22,8 +22,8 @@
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
-#include <c-macro.h>
-#include <c-cleanup.h>
+#include <bus1/c-macro.h>
+#include <bus1/c-cleanup.h>
 
 #include "sysfs.h"
 
