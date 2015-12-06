@@ -24,12 +24,29 @@
 #include <stdbool.h>
 #include <signal.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <sys/wait.h>
+#include <sys/mount.h>
+#include <sys/reboot.h>
 #include <c-macro.h>
 #include <c-cleanup.h>
 
 #include "util.h"
+
+static int system_shutdown(int cmd) {
+        unsigned int i;
+
+        for (i = 0; i < 10; i++) {
+                if (mount(NULL, "/bus1", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0)
+                        break;
+
+                printf("killing all processes\n");
+                kill(-1, SIGKILL);
+                sleep(1);
+        }
+
+        sync();
+
+        return reboot(cmd);
+}
 
 int main(int argc, char **argv) {
         struct sigaction sa = {
@@ -52,5 +69,7 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         bash_execute(release);
+
+        system_shutdown(RB_POWER_OFF);
         return EXIT_FAILURE;
 }
