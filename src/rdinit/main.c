@@ -203,7 +203,7 @@ static int bus1_disk_probe(const char *disk, const char *disk_uuid, char **parti
                 if (!s)
                         continue;
 
-                if (strcmp(s, BUS1_GPT_PARTITION_TYPE_UUID) != 0)
+                if (strcmp(s, C_STRINGIFY(BUS1_GPT_PARTITION_TYPE_UUID)) != 0)
                         continue;
 
                 if (isdigit(disk[strlen(disk) - 1])) {
