@@ -69,9 +69,6 @@ pid_t service_start(const char *prog) {
                 prog,
                 NULL
         };
-        const char *env[] = {
-                NULL
-        };
         pid_t p;
 
         p = fork();
@@ -82,7 +79,7 @@ pid_t service_start(const char *prog) {
                 if (setsid() < 0)
                         return -errno;
 
-                execve(argv[0], (char **)argv, (char **)env);
+                execve(argv[0], (char **)argv, NULL);
                 return -errno;
         }
 

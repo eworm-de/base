@@ -430,16 +430,16 @@ static int root_switch(const char *newroot) {
         return 0;
 }
 
-static int init_execute(void) {
+static int init_execute(const char *init) {
         const char *argv[] = {
                 "/usr/bin/org.bus1.init",
                 NULL
         };
-        const char *env[] = {
-                NULL
-        };
 
-        execve(argv[0], (char **)argv, (char **)env);
+        if (init)
+                argv[0] = init;
+
+        execve(argv[0], (char **)argv, NULL);
         return -errno;
 }
 
@@ -447,6 +447,7 @@ int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdinit";
         _c_cleanup_(c_freep) char *disk = NULL;
         _c_cleanup_(c_freep) char *partition = NULL;
+        _c_cleanup_(c_freep) char *init = NULL;
         struct sigaction sa = {
                 .sa_handler = SIG_IGN,
                 .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
@@ -529,6 +530,8 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        init_execute();
+        kernel_cmdline_option("init", &init);
+        init_execute(init);
+
         return EXIT_FAILURE;
 }
