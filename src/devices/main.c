@@ -24,7 +24,6 @@
 #include <sys/signalfd.h>
 #include <sys/epoll.h>
 #include <bus1/c-macro.h>
-#include <bus1/c-cleanup.h>
 
 #include "uevent.h"
 #include "sysfs.h"

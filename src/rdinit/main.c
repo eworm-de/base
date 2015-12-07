@@ -31,7 +31,6 @@
 #include <libkmod.h>
 #include <blkid/blkid.h>
 #include <bus1/c-macro.h>
-#include <bus1/c-cleanup.h>
 #include <bus1/b1-platform.h>
 
 //FIXME: use bus
@@ -156,7 +155,7 @@ static int newroot_create(const char *root) {
         return 0;
 }
 
-C_DEFINE_CLEANUP_FUNC(blkid_probe, blkid_free_probe);
+C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
 
 static int bus1_disk_probe(const char *disk, const char *disk_uuid, char **partition) {
         const char *s;

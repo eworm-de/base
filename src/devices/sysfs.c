@@ -22,7 +22,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <bus1/c-macro.h>
-#include <bus1/c-cleanup.h>
 
 #include "sysfs.h"
 

@@ -25,7 +25,6 @@
 #include <sys/mount.h>
 #include <sys/reboot.h>
 #include <bus1/c-macro.h>
-#include <bus1/c-cleanup.h>
 
 #include "util.h"
 
