@@ -19,10 +19,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include "bus1/c-macro.h"
 #include "bus1/b1-identity.h"
 #include "permissions.h"
 

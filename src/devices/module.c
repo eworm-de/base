@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 #include <pthread.h>
 #include <libkmod.h>

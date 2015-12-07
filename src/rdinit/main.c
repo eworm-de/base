@@ -19,9 +19,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <errno.h>
 #include <fcntl.h>
-#include <stdbool.h>
 #include <signal.h>
 #include <ctype.h>
 #include <sys/prctl.h>
@@ -34,11 +32,11 @@
 #include <blkid/blkid.h>
 #include <bus1/c-macro.h>
 #include <bus1/c-cleanup.h>
-
 #include <bus1/b1-platform.h>
+
 //FIXME: use bus
-#include <../devices/sysfs.h>
-#include <util.h>
+#include "../devices/sysfs.h"
+#include "util.h"
 
 static const struct mountpoint {
         const char *what;

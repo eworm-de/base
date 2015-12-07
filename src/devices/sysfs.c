@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <bus1/c-macro.h>
