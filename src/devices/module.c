@@ -15,14 +15,11 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
-#include <libkmod.h>
-#include <sys/prctl.h>
 #include <bus1/c-macro.h>
+#include <libkmod.h>
+#include <pthread.h>
+#include <string.h>
+#include <sys/prctl.h>
 
 #include "module.h"
 

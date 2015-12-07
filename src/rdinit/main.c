@@ -15,23 +15,18 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <blkid/blkid.h>
+#include <bus1/b1-platform.h>
+#include <bus1/c-macro.h>
 #include <string.h>
-#include <fcntl.h>
 #include <signal.h>
 #include <ctype.h>
-#include <sys/prctl.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <sys/mount.h>
-#include <linux/loop.h>
 #include <libkmod.h>
-#include <blkid/blkid.h>
-#include <bus1/c-macro.h>
-#include <bus1/b1-platform.h>
+#include <linux/loop.h>
+#include <sys/ioctl.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <sys/mount.h>
 
 //FIXME: use bus
 #include "../devices/sysfs.h"

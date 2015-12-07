@@ -15,16 +15,12 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
+#include <bus1/c-macro.h>
 #include <signal.h>
-#include <sys/stat.h>
+#include <string.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
-#include <bus1/c-macro.h>
+#include <sys/stat.h>
 
 #include "util.h"
 

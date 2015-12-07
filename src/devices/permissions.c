@@ -15,15 +15,11 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <bus1/b1-identity.h>
+#include <bus1/c-macro.h>
 #include <string.h>
-#include <fcntl.h>
 #include <sys/stat.h>
 
-#include "bus1/c-macro.h"
-#include "bus1/b1-identity.h"
 #include "permissions.h"
 
 #define ELEMENTSOF(x) (sizeof(x) / sizeof((x)[0]))

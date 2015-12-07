@@ -15,13 +15,8 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <dirent.h>
-#include <fcntl.h>
 #include <bus1/c-macro.h>
+#include <string.h>
 
 #include "sysfs.h"
 

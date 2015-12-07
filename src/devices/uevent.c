@@ -15,15 +15,11 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
+#include <bus1/c-macro.h>
 #include <linux/filter.h>
 #include <linux/netlink.h>
+#include <string.h>
 #include <sys/socket.h>
-#include <bus1/c-macro.h>
 
 #include "uevent.h"
 

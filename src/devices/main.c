@@ -15,20 +15,16 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <sys/signalfd.h>
-#include <sys/epoll.h>
 #include <bus1/c-macro.h>
+#include <signal.h>
+#include <string.h>
+#include <sys/epoll.h>
+#include <sys/signalfd.h>
 
-#include "uevent.h"
-#include "sysfs.h"
-#include "permissions.h"
 #include "module.h"
+#include "permissions.h"
+#include "sysfs.h"
+#include "uevent.h"
 
 static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
                     int devfd, const char *devname, const char *modalias,
