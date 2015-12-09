@@ -50,6 +50,7 @@ static const struct module {
         const char *path;
 } modules[] = {
         { "loop", "/sys/module/loop" },
+        { "bus1", "/sys/module/bus1" },
 };
 
 static int filesystem_mount(void) {
