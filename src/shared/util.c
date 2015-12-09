@@ -127,7 +127,7 @@ int bus1_release(char **release) {
         char line[4096];
         size_t len;
 
-        f = fopen("/etc/bus1-release", "re");
+        f = fopen("/usr/lib/bus1-release", "re");
         if (!f)
                 return -errno;
 
