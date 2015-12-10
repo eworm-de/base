@@ -19,4 +19,4 @@
 int bus1_release(char **release);
 pid_t service_start(const char *prog);
 int bash_execute(const char *release);
-bool kernel_cmdline_option(const char *key, char **value);
+int kernel_cmdline_option(const char *key, char **value);

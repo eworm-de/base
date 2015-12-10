@@ -132,14 +132,15 @@ int main(int argc, char **argv) {
                 }
 
                 if (ev.data.fd == fd_signal && ev.events & EPOLLIN) {
-                                struct signalfd_siginfo fdsi;
-                                ssize_t size;
+                        struct signalfd_siginfo fdsi;
+                        ssize_t size;
 
-                                size = read(fd_signal, &fdsi, sizeof(struct signalfd_siginfo));
-                                if (size != sizeof(struct signalfd_siginfo))
-                                        continue;
-                                if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT)
-                                        break;
+                        size = read(fd_signal, &fdsi, sizeof(struct signalfd_siginfo));
+                        if (size != sizeof(struct signalfd_siginfo))
+                                continue;
+
+                        if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT)
+                                break;
                 }
         }
 

@@ -443,10 +443,6 @@ int main(int argc, char **argv) {
         _c_cleanup_(c_freep) char *disk = NULL;
         _c_cleanup_(c_freep) char *partition = NULL;
         _c_cleanup_(c_freep) char *init = NULL;
-        struct sigaction sa = {
-                .sa_handler = SIG_IGN,
-                .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
-        };
         struct timezone tz = {};
         pid_t pid_devices = 0;
         bool shell;
@@ -460,9 +456,6 @@ int main(int argc, char **argv) {
         umask(0);
         if (setsid() < 0)
                 return EXIT_FAILURE;
-
-        if (sigaction(SIGCHLD, &sa, NULL) < 0)
-                return -errno;
 
         r = filesystem_mount();
         if (r < 0)
@@ -492,7 +485,13 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        if (!kernel_cmdline_option("root", &partition) && !kernel_cmdline_option("disk", &disk))
+        if (kernel_cmdline_option("root", &partition) < 0)
+                return EXIT_FAILURE;
+
+        if (kernel_cmdline_option("disk", &disk) < 0)
+                return EXIT_FAILURE;
+
+        if (!partition && !disk)
                 return EXIT_FAILURE;
 
         if (!partition) {
@@ -525,7 +524,9 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        kernel_cmdline_option("init", &init);
+        if (kernel_cmdline_option("init", &init) < 0)
+                return EXIT_FAILURE;
+
         init_execute(init);
 
         return EXIT_FAILURE;
