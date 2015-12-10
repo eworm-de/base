@@ -41,12 +41,40 @@ static int system_shutdown(int cmd) {
         return reboot(cmd);
 }
 
+static pid_t getty_start(const char *device) {
+        const char *argv[] = {
+                "/usr/bin/agetty",
+                "--keep-baud",
+                "115200,38400,9600",
+                device,
+                "linux",
+                NULL
+        };
+        pid_t p;
+
+        p = fork();
+        if (p < 0)
+                return -errno;
+
+        if (p == 0) {
+                if (setsid() < 0)
+                        return EXIT_FAILURE;
+
+                execve(argv[0], (char **)argv, NULL);
+                return EXIT_FAILURE;
+        }
+
+        return p;
+}
+
 int main(int argc, char **argv) {
         struct sigaction sa = {
                 .sa_handler = SIG_IGN,
                 .sa_flags = SA_NOCLDSTOP|SA_NOCLDWAIT|SA_RESTART,
         };
         pid_t pid_devices = 0;
+        pid_t pid_getty = 0;
+        _c_cleanup_(c_freep) char *device = NULL;
         _c_cleanup_(c_freep) char *release = NULL;
 
         umask(0);
@@ -61,7 +89,19 @@ int main(int argc, char **argv) {
         if (pid_devices < 0)
                 return EXIT_FAILURE;
 
+        if (kernel_cmdline_option("console", &device)) {
+                pid_getty = getty_start(device);
+                if (pid_getty < 0)
+                        return EXIT_FAILURE;
+        }
+
         bash_execute(release);
+
+        if (kill(pid_devices, SIGTERM) < 0)
+                return EXIT_FAILURE;
+
+        if (pid_getty > 0 && kill(pid_devices, SIGTERM) < 0)
+                return EXIT_FAILURE;
 
         system_shutdown(RB_POWER_OFF);
         return EXIT_FAILURE;

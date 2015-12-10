@@ -39,16 +39,16 @@ int bash_execute(const char *release) {
 
         if (p == 0) {
                 if (setsid() < 0)
-                        return -errno;
+                        return EXIT_FAILURE;
 
                 if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
-                        return -errno;
+                        return EXIT_FAILURE;
 
                 printf("Welcome to %s (%s).\n\n"
                        "Type 'exit' to continue.\n\n", program_invocation_short_name, release);
 
                 execve(argv[0], (char **)argv, (char **)env);
-                return -errno;
+                return EXIT_FAILURE;
         }
 
         p = waitpid(p, NULL, 0);
@@ -71,10 +71,10 @@ pid_t service_start(const char *prog) {
 
         if (p == 0) {
                 if (setsid() < 0)
-                        return -errno;
+                        return EXIT_FAILURE;
 
                 execve(argv[0], (char **)argv, NULL);
-                return -errno;
+                return EXIT_FAILURE;
         }
 
         return p;
