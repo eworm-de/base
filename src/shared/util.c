@@ -22,42 +22,6 @@
 
 #include "util.h"
 
-int bash_execute(const char *release) {
-        const char *argv[] = {
-                "/usr/bin/bash",
-                NULL
-        };
-        const char *env[] = {
-                "TERM=linux",
-                NULL
-        };
-        pid_t p;
-
-        p = fork();
-        if (p < 0)
-                return -errno;
-
-        if (p == 0) {
-                if (setsid() < 0)
-                        return EXIT_FAILURE;
-
-                if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
-                        return EXIT_FAILURE;
-
-                printf("Welcome to %s (%s).\n\n"
-                       "Type 'exit' to continue.\n\n", program_invocation_short_name, release);
-
-                execve(argv[0], (char **)argv, (char **)env);
-                return EXIT_FAILURE;
-        }
-
-        p = waitpid(p, NULL, 0);
-        if (p < 0)
-                return errno;
-
-        return 0;
-}
-
 pid_t service_start(const char *prog) {
         const char *argv[] = {
                 prog,
@@ -122,7 +86,7 @@ int kernel_cmdline_option(const char *key, char **value) {
         return true;
 }
 
-int bus1_release(char **release) {
+int bus1_read_release(char **release) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         char line[4096];
         size_t len;

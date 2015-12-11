@@ -300,8 +300,7 @@ int main(int argc, char **argv) {
         if (manager_new(&m) < 0)
                 return EXIT_FAILURE;
 
-        /* /usr/lib/bus1-release */
-        if (bus1_release(&m->release) < 0)
+        if (bus1_read_release(&m->release) < 0)
                 return EXIT_FAILURE;
 
         /* serial console getty */

@@ -16,7 +16,6 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int bus1_release(char **release);
+int bus1_read_release(char **release);
 pid_t service_start(const char *prog);
-int bash_execute(const char *release);
 int kernel_cmdline_option(const char *key, char **value);

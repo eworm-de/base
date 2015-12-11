@@ -23,37 +23,140 @@
 #include <ctype.h>
 #include <libkmod.h>
 #include <linux/loop.h>
+#include <sys/epoll.h>
 #include <sys/ioctl.h>
+#include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
-#include <sys/mount.h>
+#include <sys/signalfd.h>
+#include <sys/wait.h>
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
 #include "util.h"
 
-static const struct mountpoint {
-        const char *what;
-        const char *where;
-        const char *type;
-        const char *options;
-        unsigned long flags;
-} mountpoints[] = {
-        { "proc",     "/proc",    "proc",     NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
-        { "sysfs",    "/sys",     "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
-        { "devtmpfs", "/dev",     "devtmpfs", "mode=755",  MS_NOSUID|MS_STRICTATIME },
-        { "devpts",   "/dev/pts", "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
+typedef struct Manager Manager;
+
+struct Manager {
+        char *release;
+        char *disk;
+        char *partition;
+        bool shell;
+
+        int fd_signal;
+        int fd_ep;
+        struct epoll_event ep_signal;
+
+        /* org.bus1.devices */
+        pid_t devices_pid;
 };
 
-static const struct module {
-        const char *name;
-        const char *path;
-} modules[] = {
-        { "loop", "/sys/module/loop" },
-        { "bus1", "/sys/module/bus1" },
-};
+static Manager *manager_free(Manager *m) {
+        free(m->release);
+        free(m->disk);
+        free(m->partition);
+        c_close(m->fd_ep);
+        c_close(m->fd_signal);
+        free(m);
+        return NULL;
+}
 
-static int filesystem_mount(void) {
+C_DEFINE_CLEANUP(Manager *, manager_free);
+static int manager_new(Manager **manager) {
+        _c_cleanup_(manager_freep) Manager *m = NULL;
+        sigset_t mask;
+
+        m = calloc(1, sizeof(Manager));
+        if (!m)
+                return -ENOMEM;
+
+        m->ep_signal.events = EPOLLIN;
+        m->fd_signal = -1;
+        m->fd_ep = -1;
+
+        m->devices_pid = -1;
+
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGTERM);
+        sigaddset(&mask, SIGINT);
+        sigaddset(&mask, SIGCHLD);
+        sigprocmask(SIG_BLOCK, &mask, NULL);
+
+        m->fd_ep = epoll_create1(EPOLL_CLOEXEC);
+        if (m->fd_ep < 0)
+                return -errno;
+
+        m->fd_signal = signalfd(-1, &mask, SFD_NONBLOCK|SFD_CLOEXEC);
+        if (m->fd_signal < 0)
+                return -errno;
+        m->ep_signal.data.fd = m->fd_signal;
+
+        if (epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_signal, &m->ep_signal) < 0)
+                return -errno;
+
+       *manager = m;
+       m = NULL;
+
+       return 0;
+}
+
+static int child_reap(pid_t *p) {
+        bool reap = false;
+
+        for (;;) {
+                siginfo_t si = {};
+
+                if (waitid(P_ALL, 0, &si, WEXITED|WNOHANG) < 0) {
+                        if (errno == ECHILD)
+                                break;
+
+                        if (errno == EINTR)
+                                continue;
+
+                        return -errno;
+                }
+
+                reap = true;
+
+                if (p) {
+                        *p = si.si_pid;
+                        break;
+                }
+        }
+
+        return reap;
+}
+
+static int manager_start_services(Manager *m, pid_t died_pid) {
+        if (m->devices_pid < 0 || died_pid == m->devices_pid) {
+                m->devices_pid = service_start("/usr/bin/org.bus1.devices");
+                if (m->devices_pid < 0)
+                        return m->devices_pid;
+        }
+
+       return 0;
+}
+
+static int manager_stop_services(Manager *m) {
+        if (m->devices_pid > 0 && kill(m->devices_pid, SIGTERM) < 0)
+                return -errno;
+
+        return 0;
+}
+
+static int manager_kernel_filesystem_mount(Manager *m) {
+        static const struct mountpoint {
+                const char *what;
+                const char *where;
+                const char *type;
+                const char *options;
+                unsigned long flags;
+        } mountpoints[] = {
+                { "proc",     "/proc",    "proc",     NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
+                { "sysfs",    "/sys",     "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
+                { "devtmpfs", "/dev",     "devtmpfs", "mode=755",  MS_NOSUID|MS_STRICTATIME },
+                { "devpts",   "/dev/pts", "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
+        };
         unsigned int i;
         int r;
 
@@ -74,7 +177,14 @@ static int filesystem_mount(void) {
 
 static void module_log(void *data, int priority, const char *file, int line, const char *fn, const char *format, va_list args) {}
 
-static int modules_load(void) {
+static int manager_modules_load(Manager *m) {
+        static const struct module {
+                const char *name;
+                const char *path;
+        } modules[] = {
+                { "loop", "/sys/module/loop" },
+                { "bus1", "/sys/module/bus1" },
+        };
         unsigned int i;
         struct kmod_ctx *ctx = NULL;
         int r = 0;
@@ -112,7 +222,7 @@ err:
         return r;
 }
 
-static int newroot_create(const char *root) {
+static int manager_newroot_create(Manager *m, const char *root) {
         _c_cleanup_(c_closep) int rootfd = -1;
         static const char *dirs[] = {
                 "proc",
@@ -255,7 +365,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         return 1;
 }
 
-static int bus1_disk_find(const char *disk_uuid, char **partition) {
+static int manager_disk_find(const char *disk_uuid, char **partition) {
         _c_cleanup_(c_closep) int sysfd = -1;
         unsigned int i;
         int r;
@@ -278,7 +388,7 @@ static int bus1_disk_find(const char *disk_uuid, char **partition) {
         return -ENOENT;
 }
 
-static int bus1_disk_mount(const char *partition, const char *dir) {
+static int manager_disk_mount(const char *partition, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
@@ -295,7 +405,7 @@ static int bus1_disk_mount(const char *partition, const char *dir) {
         return 0;
 }
 
-static int bus1_system_mount(const char *image, const char *dir) {
+static int manager_system_image_mount(const char *image, const char *dir) {
         _c_cleanup_(c_closep) int fd_loopctl = -1;
         _c_cleanup_(c_closep) int fd_loop = -1;
         _c_cleanup_(c_closep) int fd_image = -1;
@@ -382,7 +492,7 @@ static int directory_delete(int *dfd, const char *exclude) {
         return 0;
 }
 
-static int root_switch(const char *newroot) {
+static int manager_switch_root(Manager *m, const char *newroot) {
         static const char *mounts[] = {
                 "/dev",
                 "/proc",
@@ -425,29 +535,55 @@ static int root_switch(const char *newroot) {
         return 0;
 }
 
-static int init_execute(const char *init) {
+static int manager_rdshell(Manager *m) {
         const char *argv[] = {
-                "/usr/bin/org.bus1.init",
+                "/usr/bin/bash",
                 NULL
         };
+        const char *env[] = {
+                "TERM=linux",
+                NULL
+        };
+        pid_t p;
 
-        if (init)
-                argv[0] = init;
+        if (!m->shell)
+                return 0;
 
-        execve(argv[0], (char **)argv, NULL);
-        return -errno;
+        p = fork();
+        if (p < 0)
+                return -errno;
+
+        if (p == 0) {
+                if (setsid() < 0)
+                        return EXIT_FAILURE;
+
+                if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
+                        return EXIT_FAILURE;
+
+                printf("Welcome to %s (%s).\n\n"
+                       "Type 'exit' to continue.\n\n", program_invocation_short_name, m->release);
+
+                execve(argv[0], (char **)argv, (char **)env);
+                return EXIT_FAILURE;
+        }
+
+        p = waitpid(p, NULL, 0);
+        if (p < 0)
+                return errno;
+
+        return 0;
 }
 
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdinit";
-        _c_cleanup_(c_freep) char *disk = NULL;
-        _c_cleanup_(c_freep) char *partition = NULL;
+        _c_cleanup_(manager_freep) Manager *m = NULL;
+        _c_cleanup_(c_freep) char *image = NULL;
         _c_cleanup_(c_freep) char *init = NULL;
         struct timezone tz = {};
-        pid_t pid_devices = 0;
-        bool shell;
-        _c_cleanup_(c_freep) char *release = NULL;
-        _c_cleanup_(c_freep) char *system = NULL;
+        const char *init_argv[] = {
+                "/usr/bin/org.bus1.init",
+                NULL
+        };
         int r;
 
         program_invocation_short_name = name;
@@ -457,77 +593,89 @@ int main(int argc, char **argv) {
         if (setsid() < 0)
                 return EXIT_FAILURE;
 
-        r = filesystem_mount();
-        if (r < 0)
-                return EXIT_FAILURE;
-
         /* do a dummy call to disable the time zone warping magic */
         r  = settimeofday(NULL, &tz);
         if (r < 0)
                 return EXIT_FAILURE;
 
-        if (bus1_release(&release) < 0)
+        if (manager_new(&m) < 0)
                 return EXIT_FAILURE;
 
-        shell = kernel_cmdline_option("rdshell", NULL);
-        if (shell)
-                bash_execute(release);
-
-        r = modules_load();
+        r = manager_kernel_filesystem_mount(m);
         if (r < 0)
                 return EXIT_FAILURE;
 
-        pid_devices = service_start("/usr/bin/org.bus1.devices");
-        if (pid_devices < 0)
+        if (bus1_read_release(&m->release) < 0)
                 return EXIT_FAILURE;
 
-        r = newroot_create("/sysroot");
+        r = kernel_cmdline_option("rdshell", NULL);
         if (r < 0)
                 return EXIT_FAILURE;
 
-        if (kernel_cmdline_option("root", &partition) < 0)
+        m->shell = !!r;
+
+        if (manager_rdshell(m) < 0)
                 return EXIT_FAILURE;
 
-        if (kernel_cmdline_option("disk", &disk) < 0)
+        r = manager_modules_load(m);
+        if (r < 0)
                 return EXIT_FAILURE;
 
-        if (!partition && !disk)
+        if (manager_start_services(m, -1) < 0)
                 return EXIT_FAILURE;
 
-        if (!partition) {
-                r = bus1_disk_find(disk, &partition);
+        r = manager_newroot_create(m, "/sysroot");
+        if (r < 0)
+                return EXIT_FAILURE;
+
+        if (kernel_cmdline_option("root", &m->partition) < 0)
+                return EXIT_FAILURE;
+
+        if (kernel_cmdline_option("disk", &m->disk) < 0)
+                return EXIT_FAILURE;
+
+        if (!m->partition && !m->disk)
+                return EXIT_FAILURE;
+
+        if (!m->partition) {
+                r = manager_disk_find(m->disk, &m->partition);
                 if (r < 0)
                         return r;
         }
 
-        r = bus1_disk_mount(partition, "/sysroot/bus1");
+        r = manager_disk_mount(m->partition, "/sysroot/bus1");
         if (r < 0)
                 return EXIT_FAILURE;
 
-        if (asprintf(&system, "/sysroot/bus1/system/%s.img", release) < 0)
+        if (asprintf(&image, "/sysroot/bus1/system/%s.img", m->release) < 0)
                 return EXIT_FAILURE;
 
-        r = bus1_system_mount(system, "/sysroot/usr");
+        r = manager_system_image_mount(image, "/sysroot/usr");
         if (r < 0)
                 return EXIT_FAILURE;
 
         if (symlink("bus1/data", "/sysroot/var") < 0)
                 return EXIT_FAILURE;
 
-        if (shell)
-                bash_execute(release);
-
-        if (kill(pid_devices, SIGTERM) < 0)
+        if (manager_rdshell(m) < 0)
                 return EXIT_FAILURE;
 
-        r = root_switch("/sysroot");
+        if (manager_stop_services(m) < 0)
+                return EXIT_FAILURE;
+
+        if (child_reap(NULL) < 0)
+                return EXIT_FAILURE;
+
+        r = manager_switch_root(m, "/sysroot");
         if (r < 0)
                 return EXIT_FAILURE;
 
         if (kernel_cmdline_option("init", &init) < 0)
                 return EXIT_FAILURE;
 
-        init_execute(init);
+        if (init)
+                init_argv[0] = init;
 
+        execve(init_argv[0], (char **)init_argv, NULL);
         return EXIT_FAILURE;
 }
