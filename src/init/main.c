@@ -47,6 +47,7 @@ static int system_reboot(int cmd) {
 static pid_t login_start(void) {
         const char *argv[] = {
                 "/usr/bin/login",
+                "-H",
                 NULL
         };
         const char *env[] = {
