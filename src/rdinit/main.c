@@ -263,7 +263,7 @@ static int manager_newroot_create(Manager *m, const char *root) {
 
 C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
 
-static int bus1_disk_probe(const char *disk, const char *disk_uuid, char **partition) {
+static int manager_disk_probe(const char *disk, const char *disk_uuid, char **partition) {
         const char *s;
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         blkid_partlist pl;
@@ -323,7 +323,7 @@ static int bus1_disk_probe(const char *disk, const char *disk_uuid, char **parti
         return -ENODEV;
 }
 
-static int bus1_partition_probe(const char *partition, char **fstype) {
+static int manager_partition_probe(const char *partition, char **fstype) {
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         const char *s;
         int r;
@@ -358,7 +358,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         if (asprintf(&device, "/dev/%s", devname) < 0)
                 return -ENOMEM;
 
-        r = bus1_disk_probe(device, disk_uuid, partition);
+        r = manager_disk_probe(device, disk_uuid, partition);
         if (r < 0)
                 return 0;
 
@@ -392,7 +392,7 @@ static int manager_disk_mount(const char *partition, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
-        r = bus1_partition_probe(partition, &fstype);
+        r = manager_partition_probe(partition, &fstype);
         if (r < 0)
                 return r;
 
