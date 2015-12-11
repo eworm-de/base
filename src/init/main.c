@@ -211,7 +211,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
                         return m->login_pid;
         }
 
-        if (&m->serial_device && (m->serial_pid < 0 || died_pid == m->serial_pid)) {
+        if (m->serial_device && (m->serial_pid < 0 || died_pid == m->serial_pid)) {
                 m->serial_pid = getty_start(m->serial_device);
                 if (m->serial_pid < 0)
                         return m->serial_pid;
