@@ -44,37 +44,6 @@ static int system_reboot(int cmd) {
         return reboot(cmd);
 }
 
-static pid_t login_start(void) {
-        const char *argv[] = {
-                "/usr/bin/login",
-                "-H",
-                NULL
-        };
-        const char *env[] = {
-                "TERM=linux",
-                NULL
-        };
-        pid_t p;
-
-        p = fork();
-        if (p < 0)
-                return -errno;
-
-        if (p == 0) {
-                if (setsid() < 0)
-                        return -errno;
-
-                if (ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
-                        return -errno;
-
-                printf("\nlogin: ");
-                execve(argv[0], (char **)argv, (char **)env);
-                return -errno;
-        }
-
-        return p;
-}
-
 static pid_t getty_start(const char *device) {
         const char *argv[] = {
                 "/usr/bin/agetty",
@@ -206,8 +175,8 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
                         return m->devices_pid;
         }
 
-        if (m->login_pid < 0 || died_pid == m->login_pid) {
-                m->login_pid = login_start();
+        if (access("/dev/tty1", F_OK) >= 0 && (m->login_pid < 0 || died_pid == m->login_pid)) {
+                m->login_pid = getty_start("tty1");
                 if (m->login_pid < 0)
                         return m->login_pid;
         }

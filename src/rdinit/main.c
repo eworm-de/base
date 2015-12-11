@@ -621,9 +621,6 @@ int main(int argc, char **argv) {
         if (r < 0)
                 return EXIT_FAILURE;
 
-        if (manager_start_services(m, -1) < 0)
-                return EXIT_FAILURE;
-
         r = manager_newroot_create(m, "/sysroot");
         if (r < 0)
                 return EXIT_FAILURE;
@@ -635,6 +632,9 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         if (!m->partition && !m->disk)
+                return EXIT_FAILURE;
+
+        if (manager_start_services(m, -1) < 0)
                 return EXIT_FAILURE;
 
         if (!m->partition) {
