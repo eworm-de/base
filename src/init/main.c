@@ -169,36 +169,63 @@ static int manager_new(Manager **manager) {
 }
 
 static int manager_start_services(Manager *m, pid_t died_pid) {
-        if (m->devices_pid < 0 || died_pid == m->devices_pid) {
-                m->devices_pid = service_start("/usr/bin/org.bus1.devices");
-                if (m->devices_pid < 0)
-                        return m->devices_pid;
+        if (m->devices_pid > 0 && died_pid == m->devices_pid)
+                return -EIO;
+
+        if (m->devices_pid < 0) {
+                pid_t pid;
+
+                pid = service_start("/usr/bin/org.bus1.devices");
+                if (pid < 0)
+                        return pid;
+
+                m->devices_pid = pid;
         }
 
         if (access("/dev/tty1", F_OK) >= 0 && (m->login_pid < 0 || died_pid == m->login_pid)) {
-                m->login_pid = getty_start("tty1");
-                if (m->login_pid < 0)
-                        return m->login_pid;
+                pid_t pid;
+
+                pid = getty_start("tty1");
+                if (pid < 0)
+                        return pid;
+
+                m->login_pid = pid;
         }
 
         if (m->serial_device && (m->serial_pid < 0 || died_pid == m->serial_pid)) {
-                m->serial_pid = getty_start(m->serial_device);
-                if (m->serial_pid < 0)
-                        return m->serial_pid;
+                pid_t pid;
+
+                pid = getty_start(m->serial_device);
+                if (pid < 0)
+                        return pid;
+
+                m->serial_pid = pid;
         }
 
        return 0;
 }
 
 static int manager_stop_services(Manager *m) {
-        if (m->devices_pid > 0 && kill(m->devices_pid, SIGTERM) < 0)
-                return -errno;
+        if (m->devices_pid > 0) {
+                if (kill(m->devices_pid, SIGTERM) < 0)
+                        return -errno;
 
-        if (m->serial_pid > 0 && kill(m->serial_pid, SIGTERM) < 0)
-                return -errno;
+                m->devices_pid = -1;
+        }
 
-        if (m->login_pid > 0 && kill(m->login_pid, SIGTERM) < 0)
-                return -errno;
+        if (m->serial_pid > 0) {
+                if (kill(m->serial_pid, SIGTERM) < 0)
+                        return -errno;
+
+                m->serial_pid = -1;
+        }
+
+        if (m->login_pid > 0) {
+                if (kill(m->login_pid, SIGTERM) < 0)
+                        return -errno;
+
+                m->login_pid = -1;
+        }
 
         return 0;
 }

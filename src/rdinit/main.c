@@ -18,6 +18,7 @@
 #include <blkid/blkid.h>
 #include <bus1/b1-platform.h>
 #include <bus1/c-macro.h>
+#include <bus1/c-shared.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
@@ -128,18 +129,29 @@ static int child_reap(pid_t *p) {
 }
 
 static int manager_start_services(Manager *m, pid_t died_pid) {
-        if (m->devices_pid < 0 || died_pid == m->devices_pid) {
-                m->devices_pid = service_start("/usr/bin/org.bus1.devices");
-                if (m->devices_pid < 0)
-                        return m->devices_pid;
+        if (m->devices_pid > 0 && died_pid == m->devices_pid)
+                return -EIO;
+
+        if (m->devices_pid < 0) {
+                pid_t pid;
+
+                pid = service_start("/usr/bin/org.bus1.devices");
+                if (pid < 0)
+                        return pid;
+
+                m->devices_pid = pid;
         }
 
-       return 0;
+        return 0;
 }
 
 static int manager_stop_services(Manager *m) {
-        if (m->devices_pid > 0 && kill(m->devices_pid, SIGTERM) < 0)
-                return -errno;
+        if (m->devices_pid > 0) {
+                if (kill(m->devices_pid, SIGTERM) < 0)
+                        return -errno;
+
+                m->devices_pid = -1;
+        }
 
         return 0;
 }
@@ -365,27 +377,87 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         return 1;
 }
 
-static int manager_disk_find(const char *disk_uuid, char **partition) {
+static int manager_find_disk(Manager *m) {
         _c_cleanup_(c_closep) int sysfd = -1;
-        unsigned int i;
+        _c_cleanup_(c_freep) char *partition = NULL;
+        c_usec start;
+        bool exit = false;
         int r;
 
         sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (sysfd < 0)
                 return -errno;
 
-        for (i = 0; i < 15; i++) {
-                r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, disk_uuid, partition);
+        start = c_usec_from_clock(CLOCK_BOOTTIME);
+
+        while (!exit) {
+                c_usec now;
+                int n;
+                struct epoll_event ev;
+
+                n = epoll_wait(m->fd_ep, &ev, 1, 100);
+                if (n < 0) {
+                        if (errno == EINTR)
+                                continue;
+
+                        return -errno;
+                }
+
+                if (ev.data.fd == m->fd_signal && ev.events & EPOLLIN) {
+                        struct signalfd_siginfo fdsi;
+                        ssize_t size;
+
+                        size = read(m->fd_signal, &fdsi, sizeof(struct signalfd_siginfo));
+                        if (size != sizeof(struct signalfd_siginfo))
+                                continue;
+
+                        switch (fdsi.ssi_signo) {
+                        case SIGTERM:
+                        case SIGINT:
+                                exit = true;
+                                break;
+
+                        case SIGCHLD: {
+                                pid_t pid;
+
+                                r = child_reap(&pid);
+                                if (r < 0)
+                                        return r;
+
+                                if (r == 0)
+                                        break;
+
+                                r = manager_start_services(m, pid);
+                                if (r < 0)
+                                        return r;
+
+                                break;
+                        }
+
+                        default:
+                                return -EINVAL;
+                        }
+                }
+
+                //FIXME: hook up device events
+                r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, m->disk, &partition);
                 if (r < 0)
                         return r;
                 if (r == 1)
-                        return 0;
+                        break;
 
-                //FIXME: wait for events and retry
-                sleep(1);
+                now = c_usec_from_clock(CLOCK_BOOTTIME);
+                if (now - start > c_usec_from_sec(30))
+                        break;
         }
 
-        return -ENOENT;
+        if (partition) {
+                m->partition = partition;
+                partition = NULL;
+                return 0;
+        }
+
+        return -ENODEV;
 }
 
 static int manager_disk_mount(const char *partition, const char *dir) {
@@ -638,7 +710,7 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         if (!m->partition) {
-                r = manager_disk_find(m->disk, &m->partition);
+                r = manager_find_disk(m);
                 if (r < 0)
                         return r;
         }
