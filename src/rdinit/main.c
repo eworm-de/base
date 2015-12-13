@@ -156,32 +156,44 @@ static int manager_stop_services(Manager *m) {
         return 0;
 }
 
-static int manager_kernel_filesystem_mount(Manager *m) {
+static int manager_kernel_filesystem_mount(Manager *m, bool early) {
         static const struct mountpoint {
                 const char *what;
                 const char *where;
                 const char *type;
                 const char *options;
                 unsigned long flags;
-        } mountpoints[] = {
-                { "proc",     "/proc",    "proc",     NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
-                { "sysfs",    "/sys",     "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
-                { "devtmpfs", "/dev",     "devtmpfs", "mode=755",  MS_NOSUID|MS_STRICTATIME },
-                { "devpts",   "/dev/pts", "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
+        } mount_early[] = {
+                { "devtmpfs", "/dev",         "devtmpfs", "mode=755",  MS_NOSUID|MS_STRICTATIME },
+                { "devpts",   "/dev/pts",     "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
+                { "proc",     "/proc",        "proc",     NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
+                { "sysfs",    "/sys",         "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
+        }, mount_late[] = {
+                { "bus1fs",   "/sys/fs/bus1", "bus1fs",   NULL,        MS_NOSUID|MS_NOEXEC },
         };
-        unsigned int i;
-        int r;
 
-        for (i = 0; i < C_ARRAY_SIZE(mountpoints); i++) {
-                r = mkdir(mountpoints[i].where, 0700);
-                if (r < 0 && errno != EEXIST)
-                        return -errno;
+        if (early) {
+                unsigned int i;
 
-                r = mount(mountpoints[i].what, mountpoints[i].where,
-                          mountpoints[i].type, mountpoints[i].flags,
-                          mountpoints[i].options);
-                if (r < 0 && errno != EBUSY)
-                        return -errno;
+                for (i = 0; i < C_ARRAY_SIZE(mount_early); i++) {
+                        if (mkdir(mount_early[i].where, 0700) < 0 && errno != EEXIST)
+                                return -errno;
+
+                        if (mount(mount_early[i].what, mount_early[i].where,
+                                  mount_early[i].type, mount_early[i].flags,
+                                  mount_early[i].options) < 0 && errno != EBUSY)
+                                return -errno;
+                }
+        } else {
+                unsigned int i;
+
+                for (i = 0; i < C_ARRAY_SIZE(mount_late); i++) {
+                        printf("XX %s\n", mount_late[i].what);
+                        if (mount(mount_late[i].what, mount_late[i].where,
+                                  mount_late[i].type, mount_late[i].flags,
+                                  mount_late[i].options) < 0 && errno != EBUSY)
+                                return -errno;
+                }
         }
 
         return 0;
@@ -194,8 +206,8 @@ static int manager_modules_load(Manager *m) {
                 const char *name;
                 const char *path;
         } modules[] = {
-                { "loop", "/sys/module/loop" },
                 { "bus1", "/sys/module/bus1" },
+                { "loop", "/sys/module/loop" },
         };
         unsigned int i;
         struct kmod_ctx *ctx = NULL;
@@ -666,15 +678,14 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         /* do a dummy call to disable the time zone warping magic */
-        r  = settimeofday(NULL, &tz);
-        if (r < 0)
+        if (settimeofday(NULL, &tz) < 0)
                 return EXIT_FAILURE;
 
         if (manager_new(&m) < 0)
                 return EXIT_FAILURE;
 
-        r = manager_kernel_filesystem_mount(m);
-        if (r < 0)
+        /* early mount before module load and command line parsing */
+        if (manager_kernel_filesystem_mount(m, true) < 0)
                 return EXIT_FAILURE;
 
         if (bus1_read_release(&m->release) < 0)
@@ -689,12 +700,14 @@ int main(int argc, char **argv) {
         if (manager_rdshell(m) < 0)
                 return EXIT_FAILURE;
 
-        r = manager_modules_load(m);
-        if (r < 0)
+        if (manager_modules_load(m) < 0)
                 return EXIT_FAILURE;
 
-        r = manager_newroot_create(m, "/sysroot");
-        if (r < 0)
+        /* late mount after module load */
+        if (manager_kernel_filesystem_mount(m, false) < 0)
+                return EXIT_FAILURE;
+
+        if (manager_newroot_create(m, "/sysroot") < 0)
                 return EXIT_FAILURE;
 
         if (kernel_cmdline_option("root", &m->partition) < 0)
@@ -709,21 +722,16 @@ int main(int argc, char **argv) {
         if (manager_start_services(m, -1) < 0)
                 return EXIT_FAILURE;
 
-        if (!m->partition) {
-                r = manager_find_disk(m);
-                if (r < 0)
-                        return r;
-        }
+        if (!m->partition && manager_find_disk(m) < 0)
+                        return EXIT_FAILURE;
 
-        r = manager_disk_mount(m->partition, "/sysroot/bus1");
-        if (r < 0)
+        if (manager_disk_mount(m->partition, "/sysroot/bus1") < 0)
                 return EXIT_FAILURE;
 
         if (asprintf(&image, "/sysroot/bus1/system/%s.img", m->release) < 0)
                 return EXIT_FAILURE;
 
-        r = manager_system_image_mount(image, "/sysroot/usr");
-        if (r < 0)
+        if (manager_system_image_mount(image, "/sysroot/usr") < 0)
                 return EXIT_FAILURE;
 
         if (symlink("bus1/data", "/sysroot/var") < 0)
@@ -738,8 +746,7 @@ int main(int argc, char **argv) {
         if (child_reap(NULL) < 0)
                 return EXIT_FAILURE;
 
-        r = manager_switch_root(m, "/sysroot");
-        if (r < 0)
+        if (manager_switch_root(m, "/sysroot") < 0)
                 return EXIT_FAILURE;
 
         if (kernel_cmdline_option("init", &init) < 0)
