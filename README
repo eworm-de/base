@@ -1,23 +1,42 @@
+bus1 - System Init
+
 org.bus1.rdinit: /init to use in the initrd:
- - mouts /dev, /sys, /proc
- - starts org.bus1.devices
- - reads the kernel commandline:
-   - "disk=UUID" searches and finds the disk with the given GPT UUID,
-     searches and finds the first GPT partition with the GPT partition
-     type UUID of e0243462-d2d0-4c3b-ad28-b365f2da3b4d
-   - root=<partition device node> specifies the partition device node
-     to mount
- - mounts the bus1 partition to /bus1
- - mounts the system squashfs image in /bus1/system/ to /usr
- - mounts /bus1/data to /var
- - executes org.bus1.init
+        - mouts /dev, /sys, /proc
+        - starts org.bus1.devices
+        - reads the kernel commandline:
+        - "disk=UUID" searches and finds the disk with the given GPT UUID,
+          searches and finds the first GPT partition with the GPT partition
+          type UUID of e0243462-d2d0-4c3b-ad28-b365f2da3b4d
+        - root=<partition device node> specifies the partition device node
+          to mount
+        - mounts the bus1 partition to /bus1
+        - mounts the system squashfs image in /bus1/system/<release>.img to /usr
+        - symlinks /bus1/data to /var
+        - executes org.bus1.init
 
 org.bus1.devices: hotplug device manager and kernel module loader
- - listens to kernel uevents
- - crawls /sys for coldplug
- - adjusts platform permissions in /dev
- - loads kernel modules for plugged devices
+        - listens to kernel uevents
+        - crawls /sys for coldplug
+        - adjusts platform permissions in /dev
+        - loads kernel modules for plugged devices
 
 org.bus1.init
- - starts org.bus1.devices
- - starts bash
+        - starts org.bus1.devices
+        - starts tty login and serial console
+
+DETAILS:
+        https://github.com/bus1/init
+
+BUG REPORTS:
+        https://github.com/bus1/init/issues
+
+GIT:
+        git@github.com:bus1/init.git
+        https://github.com/bus1/init.git
+
+GITWEB:
+        https://github.com/bus1/init
+
+LICENSE:
+        LGPLv2.1+ (LICENSE.LGPL2.1)
+        See COPYING for details.
