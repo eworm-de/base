@@ -1,14 +1,13 @@
 bus1 - System Init
 
 org.bus1.rdinit: /init to use in the initrd:
-        - mouts /dev, /sys, /proc
-        - starts org.bus1.devices
+        - mouts /dev, /sys, /proc, /dev/pts, /sys/fs/bus1
         - reads the kernel commandline:
-        - "disk=UUID" searches and finds the disk with the given GPT UUID,
-          searches and finds the first GPT partition with the GPT partition
-          type UUID of e0243462-d2d0-4c3b-ad28-b365f2da3b4d
-        - root=<partition device node> specifies the partition device node
-          to mount
+        - "disk=UUID" looks (and waits) for the disk with the given GPT UUID,
+          on that disk, it looks for the first GPT partition with the GPT
+          partition type UUID of e0243462-d2d0-4c3b-ad28-b365f2da3b4d
+        - "partition=<partition device node>" specifies the partition to mount
+        - starts org.bus1.devices
         - mounts the bus1 partition to /bus1
         - mounts the system squashfs image in /bus1/system/<release>.img to /usr
         - symlinks /bus1/data to /var
@@ -22,7 +21,9 @@ org.bus1.devices: hotplug device manager and kernel module loader
 
 org.bus1.init
         - starts org.bus1.devices
-        - starts tty login and serial console
+        - starts tty login
+        - starts serial console if console=<device> is given on the kernel
+          command line
 
 DETAILS:
         https://github.com/bus1/init

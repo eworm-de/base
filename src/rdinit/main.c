@@ -710,7 +710,7 @@ int main(int argc, char **argv) {
         if (manager_newroot_create(m, "/sysroot") < 0)
                 return EXIT_FAILURE;
 
-        if (kernel_cmdline_option("root", &m->partition) < 0)
+        if (kernel_cmdline_option("partition", &m->partition) < 0)
                 return EXIT_FAILURE;
 
         if (kernel_cmdline_option("disk", &m->disk) < 0)
