@@ -188,7 +188,6 @@ static int manager_kernel_filesystem_mount(Manager *m, bool early) {
                 unsigned int i;
 
                 for (i = 0; i < C_ARRAY_SIZE(mount_late); i++) {
-                        printf("XX %s\n", mount_late[i].what);
                         if (mount(mount_late[i].what, mount_late[i].where,
                                   mount_late[i].type, mount_late[i].flags,
                                   mount_late[i].options) < 0 && errno != EBUSY)
