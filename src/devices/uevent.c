@@ -67,7 +67,7 @@ int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
         _c_cleanup_(c_freep) char *dt = NULL;
         _c_cleanup_(c_freep) char *dn = NULL;
         _c_cleanup_(c_freep) char *ma = NULL;
-        unsigned int i;
+        int i;
 
         iov.iov_base = buf;
         iov.iov_len = sizeof(buf);
