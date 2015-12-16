@@ -1,4 +1,4 @@
-bus1 - System Init
+bus1 - Base System Tools
 
 org.bus1.rdinit: /init to use in the initrd:
         - mouts /dev, /sys, /proc, /dev/pts, /sys/fs/bus1
@@ -26,17 +26,17 @@ org.bus1.init
           command line
 
 DETAILS:
-        https://github.com/bus1/init
+        https://github.com/bus1/base
 
 BUG REPORTS:
-        https://github.com/bus1/init/issues
+        https://github.com/bus1/base/issues
 
 GIT:
-        git@github.com:bus1/init.git
-        https://github.com/bus1/init.git
+        git@github.com:bus1/base.git
+        https://github.com/bus1/base.git
 
 GITWEB:
-        https://github.com/bus1/init
+        https://github.com/bus1/base
 
 LICENSE:
         LGPLv2.1+ (LICENSE.LGPL2.1)

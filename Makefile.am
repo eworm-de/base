@@ -89,7 +89,7 @@ bin_PROGRAMS += \
 	org.bus1.devices
 
 org_bus1_devices_SOURCES = \
-	src/include/bus1/b1-identity.h \
+	src/bus1/b1-identity.h \
 	src/devices/uevent.h \
 	src/devices/uevent.c \
 	src/devices/sysfs.h \
