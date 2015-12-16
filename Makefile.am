@@ -68,6 +68,8 @@ bin_PROGRAMS += \
 org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.h \
 	src/devices/sysfs.c \
+	src/shared/rootfs.h \
+	src/shared/rootfs.c \
 	src/rdinit/main.c
 
 org_bus1_rdinit_CFLAGS = \

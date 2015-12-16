@@ -34,6 +34,7 @@
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
+#include "rootfs.h"
 #include "util.h"
 
 typedef struct Manager Manager;
@@ -243,57 +244,6 @@ static int manager_modules_load(Manager *m) {
 err:
         kmod_unref(ctx);
         return r;
-}
-
-static int manager_newroot_create(Manager *m, const char *root) {
-        _c_cleanup_(c_closep) int rootfd = -1;
-        static const char *dirs[] = {
-                "proc",
-                "sys",
-                "dev",
-                "usr",
-#if defined(__x86_64__)
-                "lib64",
-#else
-                "lib",
-#endif
-        };
-        static const struct link {
-                const char *file;
-                const char *target;
-        } links[] = {
-                { "bin",                        "usr/bin" },
-                { "etc",                        "usr/etc" },
-                { "lib",                        "usr/lib" },
-                { "sbin",                       "usr/bin" },
-#if defined(__i386__)
-                { "lib/ld-linux.so.2", "../usr/lib/i386-linux-gnu/ld-linux.so.2"
-#elif defined(__x86_64__)
-                { "lib64/ld-linux-x86-64.so.2", "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" },
-#elif defined(__arm__)
-                { "lib/ld-linux-armhf.so.3", "../usr/lib/arm-linux-gnueabihf/ld-linux-armhf.so.3" },
-#elif defined(__aarch64__)
-                { "lib/ld-linux-aarch64.so.1", "../usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"  },
-#endif
-        };
-        unsigned int i;
-
-        if (mkdir(root, 0755) < 0)
-                return -errno;
-
-        rootfd = openat(AT_FDCWD, root, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (rootfd < 0)
-                return -errno;
-
-        for (i = 0; i < C_ARRAY_SIZE(dirs); i++)
-                if (mkdirat(rootfd, dirs[i], 0755) < 0)
-                        return -errno;
-
-        for (i = 0; i < C_ARRAY_SIZE(links); i++)
-                if (symlinkat(links[i].target, rootfd, links[i].file) < 0)
-                        return -errno;
-
-        return 0;
 }
 
 C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
@@ -718,7 +668,7 @@ int main(int argc, char **argv) {
         if (manager_kernel_filesystem_mount(m, false) < 0)
                 return EXIT_FAILURE;
 
-        if (manager_newroot_create(m, "/sysroot") < 0)
+        if (rootfs_setup("/sysroot") < 0)
                 return EXIT_FAILURE;
 
         if (kernel_cmdline_option("partition", &m->partition) < 0)
