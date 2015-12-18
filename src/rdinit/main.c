@@ -167,7 +167,7 @@ static int manager_kernel_filesystem_mount(Manager *m, bool early) {
         } mount_early[] = {
                 { "devtmpfs", "/dev",         "devtmpfs", "mode=755",  MS_NOSUID|MS_STRICTATIME },
                 { "devpts",   "/dev/pts",     "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
-                { "proc",     "/proc",        "proc",     NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
+                { "proc",     "/proc",        "proc",     "hidepid=2", MS_NOSUID|MS_NOEXEC|MS_NODEV },
                 { "sysfs",    "/sys",         "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
         }, mount_late[] = {
                 { "bus1fs",   "/sys/fs/bus1", "bus1fs",   NULL,        MS_NOSUID|MS_NOEXEC },
@@ -695,7 +695,7 @@ int main(int argc, char **argv) {
         if (manager_system_image_mount(image, "/sysroot/usr") < 0)
                 return EXIT_FAILURE;
 
-        if (symlink("bus1/data", "/sysroot/var") < 0)
+        if (mount("/sysroot/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL) < 0)
                 return EXIT_FAILURE;
 
         if (manager_rdshell(m) < 0)

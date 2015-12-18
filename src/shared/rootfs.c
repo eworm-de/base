@@ -24,15 +24,16 @@
 int rootfs_setup(const char *rootdir) {
         _c_cleanup_(c_closep) int rootfd = -1;
         static const char *dirs[] = {
-                "proc",
-                "sys",
                 "dev",
-                "usr",
 #if defined(__x86_64__)
                 "lib64",
 #else
                 "lib",
 #endif
+                "proc",
+                "sys",
+                "usr",
+                "var",
         };
         static const struct link {
                 const char *file;
@@ -41,7 +42,6 @@ int rootfs_setup(const char *rootdir) {
                 { "bin",                        "usr/bin" },
                 { "etc",                        "usr/etc" },
                 { "lib",                        "usr/lib" },
-                { "sbin",                       "usr/bin" },
 #if defined(__i386__)
                 { "lib/ld-linux.so.2", "../usr/lib/i386-linux-gnu/ld-linux.so.2"
 #elif defined(__x86_64__)
@@ -51,6 +51,7 @@ int rootfs_setup(const char *rootdir) {
 #elif defined(__aarch64__)
                 { "lib/ld-linux-aarch64.so.1", "../usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"  },
 #endif
+                { "sbin",                       "usr/bin" },
         };
         unsigned int i;
 
