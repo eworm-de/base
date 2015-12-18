@@ -16,6 +16,17 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int bus1_read_release(char **release);
+#include <sys/syscall.h>
+
+static inline int c_sys_clone(unsigned long flags, void *child_stack) {
+#if defined(__s390__) || defined(__CRIS__)
+        return (int)syscall(__NR_clone, child_stack, flags);
+#else
+        return (int)syscall(__NR_clone, flags, child_stack);
+#endif
+}
+
+int child_reap(pid_t *p);
 pid_t service_start(const char *prog);
+int bus1_read_release(char **release);
 int kernel_cmdline_option(const char *key, char **value);

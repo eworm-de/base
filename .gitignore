@@ -27,3 +27,4 @@ Makefile.in
 /org.bus1.devices
 /org.bus1.rdinit
 /org.bus1.init
+/org.bus1.activator

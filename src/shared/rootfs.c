@@ -23,19 +23,23 @@
 
 int rootfs_setup(const char *rootdir) {
         _c_cleanup_(c_closep) int rootfd = -1;
-        static const char *dirs[] = {
-                "dev",
+        static const struct {
+                const char *name;
+                mode_t mode;
+        } dirs[] = {
+                { "dev",    0755 },
 #if defined(__x86_64__)
-                "lib64",
+                { "lib64",  0755 },
 #else
-                "lib",
+                { "lib",    0755 },
 #endif
-                "proc",
-                "sys",
-                "usr",
-                "var",
+                { "proc",   0755 },
+                { "sys",    0755 },
+                { "tmp",   01777 },
+                { "usr",    0755 },
+                { "var",    0755 },
         };
-        static const struct link {
+        static const struct {
                 const char *file;
                 const char *target;
         } links[] = {
@@ -55,15 +59,12 @@ int rootfs_setup(const char *rootdir) {
         };
         unsigned int i;
 
-        if (mkdir(rootdir, 0755) < 0)
-                return -errno;
-
         rootfd = openat(AT_FDCWD, rootdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (rootfd < 0)
                 return -errno;
 
         for (i = 0; i < C_ARRAY_SIZE(dirs); i++)
-                if (mkdirat(rootfd, dirs[i], 0755) < 0)
+                if (mkdirat(rootfd, dirs[i].name, dirs[i].mode) < 0)
                         return -errno;
 
         for (i = 0; i < C_ARRAY_SIZE(links); i++)

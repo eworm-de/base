@@ -13,17 +13,26 @@ org.bus1.rdinit: /init to use in the initrd:
         - symlinks /bus1/data to /var
         - executes org.bus1.init
 
+org.bus1.init: init process PID1
+        - starts org.bus1.activator
+        - starts tty login
+        - starts serial console if console=<device> is given on the kernel
+          command line
+
+org.bus1.activator: system service activator
+        - sets up the service environment:
+                - a new mount namespace
+                - a separate tmpfs /
+                - mounts the kernel filesystems
+                - mounts /usr with the system image
+                - mounts /var with the /var/bus1/<service> data directory
+        - starts org.bus1.devices
+
 org.bus1.devices: hotplug device manager and kernel module loader
         - listens to kernel uevents
         - crawls /sys for coldplug
         - adjusts platform permissions in /dev
         - loads kernel modules for plugged devices
-
-org.bus1.init
-        - starts org.bus1.devices
-        - starts tty login
-        - starts serial console if console=<device> is given on the kernel
-          command line
 
 DETAILS:
         https://github.com/bus1/base

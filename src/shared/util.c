@@ -22,6 +22,32 @@
 
 #include "util.h"
 
+int child_reap(pid_t *p) {
+        pid_t pid = -1;
+
+        for (;;) {
+                siginfo_t si = {};
+
+                if (waitid(P_ALL, 0, &si, WEXITED|WNOHANG) < 0) {
+                        if (errno == ECHILD)
+                                break;
+
+                        if (errno == EINTR)
+                                continue;
+
+                        return -errno;
+                }
+
+                pid = si.si_pid;
+                break;
+        }
+
+        if (p)
+                *p = pid;
+
+        return 0;
+}
+
 pid_t service_start(const char *prog) {
         const char *argv[] = {
                 prog,

@@ -15,87 +15,38 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <bus1/b1-platform.h>
 #include <bus1/c-macro.h>
+#include <bus1/c-shared.h>
+#include <ctype.h>
+#include <linux/sched.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
 #include <sys/mount.h>
-#include <sys/reboot.h>
-#include <sys/signalfd.h>
+#include <sys/prctl.h>
 #include <sys/stat.h>
+#include <sys/signalfd.h>
 #include <sys/wait.h>
 
+#include "rootfs.h"
 #include "util.h"
-
-static int system_reboot(int cmd) {
-        unsigned int i;
-
-        for (i = 0; i < 10; i++) {
-                if (mount(NULL, "/bus1", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0)
-                        break;
-
-                printf("killing all processes\n");
-                kill(-1, SIGKILL);
-                sleep(1);
-        }
-
-        sync();
-
-        return reboot(cmd);
-}
-
-static pid_t getty_start(const char *device) {
-        const char *argv[] = {
-                "/usr/bin/agetty",
-                "--nohostname",
-                "--keep-baud",
-                "115200,38400,9600",
-                device,
-                "linux",
-                NULL
-        };
-        pid_t p;
-
-        p = fork();
-        if (p < 0)
-                return -errno;
-
-        if (p == 0) {
-                if (setsid() < 0)
-                        return -errno;
-
-                execve(argv[0], (char **)argv, NULL);
-                return -errno;
-        }
-
-        return p;
-}
 
 typedef struct Manager Manager;
 
 struct Manager {
-        char *release;
+        /* org.bus1.devices */
+        pid_t devices_pid;
 
         int fd_signal;
         int fd_ep;
         struct epoll_event ep_signal;
-
-        /* org.bus1.activator */
-        pid_t activator_pid;
-
-        /* console login */
-        pid_t login_pid;
-
-        /* serial console login */
-        pid_t serial_pid;
-        char *serial_device;
 };
 
 static Manager *manager_free(Manager *m) {
-        free(m->release);
         c_close(m->fd_ep);
         c_close(m->fd_signal);
-        free(m->serial_device);
         free(m);
         return NULL;
 }
@@ -109,9 +60,7 @@ static int manager_new(Manager **manager) {
         if (!m)
                 return -ENOMEM;
 
-        m->activator_pid = -1;
-        m->login_pid = -1;
-        m->serial_pid = -1;
+        m->devices_pid = -1;
 
         m->ep_signal.events = EPOLLIN;
         m->fd_signal = -1;
@@ -141,68 +90,106 @@ static int manager_new(Manager **manager) {
        return 0;
 }
 
-static int manager_start_services(Manager *m, pid_t died_pid) {
-        if (m->activator_pid > 0 && died_pid == m->activator_pid)
-                return -EIO;
+static pid_t service_activate(const char *service) {
+        pid_t p;
+        static const char *mounts[] = {
+                "/dev",
+                "/proc",
+                "/sys",
+                "/usr",
+        };
+        unsigned int i;
+        _c_cleanup_(c_freep) char *datadir = NULL;
+        _c_cleanup_(c_freep) char *exe = NULL;
+        const char *argv[2] = {};
+        int r;
 
-        if (m->activator_pid < 0) {
-                pid_t pid;
+        if (asprintf(&datadir, "/var/bus1/%s", service) < 0)
+                return -ENOMEM;
 
-                pid = service_start("/usr/bin/org.bus1.activator");
-                if (pid < 0)
-                        return pid;
+        if (mkdir(datadir, 0755) < 0 && errno != EEXIST)
+                return -errno;
 
-                m->activator_pid = pid;
+        p = c_sys_clone(SIGCHLD|CLONE_NEWNS, NULL);
+        if (p < 0)
+                return -errno;
+        if (p > 0)
+                return p;
+
+        if (prctl(PR_SET_PDEATHSIG, SIGTERM) < 0)
+                return -errno;
+
+        if (setsid() < 0)
+                return -errno;
+
+        if (mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID|MS_STRICTATIME, "mode=0755,size=5M") < 0)
+                return errno;
+
+        r = rootfs_setup("/tmp");
+        if (r < 0)
+                return r;
+
+        for (i = 0; i < C_ARRAY_SIZE(mounts); i++) {
+                _c_cleanup_(c_freep) char *target = NULL;
+
+                if (asprintf(&target, "/tmp%s", mounts[i]) < 0)
+                        return -ENOMEM;
+
+                if (mount(mounts[i], target, NULL, MS_BIND|MS_REC, NULL) < 0)
+                        return -errno;
         }
 
-        if (access("/dev/tty1", F_OK) >= 0 && (m->login_pid < 0 || died_pid == m->login_pid)) {
-                pid_t pid;
+        if (mount(datadir, "/tmp/var", NULL, MS_BIND, NULL) < 0)
+                return -errno;
 
-                pid = getty_start("tty1");
-                if (pid < 0)
-                        return pid;
+        if (chdir("/tmp") < 0)
+                return -errno;
 
-                m->login_pid = pid;
-        }
+        if (mount("/tmp", "/", NULL, MS_BIND, NULL) < 0)
+                return -errno;
 
-        if (m->serial_device && (m->serial_pid < 0 || died_pid == m->serial_pid)) {
-                pid_t pid;
+        if (chroot(".") < 0)
+                return -errno;
 
-                pid = getty_start(m->serial_device);
-                if (pid < 0)
-                        return pid;
+        if (chdir("/") < 0)
+                return -errno;
 
-                m->serial_pid = pid;
-        }
+        if (asprintf(&exe, "/usr/bin/%s", service) < 0)
+                return -ENOMEM;
 
-       return 0;
+        argv[0] = exe;
+        execve(argv[0], (char **)argv, NULL);
+
+        return -errno;
 }
 
-static int manager_stop_services(Manager *m) {
-        if (m->activator_pid > 0) {
-                if (kill(m->activator_pid, SIGTERM) < 0)
-                        return -errno;
+static int manager_start_services(Manager *m, pid_t died_pid) {
+        if (m->devices_pid > 0 && died_pid == m->devices_pid)
+                return -EIO;
 
-                m->activator_pid = -1;
-        }
+        if (m->devices_pid < 0) {
+                pid_t pid;
 
-        if (m->serial_pid > 0) {
-                if (kill(m->serial_pid, SIGTERM) < 0)
-                        return -errno;
+                pid = service_activate("org.bus1.devices");
+                if (pid < 0)
+                        return pid;
 
-                m->serial_pid = -1;
-        }
-
-        if (m->login_pid > 0) {
-                if (kill(m->login_pid, SIGTERM) < 0)
-                        return -errno;
-
-                m->login_pid = -1;
+                m->devices_pid = pid;
         }
 
         return 0;
 }
 
+static int manager_stop_services(Manager *m) {
+        if (m->devices_pid > 0) {
+                if (kill(m->devices_pid, SIGTERM) < 0)
+                        return -errno;
+
+                m->devices_pid = -1;
+        }
+
+        return 0;
+}
 
 static int manager_run(Manager *m) {
         bool exit = false;
@@ -235,7 +222,7 @@ static int manager_run(Manager *m) {
                                 break;
 
                         case SIGCHLD: {
-                                pid_t pid;
+                                pid_t pid = -1;
 
                                 r = child_reap(&pid);
                                 if (r < 0)
@@ -263,18 +250,13 @@ static int manager_run(Manager *m) {
 int main(int argc, char **argv) {
         _c_cleanup_(manager_freep) Manager *m = NULL;
 
-        /* clean up zombies from the initrd */
-        if (child_reap(NULL) < 0)
+        if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0)
                 return EXIT_FAILURE;
+
+        if (mkdir("/var/bus1", 0755) < 0 && errno != EEXIST)
+                return -errno;
 
         if (manager_new(&m) < 0)
-                return EXIT_FAILURE;
-
-        if (bus1_read_release(&m->release) < 0)
-                return EXIT_FAILURE;
-
-        /* serial console getty */
-        if (kernel_cmdline_option("console", &m->serial_device) < 0)
                 return EXIT_FAILURE;
 
         if (manager_start_services(m, -1) < 0)
@@ -286,6 +268,5 @@ int main(int argc, char **argv) {
         if (manager_stop_services(m) < 0)
                 return EXIT_FAILURE;
 
-        system_reboot(RB_POWER_OFF);
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
 }

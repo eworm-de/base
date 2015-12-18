@@ -49,8 +49,8 @@ struct Manager {
         int fd_ep;
         struct epoll_event ep_signal;
 
-        /* org.bus1.devices */
-        pid_t devices_pid;
+        /* org.bus1.activator */
+        pid_t activator_pid;
 };
 
 static Manager *manager_free(Manager *m) {
@@ -76,7 +76,7 @@ static int manager_new(Manager **manager) {
         m->fd_signal = -1;
         m->fd_ep = -1;
 
-        m->devices_pid = -1;
+        m->activator_pid = -1;
 
         sigemptyset(&mask);
         sigaddset(&mask, SIGTERM);
@@ -102,56 +102,29 @@ static int manager_new(Manager **manager) {
        return 0;
 }
 
-static int child_reap(pid_t *p) {
-        bool reap = false;
-
-        for (;;) {
-                siginfo_t si = {};
-
-                if (waitid(P_ALL, 0, &si, WEXITED|WNOHANG) < 0) {
-                        if (errno == ECHILD)
-                                break;
-
-                        if (errno == EINTR)
-                                continue;
-
-                        return -errno;
-                }
-
-                reap = true;
-
-                if (p) {
-                        *p = si.si_pid;
-                        break;
-                }
-        }
-
-        return reap;
-}
-
 static int manager_start_services(Manager *m, pid_t died_pid) {
-        if (m->devices_pid > 0 && died_pid == m->devices_pid)
+        if (m->activator_pid > 0 && died_pid == m->activator_pid)
                 return -EIO;
 
-        if (m->devices_pid < 0) {
+        if (m->activator_pid < 0) {
                 pid_t pid;
 
-                pid = service_start("/usr/bin/org.bus1.devices");
+                pid = service_start("/usr/bin/org.bus1.activator");
                 if (pid < 0)
                         return pid;
 
-                m->devices_pid = pid;
+                m->activator_pid = pid;
         }
 
         return 0;
 }
 
 static int manager_stop_services(Manager *m) {
-        if (m->devices_pid > 0) {
-                if (kill(m->devices_pid, SIGTERM) < 0)
+        if (m->activator_pid > 0) {
+                if (kill(m->activator_pid, SIGTERM) < 0)
                         return -errno;
 
-                m->devices_pid = -1;
+                m->activator_pid = -1;
         }
 
         return 0;
@@ -397,7 +370,7 @@ static int manager_find_disk(Manager *m) {
                                 if (r < 0)
                                         return r;
 
-                                if (r == 0)
+                                if (pid < 0)
                                         break;
 
                                 r = manager_start_services(m, pid);
@@ -551,7 +524,7 @@ static int manager_switch_root(Manager *m, const char *newroot) {
         if (rootfd < 0)
                 return -errno;
 
-        for (i = 0; i< C_ARRAY_SIZE(mounts); i++) {
+        for (i = 0; i < C_ARRAY_SIZE(mounts); i++) {
                 _c_cleanup_(c_freep) char *target = NULL;
 
                 if (asprintf(&target, "%s%s", newroot, mounts[i]) < 0)
@@ -666,6 +639,9 @@ int main(int argc, char **argv) {
 
         /* late mount after module load */
         if (manager_kernel_filesystem_mount(m, false) < 0)
+                return EXIT_FAILURE;
+
+        if (mkdir("/sysroot", 0755) < 0)
                 return EXIT_FAILURE;
 
         if (rootfs_setup("/sysroot") < 0)

@@ -39,6 +39,8 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
+	src/shared/rootfs.h \
+	src/shared/rootfs.c \
 	src/shared/util.h \
 	src/shared/util.c
 
@@ -68,8 +70,6 @@ bin_PROGRAMS += \
 org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.h \
 	src/devices/sysfs.c \
-	src/shared/rootfs.h \
-	src/shared/rootfs.c \
 	src/rdinit/main.c
 
 org_bus1_rdinit_CFLAGS = \
@@ -110,6 +110,22 @@ org_bus1_devices_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(KMOD_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
+	org.bus1.activator
+
+org_bus1_activator_SOURCES = \
+	src/bus1/b1-identity.h \
+	src/activator/main.c
+
+org_bus1_activator_CFLAGS = \
+	$(BUS1_CFLAGS) \
+	$(AM_CFLAGS)
+
+org_bus1_activator_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS)
 
 # ------------------------------------------------------------------------------
 .PHONY: install-tree
