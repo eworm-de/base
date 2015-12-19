@@ -15,7 +15,7 @@ org.bus1.rdinit: /init to use in the initrd:
 
 org.bus1.init: init process PID1
         - starts org.bus1.activator
-        - starts tty login
+        - starts tty login if /dev/tty1 exists
         - starts serial console if console=<device> is given on the kernel
           command line
 

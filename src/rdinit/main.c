@@ -40,10 +40,8 @@
 typedef struct Manager Manager;
 
 struct Manager {
-        char *release;
         char *disk;
         char *partition;
-        bool shell;
 
         int fd_signal;
         int fd_ep;
@@ -54,7 +52,6 @@ struct Manager {
 };
 
 static Manager *manager_free(Manager *m) {
-        free(m->release);
         free(m->disk);
         free(m->partition);
         c_close(m->fd_ep);
@@ -130,7 +127,7 @@ static int manager_stop_services(Manager *m) {
         return 0;
 }
 
-static int manager_kernel_filesystem_mount(Manager *m, bool early) {
+static int kernel_filesystem_mount(bool early) {
         static const struct mountpoint {
                 const char *what;
                 const char *where;
@@ -174,7 +171,7 @@ static int manager_kernel_filesystem_mount(Manager *m, bool early) {
 
 static void module_log(void *data, int priority, const char *file, int line, const char *fn, const char *format, va_list args) {}
 
-static int manager_modules_load(Manager *m) {
+static int modules_load(void) {
         static const struct module {
                 const char *name;
                 const char *path;
@@ -221,7 +218,7 @@ err:
 
 C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
 
-static int manager_disk_probe(const char *disk, const char *disk_uuid, char **partition) {
+static int disk_probe(const char *disk, const char *disk_uuid, char **partition) {
         const char *s;
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         blkid_partlist pl;
@@ -281,7 +278,7 @@ static int manager_disk_probe(const char *disk, const char *disk_uuid, char **pa
         return -ENODEV;
 }
 
-static int manager_partition_probe(const char *partition, char **fstype) {
+static int partition_probe(const char *partition, char **fstype) {
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         const char *s;
         int r;
@@ -316,7 +313,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         if (asprintf(&device, "/dev/%s", devname) < 0)
                 return -ENOMEM;
 
-        r = manager_disk_probe(device, disk_uuid, partition);
+        r = disk_probe(device, disk_uuid, partition);
         if (r < 0)
                 return 0;
 
@@ -406,11 +403,11 @@ static int manager_find_disk(Manager *m) {
         return -ENODEV;
 }
 
-static int manager_disk_mount(const char *partition, const char *dir) {
+static int disk_mount(const char *partition, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
-        r = manager_partition_probe(partition, &fstype);
+        r = partition_probe(partition, &fstype);
         if (r < 0)
                 return r;
 
@@ -423,7 +420,7 @@ static int manager_disk_mount(const char *partition, const char *dir) {
         return 0;
 }
 
-static int manager_system_image_mount(const char *image, const char *dir) {
+static int system_image_mount(const char *image, const char *dir) {
         _c_cleanup_(c_closep) int fd_loopctl = -1;
         _c_cleanup_(c_closep) int fd_loop = -1;
         _c_cleanup_(c_closep) int fd_image = -1;
@@ -510,7 +507,7 @@ static int directory_delete(int *dfd, const char *exclude) {
         return 0;
 }
 
-static int manager_switch_root(Manager *m, const char *newroot) {
+static int switch_root(const char *newroot) {
         static const char *mounts[] = {
                 "/dev",
                 "/proc",
@@ -553,7 +550,7 @@ static int manager_switch_root(Manager *m, const char *newroot) {
         return 0;
 }
 
-static int manager_rdshell(Manager *m) {
+static int rdshell(const char *release) {
         const char *argv[] = {
                 "/usr/bin/bash",
                 NULL
@@ -563,9 +560,6 @@ static int manager_rdshell(Manager *m) {
                 NULL
         };
         pid_t p;
-
-        if (!m->shell)
-                return 0;
 
         p = fork();
         if (p < 0)
@@ -579,7 +573,7 @@ static int manager_rdshell(Manager *m) {
                         return EXIT_FAILURE;
 
                 printf("Welcome to %s (%s).\n\n"
-                       "Type 'exit' to continue.\n\n", program_invocation_short_name, m->release);
+                       "Type 'exit' to continue.\n\n", program_invocation_short_name, release);
 
                 execve(argv[0], (char **)argv, (char **)env);
                 return EXIT_FAILURE;
@@ -595,6 +589,8 @@ static int manager_rdshell(Manager *m) {
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdinit";
         _c_cleanup_(manager_freep) Manager *m = NULL;
+        _c_cleanup_(c_freep) char *release = NULL;
+        int shell;
         _c_cleanup_(c_freep) char *image = NULL;
         _c_cleanup_(c_freep) char *init = NULL;
         struct timezone tz = {};
@@ -602,7 +598,6 @@ int main(int argc, char **argv) {
                 "/usr/bin/org.bus1.init",
                 NULL
         };
-        int r;
 
         program_invocation_short_name = name;
         prctl(PR_SET_NAME, name);
@@ -619,26 +614,24 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         /* early mount before module load and command line parsing */
-        if (manager_kernel_filesystem_mount(m, true) < 0)
+        if (kernel_filesystem_mount(true) < 0)
                 return EXIT_FAILURE;
 
-        if (bus1_read_release(&m->release) < 0)
+        if (bus1_read_release(&release) < 0)
                 return EXIT_FAILURE;
 
-        r = kernel_cmdline_option("rdshell", NULL);
-        if (r < 0)
+        shell = kernel_cmdline_option("rdshell", NULL);
+        if (shell < 0)
                 return EXIT_FAILURE;
 
-        m->shell = !!r;
-
-        if (manager_rdshell(m) < 0)
+        if (shell && rdshell(release) < 0)
                 return EXIT_FAILURE;
 
-        if (manager_modules_load(m) < 0)
+        if (modules_load() < 0)
                 return EXIT_FAILURE;
 
         /* late mount after module load */
-        if (manager_kernel_filesystem_mount(m, false) < 0)
+        if (kernel_filesystem_mount(false) < 0)
                 return EXIT_FAILURE;
 
         if (mkdir("/sysroot", 0755) < 0)
@@ -662,19 +655,19 @@ int main(int argc, char **argv) {
         if (!m->partition && manager_find_disk(m) < 0)
                         return EXIT_FAILURE;
 
-        if (manager_disk_mount(m->partition, "/sysroot/bus1") < 0)
+        if (disk_mount(m->partition, "/sysroot/bus1") < 0)
                 return EXIT_FAILURE;
 
-        if (asprintf(&image, "/sysroot/bus1/system/%s.img", m->release) < 0)
+        if (asprintf(&image, "/sysroot/bus1/system/%s.img", release) < 0)
                 return EXIT_FAILURE;
 
-        if (manager_system_image_mount(image, "/sysroot/usr") < 0)
+        if (system_image_mount(image, "/sysroot/usr") < 0)
                 return EXIT_FAILURE;
 
         if (mount("/sysroot/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL) < 0)
                 return EXIT_FAILURE;
 
-        if (manager_rdshell(m) < 0)
+        if (shell && rdshell(release) < 0)
                 return EXIT_FAILURE;
 
         if (manager_stop_services(m) < 0)
@@ -683,7 +676,7 @@ int main(int argc, char **argv) {
         if (child_reap(NULL) < 0)
                 return EXIT_FAILURE;
 
-        if (manager_switch_root(m, "/sysroot") < 0)
+        if (switch_root("/sysroot") < 0)
                 return EXIT_FAILURE;
 
         if (kernel_cmdline_option("init", &init) < 0)
