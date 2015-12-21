@@ -30,8 +30,6 @@ int rootfs_setup(const char *rootdir) {
                 { "dev",    0755 },
 #if defined(__x86_64__)
                 { "lib64",  0755 },
-#else
-                { "lib",    0755 },
 #endif
                 { "proc",   0755 },
                 { "sys",    0755 },
@@ -46,14 +44,8 @@ int rootfs_setup(const char *rootdir) {
                 { "bin",                        "usr/bin" },
                 { "etc",                        "usr/etc" },
                 { "lib",                        "usr/lib" },
-#if defined(__i386__)
-                { "lib/ld-linux.so.2", "../usr/lib/i386-linux-gnu/ld-linux.so.2"
-#elif defined(__x86_64__)
+#if defined(__x86_64__)
                 { "lib64/ld-linux-x86-64.so.2", "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" },
-#elif defined(__arm__)
-                { "lib/ld-linux-armhf.so.3", "../usr/lib/arm-linux-gnueabihf/ld-linux-armhf.so.3" },
-#elif defined(__aarch64__)
-                { "lib/ld-linux-aarch64.so.1", "../usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"  },
 #endif
                 { "sbin",                       "usr/bin" },
         };
