@@ -664,6 +664,9 @@ int main(int argc, char **argv) {
         if (system_image_mount(image, "/sysroot/usr") < 0)
                 return EXIT_FAILURE;
 
+        if (mount("/sysroot/usr/etc", "/sysroot/etc", NULL, MS_BIND, NULL) < 0)
+                return EXIT_FAILURE;
+
         if (mount("/sysroot/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL) < 0)
                 return EXIT_FAILURE;
 

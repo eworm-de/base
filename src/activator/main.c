@@ -139,6 +139,9 @@ static pid_t service_activate(const char *service) {
                         return -errno;
         }
 
+        if (mount("/tmp/usr/etc", "/tmp/etc", NULL, MS_BIND, NULL) < 0)
+                return -errno;
+
         if (mount(datadir, "/tmp/var", NULL, MS_BIND, NULL) < 0)
                 return -errno;
 

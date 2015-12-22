@@ -28,6 +28,7 @@ int rootfs_setup(const char *rootdir) {
                 mode_t mode;
         } dirs[] = {
                 { "dev",    0755 },
+                { "etc",    0755 },
 #if defined(__x86_64__)
                 { "lib64",  0755 },
 #endif
@@ -42,7 +43,6 @@ int rootfs_setup(const char *rootdir) {
                 const char *target;
         } links[] = {
                 { "bin",                        "usr/bin" },
-                { "etc",                        "usr/etc" },
                 { "lib",                        "usr/lib" },
 #if defined(__x86_64__)
                 { "lib64/ld-linux-x86-64.so.2", "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" },
