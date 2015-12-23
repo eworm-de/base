@@ -27,7 +27,49 @@
 
 #include "util.h"
 
+/* mount all remaining device filesystem read-only */
+static int remount_filesystems(void) {
+        _c_cleanup_(c_fclosep) FILE *f = NULL;
+        int r;
+
+        f = fopen("/proc/self/mountinfo", "re");
+        if (!f)
+                return -errno;
+
+        for (;;) {
+                _c_cleanup_(c_freep) char *path = NULL, *source = NULL, *options = NULL;
+
+                r = fscanf(f,
+                           "%*s "       /* mount id */
+                           "%*s "       /* parent id */
+                           "%*s "       /* dev_t */
+                           "%*s "       /* root */
+                           "%ms "       /* mount point */
+                           "%*s"        /* mount flags */
+                           "%*[^-]"     /* optional fields */
+                           "- "         /* separator */
+                           "%*s "       /* file system type */
+                           "%ms"        /* mount source */
+                           "%ms"        /* mount options */
+                           "%*[^\n]",
+                           &path, &source, &options);
+                if (r == EOF)
+                        break;
+                if (r != 3)
+                        continue;
+
+                if (strncmp(source, "/dev/", strlen("/dev/") != 0))
+                        continue;
+
+                mount(NULL, path, NULL, MS_REMOUNT|MS_RDONLY, NULL);
+
+        }
+
+        return 0;
+}
+
 static int system_reboot(int cmd) {
+        _c_cleanup_(c_fclosep) FILE *f = NULL;
         unsigned int i;
 
         for (i = 0; i < 10; i++) {
@@ -39,6 +81,7 @@ static int system_reboot(int cmd) {
                 sleep(1);
         }
 
+        remount_filesystems();
         sync();
 
         return reboot(cmd);
