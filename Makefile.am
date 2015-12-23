@@ -39,6 +39,8 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
+	src/shared/kmsg.h \
+	src/shared/kmsg.c \
 	src/shared/rootfs.h \
 	src/shared/rootfs.c \
 	src/shared/util.h \

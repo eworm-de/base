@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include "kmsg.h"
 #include "util.h"
 
 /* mount all remaining device filesystem read-only */
@@ -117,8 +118,6 @@ static pid_t getty_start(const char *device) {
 typedef struct Manager Manager;
 
 struct Manager {
-        char *release;
-
         int fd_signal;
         int fd_ep;
         struct epoll_event ep_signal;
@@ -135,7 +134,6 @@ struct Manager {
 };
 
 static Manager *manager_free(Manager *m) {
-        free(m->release);
         c_close(m->fd_ep);
         c_close(m->fd_signal);
         free(m->serial_device);
@@ -304,7 +302,9 @@ static int manager_run(Manager *m) {
 }
 
 int main(int argc, char **argv) {
+        _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
+        _c_cleanup_(c_freep) char *release = NULL;
 
         /* clean up zombies from the initrd */
         if (child_reap(NULL) < 0)
@@ -313,8 +313,10 @@ int main(int argc, char **argv) {
         if (manager_new(&m) < 0)
                 return EXIT_FAILURE;
 
-        if (bus1_read_release(&m->release) < 0)
+        if (bus1_read_release(&release) < 0)
                 return EXIT_FAILURE;
+
+        log = kmsg(LOG_INFO, "Starting release %s.", release);
 
         /* serial console getty */
         if (kernel_cmdline_option("console", &m->serial_device) < 0)
@@ -329,6 +331,7 @@ int main(int argc, char **argv) {
         if (manager_stop_services(m) < 0)
                 return EXIT_FAILURE;
 
+        kmsg(LOG_INFO, "Shutting down.");
         system_reboot(RB_POWER_OFF);
         return EXIT_FAILURE;
 }

@@ -34,6 +34,7 @@
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
+#include "kmsg.h"
 #include "rootfs.h"
 #include "util.h"
 
@@ -246,8 +247,10 @@ static int disk_probe(const char *disk, const char *disk_uuid, char **partition)
         if (r < 0)
                 return r;
 
-        if (disk_uuid && strcmp(s, disk_uuid) != 0)
+        if (strcmp(s, disk_uuid) != 0)
                 return -ENODEV;
+
+        kmsg(LOG_INFO, "Found disk %s (%s).", disk, disk_uuid);
 
         pl = blkid_probe_get_partitions(b);
         if(!pl)
@@ -414,6 +417,7 @@ static int disk_mount(const char *partition, const char *dir) {
         if (mkdir(dir, 0755) < 0)
                 return -errno;
 
+        kmsg(LOG_INFO, "Mounting partition %s (%s).", partition, fstype);
         if (mount(partition, dir, fstype, 0, NULL) < 0)
                 return -errno;
 
@@ -588,6 +592,7 @@ static int rdshell(const char *release) {
 
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdinit";
+        _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
         _c_cleanup_(c_freep) char *release = NULL;
         int shell;
@@ -616,6 +621,8 @@ int main(int argc, char **argv) {
         /* early mount before module load and command line parsing */
         if (kernel_filesystem_mount(true) < 0)
                 return EXIT_FAILURE;
+
+        log = kmsg(0, NULL);
 
         if (bus1_read_release(&release) < 0)
                 return EXIT_FAILURE;
@@ -688,6 +695,7 @@ int main(int argc, char **argv) {
         if (init)
                 init_argv[0] = init;
 
+        kmsg(LOG_INFO, "Executing %s.", init_argv[0]);
         execve(init_argv[0], (char **)init_argv, NULL);
         return EXIT_FAILURE;
 }

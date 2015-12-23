@@ -30,6 +30,7 @@
 #include <sys/signalfd.h>
 #include <sys/wait.h>
 
+#include "kmsg.h"
 #include "rootfs.h"
 #include "util.h"
 
@@ -160,6 +161,7 @@ static pid_t service_activate(const char *service) {
         if (asprintf(&exe, "/usr/bin/%s", service) < 0)
                 return -ENOMEM;
 
+        kmsg(LOG_INFO, "Activating service %s.", exe);
         argv[0] = exe;
         execve(argv[0], (char **)argv, NULL);
 
@@ -251,7 +253,10 @@ static int manager_run(Manager *m) {
 }
 
 int main(int argc, char **argv) {
+        _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
+
+        log = kmsg(0, NULL);
 
         if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0)
                 return EXIT_FAILURE;
