@@ -33,7 +33,7 @@ FILE *kmsg(int level, const char *msg, ...) {
                 if (!f)
                         return NULL;
 
-                setvbuf(f, NULL, _IOLBF, 0);
+                setvbuf(f, NULL, _IONBF, 0);
         }
 
         if (!msg)
@@ -52,6 +52,7 @@ FILE *kmsg(int level, const char *msg, ...) {
 
         if (msg[len - 1] != '\n')
                 fprintf(f, "\n");
+        fflush(f);
 
         return f;
 }

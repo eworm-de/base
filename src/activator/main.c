@@ -161,7 +161,7 @@ static pid_t service_activate(const char *service) {
         if (asprintf(&exe, "/usr/bin/%s", service) < 0)
                 return -ENOMEM;
 
-        kmsg(LOG_INFO, "Activating service %s.", exe);
+        kmsg(LOG_INFO, "Activating service %s.", service);
         argv[0] = exe;
         execve(argv[0], (char **)argv, NULL);
 

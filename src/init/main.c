@@ -189,6 +189,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
         if (m->activator_pid < 0) {
                 pid_t pid;
 
+                kmsg(LOG_INFO, "Starting org.bus1.activator.");
                 pid = service_start("/usr/bin/org.bus1.activator");
                 if (pid < 0)
                         return pid;
@@ -199,6 +200,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
         if (access("/dev/tty1", F_OK) >= 0 && (m->login_pid < 0 || died_pid == m->login_pid)) {
                 pid_t pid;
 
+                kmsg(LOG_INFO, "Starting getty on tty1.");
                 pid = getty_start("tty1");
                 if (pid < 0)
                         return pid;
@@ -209,6 +211,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
         if (m->serial_device && (m->serial_pid < 0 || died_pid == m->serial_pid)) {
                 pid_t pid;
 
+                kmsg(LOG_INFO, "Starting getty on %s.", m->serial_device);
                 pid = getty_start(m->serial_device);
                 if (pid < 0)
                         return pid;
@@ -316,7 +319,7 @@ int main(int argc, char **argv) {
         if (bus1_read_release(&release) < 0)
                 return EXIT_FAILURE;
 
-        log = kmsg(LOG_INFO, "Starting release %s.", release);
+        log = kmsg(LOG_INFO, "Release %s.", release);
 
         /* serial console getty */
         if (kernel_cmdline_option("console", &m->serial_device) < 0)

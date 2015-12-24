@@ -21,6 +21,7 @@
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
 
+#include "kmsg.h"
 #include "module.h"
 #include "permissions.h"
 #include "sysfs.h"
@@ -47,6 +48,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
 }
 
 int main(int argc, char **argv) {
+        _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(c_closep) int fd_uevent = -1;
         _c_cleanup_(c_closep) int fd_signal = -1;
         _c_cleanup_(c_closep) int fd_ep = -1;
@@ -56,6 +58,8 @@ int main(int argc, char **argv) {
         _c_cleanup_(c_closep) int sysfd = -1;
         _c_cleanup_(c_closep) int devfd = -1;
         int r;
+
+        log = kmsg(0, NULL);
 
         devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (devfd < 0)
@@ -88,6 +92,7 @@ int main(int argc, char **argv) {
             epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_signal, &ep_signal) < 0)
                 return EXIT_FAILURE;
 
+        kmsg(LOG_INFO, "Coldplug, adjust /dev permissions and load kernel modules for current devices.");
         r = sysfs_enumerate(sysfd, NULL, NULL, devfd, sysfs_cb, NULL, NULL);
         if (r < 0)
                 return EXIT_FAILURE;

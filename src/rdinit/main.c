@@ -107,6 +107,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
         if (m->activator_pid < 0) {
                 pid_t pid;
 
+                kmsg(LOG_INFO, "Starting org.bus1.activator.");
                 pid = service_start("/usr/bin/org.bus1.activator");
                 if (pid < 0)
                         return pid;
@@ -692,10 +693,10 @@ int main(int argc, char **argv) {
         if (kernel_cmdline_option("init", &init) < 0)
                 return EXIT_FAILURE;
 
+        kmsg(LOG_INFO, "Executing %s.", init ?: "org.bus1.init");
         if (init)
                 init_argv[0] = init;
 
-        kmsg(LOG_INFO, "Executing %s.", init_argv[0]);
         execve(init_argv[0], (char **)init_argv, NULL);
         return EXIT_FAILURE;
 }
