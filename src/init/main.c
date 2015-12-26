@@ -320,6 +320,8 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         log = kmsg(LOG_INFO, "Release %s.", release);
+        if (!log)
+                return EXIT_FAILURE;
 
         /* serial console getty */
         if (kernel_cmdline_option("console", &m->serial_device) < 0)

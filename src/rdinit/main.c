@@ -555,6 +555,24 @@ static int switch_root(const char *newroot) {
         return 0;
 }
 
+static int stdio_connect(const char *device) {
+        int fd;
+
+        fd = open(device, O_RDWR|O_NOCTTY);
+        if (fd < 0)
+                return -errno;
+
+        if (dup2(fd, STDIN_FILENO) < 0 ||
+            dup2(fd, STDOUT_FILENO) < 0 ||
+            dup2(fd, STDERR_FILENO) < 0)
+            return -errno;
+
+        if (fd > STDERR_FILENO)
+                close(fd);
+
+        return 0;
+}
+
 static int rdshell(const char *release) {
         const char *argv[] = {
                 "/usr/bin/bash",
@@ -571,6 +589,9 @@ static int rdshell(const char *release) {
                 return -errno;
 
         if (p == 0) {
+                if (stdio_connect("/dev/console") < 0)
+                        return EXIT_FAILURE;
+
                 if (setsid() < 0)
                         return EXIT_FAILURE;
 
@@ -624,6 +645,11 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         log = kmsg(0, NULL);
+        if (!log)
+                return EXIT_FAILURE;
+
+        if (stdio_connect("/dev/null") < 0)
+                return EXIT_FAILURE;
 
         if (bus1_read_release(&release) < 0)
                 return EXIT_FAILURE;

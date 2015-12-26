@@ -60,6 +60,8 @@ int main(int argc, char **argv) {
         int r;
 
         log = kmsg(0, NULL);
+        if (!log)
+                return EXIT_FAILURE;
 
         devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (devfd < 0)

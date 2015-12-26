@@ -257,6 +257,8 @@ int main(int argc, char **argv) {
         _c_cleanup_(manager_freep) Manager *m = NULL;
 
         log = kmsg(0, NULL);
+        if (!log)
+                return EXIT_FAILURE;
 
         if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0)
                 return EXIT_FAILURE;
