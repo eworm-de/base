@@ -119,6 +119,8 @@ bin_PROGRAMS += \
 
 org_bus1_activator_SOURCES = \
 	src/bus1/b1-identity.h \
+	src/activator/service.h \
+	src/activator/service.c \
 	src/activator/main.c
 
 org_bus1_activator_CFLAGS = \

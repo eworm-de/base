@@ -19,26 +19,23 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 #include <ctype.h>
-#include <linux/sched.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/epoll.h>
-#include <sys/ioctl.h>
-#include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/signalfd.h>
 #include <sys/wait.h>
 
 #include "kmsg.h"
+#include "service.h"
 #include "tmpfs-root.h"
 #include "util.h"
 
 typedef struct Manager Manager;
 
 struct Manager {
-        /* org.bus1.devices */
-        pid_t devices_pid;
+        Service devices;
 
         int fd_signal;
         int fd_ep;
@@ -61,7 +58,8 @@ static int manager_new(Manager **manager) {
         if (!m)
                 return -ENOMEM;
 
-        m->devices_pid = -1;
+        m->devices.pid = -1;
+        m->devices.name = "org.bus1.devices";
 
         m->ep_signal.events = EPOLLIN;
         m->fd_signal = -1;
@@ -91,103 +89,29 @@ static int manager_new(Manager **manager) {
        return 0;
 }
 
-static pid_t service_activate(const char *service) {
-        pid_t p;
-        static const char *mounts[] = {
-                "/dev",
-                "/proc",
-                "/sys",
-                "/usr",
-        };
-        unsigned int i;
-        _c_cleanup_(c_freep) char *datadir = NULL;
-        _c_cleanup_(c_freep) char *exe = NULL;
-        const char *argv[2] = {};
-        int r;
-
-        if (asprintf(&datadir, "/var/bus1/%s", service) < 0)
-                return -ENOMEM;
-
-        if (mkdir(datadir, 0755) < 0 && errno != EEXIST)
-                return -errno;
-
-        p = c_sys_clone(SIGCHLD|CLONE_NEWNS|CLONE_NEWIPC, NULL);
-        if (p < 0)
-                return -errno;
-        if (p > 0)
-                return p;
-
-        if (prctl(PR_SET_PDEATHSIG, SIGTERM) < 0)
-                return -errno;
-
-        if (setsid() < 0)
-                return -errno;
-
-        r = tmpfs_root("/tmp");
-        if (r < 0)
-                return r;
-
-        for (i = 0; i < C_ARRAY_SIZE(mounts); i++) {
-                _c_cleanup_(c_freep) char *target = NULL;
-
-                if (asprintf(&target, "/tmp%s", mounts[i]) < 0)
-                        return -ENOMEM;
-
-                if (mount(mounts[i], target, NULL, MS_BIND|MS_REC, NULL) < 0)
-                        return -errno;
-        }
-
-        if (mount("/tmp/usr/etc", "/tmp/etc", NULL, MS_BIND, NULL) < 0)
-                return -errno;
-
-        if (mount(datadir, "/tmp/var", NULL, MS_BIND, NULL) < 0)
-                return -errno;
-
-        if (chdir("/tmp") < 0)
-                return -errno;
-
-        if (mount("/tmp", "/", NULL, MS_MOVE, NULL) < 0)
-                return -errno;
-
-        if (chroot(".") < 0)
-                return -errno;
-
-        if (chdir("/") < 0)
-                return -errno;
-
-        if (asprintf(&exe, "/usr/bin/%s", service) < 0)
-                return -ENOMEM;
-
-        kmsg(LOG_INFO, "Activating service %s.", service);
-        argv[0] = exe;
-        execve(argv[0], (char **)argv, NULL);
-
-        return -errno;
-}
-
 static int manager_start_services(Manager *m, pid_t died_pid) {
-        if (m->devices_pid > 0 && died_pid == m->devices_pid)
+        if (m->devices.pid > 0 && died_pid == m->devices.pid)
                 return -EIO;
 
-        if (m->devices_pid < 0) {
+        if (m->devices.pid < 0) {
                 pid_t pid;
 
-                pid = service_activate("org.bus1.devices");
+                pid = service_activate(&m->devices);
                 if (pid < 0)
                         return pid;
 
-                m->devices_pid = pid;
+                m->devices.pid = pid;
         }
 
         return 0;
 }
 
 static int manager_stop_services(Manager *m) {
-        if (m->devices_pid > 0) {
-                if (kill(m->devices_pid, SIGTERM) < 0)
+        if (m->devices.pid > 0) {
+                if (kill(m->devices.pid, SIGTERM) < 0)
                         return -errno;
 
-                m->devices_pid = -1;
+                m->devices.pid = -1;
         }
 
         return 0;
