@@ -35,7 +35,7 @@
 //FIXME: use bus
 #include "../devices/sysfs.h"
 #include "kmsg.h"
-#include "rootfs.h"
+#include "tmpfs-root.h"
 #include "util.h"
 
 typedef struct Manager Manager;
@@ -460,7 +460,7 @@ static int system_image_mount(const char *image, const char *dir) {
         return 0;
 }
 
-static int directory_delete(int *dfd, const char *exclude) {
+static int directory_delete(int *dfd) {
         _c_cleanup_(c_closedirp) DIR *dir = NULL;
         struct stat st;
         struct dirent *d;
@@ -478,9 +478,6 @@ static int directory_delete(int *dfd, const char *exclude) {
                 if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)
                         continue;
 
-                if (exclude && strcmp(d->d_name, exclude) == 0)
-                        continue;
-
                 if (d->d_type == DT_DIR) {
                         struct stat st2;
                         _c_cleanup_(c_closep) int dfd2 = -1;
@@ -495,7 +492,7 @@ static int directory_delete(int *dfd, const char *exclude) {
                         if (dfd2 < 0)
                                 return -errno;
 
-                        r = directory_delete(&dfd2, NULL);
+                        r = directory_delete(&dfd2);
                         if (r < 0)
                                 return r;
 
@@ -539,7 +536,7 @@ static int switch_root(const char *newroot) {
         if (chdir(newroot) < 0)
                 return -errno;
 
-        if (mount(newroot, "/", NULL, MS_BIND, NULL) < 0)
+        if (mount(newroot, "/", NULL, MS_MOVE, NULL) < 0)
                 return -errno;
 
         if (chroot(".") < 0)
@@ -548,7 +545,7 @@ static int switch_root(const char *newroot) {
         if (chdir("/") < 0)
                 return -errno;
 
-        r = directory_delete(&rootfd, newroot + 1);
+        r = directory_delete(&rootfd);
         if (r < 0)
                 return r;
 
@@ -607,7 +604,7 @@ static int rdshell(const char *release) {
 
         p = waitpid(p, NULL, 0);
         if (p < 0)
-                return errno;
+                return -errno;
 
         return 0;
 }
@@ -671,7 +668,7 @@ int main(int argc, char **argv) {
         if (mkdir("/sysroot", 0755) < 0)
                 return EXIT_FAILURE;
 
-        if (rootfs_setup("/sysroot") < 0)
+        if (tmpfs_root("/sysroot") < 0)
                 return EXIT_FAILURE;
 
         if (kernel_cmdline_option("partition", &m->partition) < 0)

@@ -17,11 +17,12 @@
 
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 
-#include "rootfs.h"
+#include "tmpfs-root.h"
 
-int rootfs_setup(const char *rootdir) {
+int tmpfs_root(const char *rootdir) {
         _c_cleanup_(c_closep) int rootfd = -1;
         static const struct {
                 const char *name;
@@ -50,6 +51,9 @@ int rootfs_setup(const char *rootdir) {
                 { "sbin",                       "usr/bin" },
         };
         unsigned int i;
+
+        if (mount("tmpfs", rootdir, "tmpfs", MS_NOSUID|MS_STRICTATIME, "mode=0755,size=5M") < 0)
+                return -errno;
 
         rootfd = openat(AT_FDCWD, rootdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (rootfd < 0)

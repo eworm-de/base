@@ -16,4 +16,4 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int rootfs_setup(const char *rootdir);
+int tmpfs_root(const char *rootdir);

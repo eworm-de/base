@@ -31,7 +31,7 @@
 #include <sys/wait.h>
 
 #include "kmsg.h"
-#include "rootfs.h"
+#include "tmpfs-root.h"
 #include "util.h"
 
 typedef struct Manager Manager;
@@ -123,10 +123,7 @@ static pid_t service_activate(const char *service) {
         if (setsid() < 0)
                 return -errno;
 
-        if (mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID|MS_STRICTATIME, "mode=0755,size=5M") < 0)
-                return errno;
-
-        r = rootfs_setup("/tmp");
+        r = tmpfs_root("/tmp");
         if (r < 0)
                 return r;
 
