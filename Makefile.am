@@ -55,6 +55,8 @@ bin_PROGRAMS += \
 	org.bus1.init
 
 org_bus1_init_SOURCES = \
+	src/init/sysctl.h \
+	src/init/sysctl.c \
 	src/init/main.c
 
 org_bus1_init_CFLAGS = \

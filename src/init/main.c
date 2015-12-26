@@ -26,6 +26,7 @@
 #include <sys/wait.h>
 
 #include "kmsg.h"
+#include "sysctl.h"
 #include "util.h"
 
 /* mount all remaining device filesystem read-only */
@@ -311,6 +312,9 @@ int main(int argc, char **argv) {
 
         /* clean up zombies from the initrd */
         if (child_reap(NULL) < 0)
+                return EXIT_FAILURE;
+
+        if (sysctl_apply() < 0)
                 return EXIT_FAILURE;
 
         if (manager_new(&m) < 0)
