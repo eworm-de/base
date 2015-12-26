@@ -111,7 +111,7 @@ static pid_t service_activate(const char *service) {
         if (mkdir(datadir, 0755) < 0 && errno != EEXIST)
                 return -errno;
 
-        p = c_sys_clone(SIGCHLD|CLONE_NEWNS, NULL);
+        p = c_sys_clone(SIGCHLD|CLONE_NEWNS|CLONE_NEWIPC, NULL);
         if (p < 0)
                 return -errno;
         if (p > 0)
@@ -149,7 +149,7 @@ static pid_t service_activate(const char *service) {
         if (chdir("/tmp") < 0)
                 return -errno;
 
-        if (mount("/tmp", "/", NULL, MS_BIND, NULL) < 0)
+        if (mount("/tmp", "/", NULL, MS_MOVE, NULL) < 0)
                 return -errno;
 
         if (chroot(".") < 0)

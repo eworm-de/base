@@ -33,7 +33,7 @@ FILE *kmsg(int level, const char *msg, ...) {
                 if (!f)
                         return NULL;
 
-                setvbuf(f, NULL, _IONBF, 0);
+                setvbuf(f, NULL, _IOFBF, 0);
         }
 
         if (!msg)
