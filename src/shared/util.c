@@ -22,6 +22,40 @@
 
 #include "util.h"
 
+char *escape_hex(const char *in) {
+        static const char hex[16] = "0123456789abcdef";
+        const char *i;
+        char *out, *o;
+
+        out = malloc(strlen(in) * 4 + 1);
+        if (!out)
+                return NULL;
+
+        for (i = in, o = out; *i; i++) {
+                switch (*i) {
+                case 'a' ... 'z':
+                case 'A' ... 'Z':
+                case '0' ... '9':
+                case '_':
+                case '-':
+                case '.':
+                        *(o++) = *i;
+                        break;
+
+                default:
+                        *(o++) = '\\';
+                        *(o++) = 'x';
+                        *(o++) = hex[(*i & 0xf) >> 4];
+                        *(o++) = hex[*i & 0xf];
+                        break;
+                }
+        }
+
+        *o = '\0';
+
+        return out;
+}
+
 int child_reap(pid_t *p) {
         pid_t pid = -1;
 

@@ -23,4 +23,5 @@ enum {
         BUS1_IDENTITY_VIDEO     = 1003,
         BUS1_IDENTITY_DISK      = 1004,
         BUS1_IDENTITY_USB       = 1005,
+        BUS1_IDENTITY_COREDUMP  = 1006,
 };

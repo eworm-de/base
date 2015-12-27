@@ -26,6 +26,7 @@ static inline int c_sys_clone(unsigned long flags, void *child_stack) {
 #endif
 }
 
+char *escape_hex(const char *in);
 int child_reap(pid_t *p);
 pid_t service_start(const char *prog);
 int bus1_read_release(char **release);

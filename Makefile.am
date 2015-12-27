@@ -146,7 +146,8 @@ org_bus1_coredump_CFLAGS = \
 
 org_bus1_coredump_LDADD = \
 	libshared.a \
-	$(BUS1_LIBS)
+	$(BUS1_LIBS) \
+	$(ELFUTILS_LIBS)
 
 # ------------------------------------------------------------------------------
 .PHONY: install-tree
