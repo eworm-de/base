@@ -16,6 +16,7 @@
 ***/
 
 #include <bus1/c-macro.h>
+#include <bus1/c-shared.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/epoll.h>
@@ -60,7 +61,7 @@ static int remount_filesystems(void) {
                 if (r != 3)
                         continue;
 
-                if (strncmp(source, "/dev/", strlen("/dev/") != 0))
+                if (!c_str_prefix(source, "/dev/"))
                         continue;
 
                 mount(NULL, path, NULL, MS_REMOUNT|MS_RDONLY, NULL);
