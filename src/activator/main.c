@@ -18,6 +18,7 @@
 #include <bus1/b1-platform.h>
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
+#include <bus1/c-sys.h>
 #include <ctype.h>
 #include <signal.h>
 #include <string.h>
