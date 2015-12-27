@@ -38,6 +38,9 @@ static const struct {
 
         { "fs/protected_hardlinks", "1" },
         { "fs/protected_symlinks", "1" },
+
+        /* comm, PID, UID, GID, signal */
+        { "kernel/core_pattern", "|/usr/bin/org.bus1.coredump %e %P %u %g %s" },
 };
 
 int sysctl_apply(void) {

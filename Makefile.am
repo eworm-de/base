@@ -134,6 +134,21 @@ org_bus1_activator_LDADD = \
 	$(BUS1_LIBS)
 
 # ------------------------------------------------------------------------------
+bin_PROGRAMS += \
+	org.bus1.coredump
+
+org_bus1_coredump_SOURCES = \
+	src/coredump/main.c
+
+org_bus1_coredump_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
+
+org_bus1_coredump_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS)
+
+# ------------------------------------------------------------------------------
 .PHONY: install-tree
 install-tree: all
 	rm -rf $(abs_srcdir)/install-tree
