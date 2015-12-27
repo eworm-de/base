@@ -79,7 +79,7 @@ static int system_reboot(int cmd) {
                 if (mount(NULL, "/bus1", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0)
                         break;
 
-                printf("killing all processes\n");
+                kmsg(LOG_INFO, "Filesystem busy. Sending all process the KILL signal: %m\n");
                 kill(-1, SIGKILL);
                 sleep(1);
         }
@@ -310,38 +310,58 @@ int main(int argc, char **argv) {
         _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
         _c_cleanup_(c_freep) char *release = NULL;
+        int r;
 
         /* clean up zombies from the initrd */
-        if (child_reap(NULL) < 0)
-                return EXIT_FAILURE;
+        if (child_reap(NULL) < 0) {
+                r = -errno;
+                goto fail;
+        }
 
-        if (sysctl_apply() < 0)
-                return EXIT_FAILURE;
+        r = sysctl_apply();
+        if (r < 0)
+                goto fail;
 
-        if (manager_new(&m) < 0)
-                return EXIT_FAILURE;
+        r = manager_new(&m);
+        if (r < 0)
+                goto fail;
 
-        if (bus1_read_release(&release) < 0)
-                return EXIT_FAILURE;
+        r = bus1_read_release(&release);
+        if (r < 0)
+                goto fail;
 
         log = kmsg(LOG_INFO, "Release %s.", release);
-        if (!log)
-                return EXIT_FAILURE;
+        if (!log) {
+                r = -errno;
+                goto fail;
+        }
 
         /* serial console getty */
-        if (kernel_cmdline_option("console", &m->serial_device) < 0)
-                return EXIT_FAILURE;
+        r = kernel_cmdline_option("console", &m->serial_device);
+        if (r < 0)
+                goto fail;
 
-        if (manager_start_services(m, -1) < 0)
-                return EXIT_FAILURE;
+        r = manager_start_services(m, -1);
+        if (r < 0)
+                goto fail;
 
-        if (manager_run(m) < 0)
-                return EXIT_FAILURE;
+        r = manager_run(m);
+        if (r < 0)
+                goto fail;
 
-        if (manager_stop_services(m) < 0)
-                return EXIT_FAILURE;
+        r = manager_stop_services(m);
+        if (r < 0)
+                goto fail;
 
         kmsg(LOG_INFO, "Shutting down.");
         system_reboot(RB_POWER_OFF);
+        r = -errno;
+        kmsg(LOG_EMERG, "Failed to execute reboot().");
+
+fail:
+        kmsg(LOG_EMERG, "Unrecoverable failure. System rebooting: %s.", strerror(-r));
+        sleep(5);
+        system_reboot(RB_AUTOBOOT);
+
         return EXIT_FAILURE;
 }

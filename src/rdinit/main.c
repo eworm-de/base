@@ -28,6 +28,7 @@
 #include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
+#include <sys/reboot.h>
 #include <sys/stat.h>
 #include <sys/signalfd.h>
 #include <sys/wait.h>
@@ -404,6 +405,7 @@ static int manager_find_disk(Manager *m) {
                 return 0;
         }
 
+        kmsg(LOG_ERR, "No disk with partition UUID %s found.", m->disk);
         return -ENODEV;
 }
 
@@ -412,8 +414,10 @@ static int disk_mount(const char *partition, const char *dir) {
         int r;
 
         r = partition_probe(partition, &fstype);
-        if (r < 0)
+        if (r < 0) {
+                kmsg(LOG_ERR, "No partition or no filesystem found on partition %s.", partition);
                 return r;
+        }
 
         if (mkdir(dir, 0755) < 0)
                 return -errno;
@@ -614,7 +618,7 @@ int main(int argc, char **argv) {
         _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
         _c_cleanup_(c_freep) char *release = NULL;
-        int shell;
+        bool shell = false;
         _c_cleanup_(c_freep) char *image = NULL;
         _c_cleanup_(c_freep) char *init = NULL;
         struct timezone tz = {};
@@ -622,104 +626,165 @@ int main(int argc, char **argv) {
                 "/usr/bin/org.bus1.init",
                 NULL
         };
+        int r;
 
         program_invocation_short_name = name;
-        prctl(PR_SET_NAME, name);
+        if (prctl(PR_SET_NAME, name) < 0) {
+                r = -errno;
+                goto fail;
+        }
 
         umask(0);
-        if (setsid() < 0)
-                return EXIT_FAILURE;
+        if (setsid() < 0) {
+                r = -errno;
+                goto fail;
+       }
 
         /* do a dummy call to disable the time zone warping magic */
-        if (settimeofday(NULL, &tz) < 0)
-                return EXIT_FAILURE;
+        if (settimeofday(NULL, &tz) < 0) {
+                r = -errno;
+                goto fail;
+        }
 
-        if (manager_new(&m) < 0)
-                return EXIT_FAILURE;
+        r = manager_new(&m);
+        if (r < 0)
+                goto fail;
 
         /* early mount before module load and command line parsing */
-        if (kernel_filesystem_mount(true) < 0)
-                return EXIT_FAILURE;
+        r = kernel_filesystem_mount(true);
+        if (r < 0)
+                goto fail;
 
         log = kmsg(0, NULL);
-        if (!log)
-                return EXIT_FAILURE;
+        if (!log) {
+                r = -errno;
+                goto fail;
+        }
 
-        if (stdio_connect("/dev/null") < 0)
-                return EXIT_FAILURE;
+        r = stdio_connect("/dev/null");
+        if (r < 0)
+                goto fail;
 
-        if (bus1_read_release(&release) < 0)
-                return EXIT_FAILURE;
+        r = kernel_cmdline_option("rdshell", NULL);
+        if (r < 0)
+                goto fail;
+        shell = !!r;
 
-        shell = kernel_cmdline_option("rdshell", NULL);
-        if (shell < 0)
-                return EXIT_FAILURE;
+        r = bus1_read_release(&release);
+        if (r < 0)
+                goto fail;
 
-        if (shell && rdshell(release) < 0)
-                return EXIT_FAILURE;
+        if (shell) {
+                r = rdshell(release);
+                if (r < 0)
+                        goto fail;
+        }
 
-        if (modules_load() < 0)
-                return EXIT_FAILURE;
+        r = modules_load();
+        if (r < 0)
+                goto fail;
 
         /* late mount after module load */
-        if (kernel_filesystem_mount(false) < 0)
-                return EXIT_FAILURE;
+        r = kernel_filesystem_mount(false);
+        if (r < 0)
+                goto fail;
 
-        if (mkdir("/sysroot", 0755) < 0)
-                return EXIT_FAILURE;
+        if (mkdir("/sysroot", 0755) < 0) {
+                r = -errno;
+                goto fail;
+        }
 
-        if (tmpfs_root("/sysroot") < 0)
-                return EXIT_FAILURE;
+        r = tmpfs_root("/sysroot");
+        if (r < 0)
+                goto fail;
 
-        if (kernel_cmdline_option("partition", &m->partition) < 0)
-                return EXIT_FAILURE;
+        r = kernel_cmdline_option("partition", &m->partition);
+        if (r < 0)
+                goto fail;
 
-        if (kernel_cmdline_option("disk", &m->disk) < 0)
-                return EXIT_FAILURE;
+        r = kernel_cmdline_option("disk", &m->disk);
+        if (r < 0)
+                goto fail;
 
-        if (!m->partition && !m->disk)
-                return EXIT_FAILURE;
+        if (!m->partition && !m->disk) {
+                kmsg(LOG_EMERG, "Missing disk= or partition= on the kernel command line.");
+                r = -EINVAL;
+                goto fail;
+        }
 
-        if (manager_start_services(m, -1) < 0)
-                return EXIT_FAILURE;
+        r = manager_start_services(m, -1);
+        if (r < 0)
+                goto fail;
 
-        if (!m->partition && manager_find_disk(m) < 0)
-                        return EXIT_FAILURE;
+        if (!m->partition) {
+                r = manager_find_disk(m);
+                if (r < 0)
+                        goto fail;
+        }
 
-        if (disk_mount(m->partition, "/sysroot/bus1") < 0)
-                return EXIT_FAILURE;
+        r = disk_mount(m->partition, "/sysroot/bus1");
+        if (r < 0)
+                goto fail;
 
-        if (asprintf(&image, "/sysroot/bus1/system/%s.img", release) < 0)
-                return EXIT_FAILURE;
+        if (asprintf(&image, "/sysroot/bus1/system/%s.img", release) < 0) {
+                r = -ENOMEM;
+                goto fail;
+        }
 
-        if (system_image_mount(image, "/sysroot/usr") < 0)
-                return EXIT_FAILURE;
+        r = system_image_mount(image, "/sysroot/usr");
+        if (r < 0) {
+                kmsg(LOG_EMERG, "Unable to mount system image %s.", image);
+                goto fail;
+        }
 
-        if (mount("/sysroot/usr/etc", "/sysroot/etc", NULL, MS_BIND, NULL) < 0)
-                return EXIT_FAILURE;
+        if (mount("/sysroot/usr/etc", "/sysroot/etc", NULL, MS_BIND, NULL) < 0) {
+                r = -errno;
+                goto fail;
+        }
 
-        if (mount("/sysroot/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL) < 0)
-                return EXIT_FAILURE;
+        if (mount("/sysroot/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL) < 0) {
+                r = -errno;
+                goto fail;
+        }
 
-        if (shell && rdshell(release) < 0)
-                return EXIT_FAILURE;
+        if (shell) {
+                r = rdshell(release);
+                if (r < 0)
+                        goto fail;
+        }
 
-        if (manager_stop_services(m) < 0)
-                return EXIT_FAILURE;
+        r = manager_stop_services(m);
+        if (r < 0)
+                goto fail;
 
-        if (child_reap(NULL) < 0)
-                return EXIT_FAILURE;
+        r = child_reap(NULL);
+        if (r < 0)
+                goto fail;
 
-        if (switch_root("/sysroot") < 0)
-                return EXIT_FAILURE;
+        r = switch_root("/sysroot");
+        if (r < 0)
+                goto fail;
 
-        if (kernel_cmdline_option("init", &init) < 0)
-                return EXIT_FAILURE;
+        r = kernel_cmdline_option("init", &init);
+        if (r < 0)
+                goto fail;
 
         kmsg(LOG_INFO, "Executing %s.", init ?: "org.bus1.init");
         if (init)
                 init_argv[0] = init;
 
         execve(init_argv[0], (char **)init_argv, NULL);
+        r = -errno;
+        kmsg(LOG_EMERG, "Failed to execute %s.", init_argv[0]);
+
+fail:
+        kmsg(LOG_EMERG, "Unrecoverable failure. System rebooting: %s.", strerror(-r));
+
+        if (shell)
+                rdshell(release);
+
+        sleep(5);
+        reboot(RB_AUTOBOOT);
+
         return EXIT_FAILURE;
 }
