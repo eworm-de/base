@@ -24,8 +24,8 @@ static int enumerate_devices(int sysfd, const char *devicesdir, const char *devt
                              int devfd,
                              int (*cb)(int sysfd, const char *subsystem, const char *devtype,
                                        int devfd, const char *devname, const char *modalias,
-                                       const void *in, void *out),
-                             const void *in, void *out) {
+                                       void *userdata),
+                             void *userdata) {
         _c_cleanup_(c_closep) int dfd2 = -1;
         _c_cleanup_(c_closedirp) DIR *dir2 = NULL;
         struct dirent *d2;
@@ -123,7 +123,7 @@ static int enumerate_devices(int sysfd, const char *devicesdir, const char *devt
                                 continue;
                 }
 
-                r = cb(sysfd, ss, dt, devfd, dn, ma, in, out);
+                r = cb(sysfd, ss, dt, devfd, dn, ma, userdata);
                 if (r < 0 || r == 1)
                         return r;
         }
@@ -135,8 +135,8 @@ static int enumerate_subsystems(int sysfd, const char *subsystemsdir, const char
                                 int devfd,
                                 int (*cb)(int sysfd, const char *subsystem, const char *devtype,
                                           int devfd, const char *devname, const char *modalias,
-                                          const void *in, void *out),
-                                const void *in, void *out) {
+                                          void *userdata),
+                                void *userdata) {
         _c_cleanup_(c_closep) int dfd = -1;
         _c_cleanup_(c_closedirp) DIR *dir = NULL;
         struct dirent *d;
@@ -154,7 +154,7 @@ static int enumerate_subsystems(int sysfd, const char *subsystemsdir, const char
                                 return -ENOMEM;
                 }
 
-                return enumerate_devices(sysfd, sd, devtype, devfd, cb, in, out);
+                return enumerate_devices(sysfd, sd, devtype, devfd, cb, userdata);
         }
 
         /* all subsystems at /sys/bus/$SUBSYSTEM or /sys/class/$SUBSYSTEM */
@@ -182,7 +182,7 @@ static int enumerate_subsystems(int sysfd, const char *subsystemsdir, const char
                 }
 
                 /* /sys/bus/$SUBSYSTEM/devices or /sys/class/$SUBSYSTEM */
-                r = enumerate_devices(sysfd, sd ?: d->d_name, devtype, devfd, cb, in, out);
+                r = enumerate_devices(sysfd, sd ?: d->d_name, devtype, devfd, cb, userdata);
                 if (r < 0)
                         return r;
         }
@@ -194,15 +194,15 @@ int sysfs_enumerate(int sysfd, const char *subsystem, const char *devtype,
                     int devfd,
                     int (*cb)(int sysfd, const char *subsystem, const char *devtype,
                               int devfd, const char *devname, const char *modalias,
-                              const void *in, void *out),
-                    const void *in, void *out) {
+                              void *userdata),
+                    void *userdata) {
         int r;
 
         /* /sys/bus/$SUBSYSTEM/devices/ */
-        r = enumerate_subsystems(sysfd, "bus", subsystem, "devices", devtype, devfd, cb, in, out);
+        r = enumerate_subsystems(sysfd, "bus", subsystem, "devices", devtype, devfd, cb, userdata);
         if (r < 0 && r != -ENOENT)
                 return r;
 
         /* /sys/class/$SUBSYSTEM/ */
-        return enumerate_subsystems(sysfd, "class", subsystem, NULL, devtype, devfd, cb, in, out);
+        return enumerate_subsystems(sysfd, "class", subsystem, NULL, devtype, devfd, cb, userdata);
 }

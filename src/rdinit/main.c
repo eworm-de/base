@@ -221,12 +221,14 @@ err:
 
 C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
 
-static int disk_probe(const char *disk, const char *disk_uuid, char **partition) {
+static int disk_probe(const char *disk, Manager *m) {
         const char *s;
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         blkid_partlist pl;
         int i;
         int r;
+
+        assert(!m->partition);
 
         b = blkid_new_probe_from_filename(disk);
         if (!b)
@@ -249,10 +251,10 @@ static int disk_probe(const char *disk, const char *disk_uuid, char **partition)
         if (r < 0)
                 return r;
 
-        if (strcmp(s, disk_uuid) != 0)
+        if (strcmp(s, m->disk) != 0)
                 return -ENODEV;
 
-        kmsg(LOG_INFO, "Found disk %s (%s).", disk, disk_uuid);
+        kmsg(LOG_INFO, "Found disk %s (%s).", disk, m->disk);
 
         pl = blkid_probe_get_partitions(b);
         if(!pl)
@@ -270,12 +272,14 @@ static int disk_probe(const char *disk, const char *disk_uuid, char **partition)
                         continue;
 
                 if (isdigit(disk[strlen(disk) - 1])) {
-                        if (asprintf(partition, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
+                        if (asprintf(&m->partition, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
                                 return -ENOMEM;
                 } else {
-                        if (asprintf(partition, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
+                        if (asprintf(&m->partition, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
                                 return -ENOMEM;
                 }
+
+                kmsg(LOG_INFO, "Found partition type bus1 at %s.", m->partition);
 
                 return 0;
         }
@@ -309,25 +313,23 @@ static int partition_probe(const char *partition, char **fstype) {
 
 static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
                     int devfd, const char *devname, const char *modalias,
-                    const void *in, void *out) {
+                    void *userdata) {
         _c_cleanup_(c_freep) char *device = NULL;
-        const char *disk_uuid = in;
-        char **partition = out;
+        Manager *m = userdata;
         int r;
 
         if (asprintf(&device, "/dev/%s", devname) < 0)
                 return -ENOMEM;
 
-        r = disk_probe(device, disk_uuid, partition);
+        r = disk_probe(device, m);
         if (r < 0)
                 return 0;
 
         return 1;
 }
 
-static int manager_find_disk(Manager *m) {
+static int manager_run(Manager *m) {
         _c_cleanup_(c_closep) int sysfd = -1;
-        _c_cleanup_(c_freep) char *partition = NULL;
         c_usec start;
         bool exit = false;
         int r;
@@ -388,28 +390,29 @@ static int manager_find_disk(Manager *m) {
                 }
 
                 //FIXME: hook up device events
-                r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, m->disk, &partition);
+                if (m->partition)
+                        r = access(m->partition, R_OK) == 0;
+                else
+                        r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, m);
                 if (r < 0)
                         return r;
                 if (r == 1)
-                        break;
+                        return 0;
 
                 now = c_usec_from_clock(CLOCK_BOOTTIME);
                 if (now - start > c_usec_from_sec(30))
                         break;
         }
 
-        if (partition) {
-                m->partition = partition;
-                partition = NULL;
-                return 0;
-        }
+        if (m->partition)
+                kmsg(LOG_ERR, "Partition %s not found.", m->disk);
+        if (m->disk)
+                kmsg(LOG_ERR, "Disk %s not found.", m->disk);
 
-        kmsg(LOG_ERR, "No disk with partition UUID %s found.", m->disk);
         return -ENODEV;
 }
 
-static int disk_mount(const char *partition, const char *dir) {
+static int partition_mount(const char *partition, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
@@ -716,13 +719,11 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        if (!m->partition) {
-                r = manager_find_disk(m);
-                if (r < 0)
-                        goto fail;
-        }
+        r = manager_run(m);
+        if (r < 0)
+                goto fail;
 
-        r = disk_mount(m->partition, "/sysroot/bus1");
+        r = partition_mount(m->partition, "/sysroot/bus1");
         if (r < 0)
                 goto fail;
 
@@ -733,7 +734,7 @@ int main(int argc, char **argv) {
 
         r = system_image_mount(image, "/sysroot/usr");
         if (r < 0) {
-                kmsg(LOG_EMERG, "Unable to mount system image %s.", image);
+                kmsg(LOG_EMERG, "Unable to mount system image %s: %s.", image, strerror(-r));
                 goto fail;
         }
 

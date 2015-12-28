@@ -29,7 +29,7 @@
 
 static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
                     int devfd, const char *devname, const char *modalias,
-                    const void *in, void *out) {
+                    void *userdata) {
         int r;
 
         if (devname) {
@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         kmsg(LOG_INFO, "Coldplug, adjust /dev permissions and load kernel modules for current devices.");
-        r = sysfs_enumerate(sysfd, NULL, NULL, devfd, sysfs_cb, NULL, NULL);
+        r = sysfs_enumerate(sysfd, NULL, NULL, devfd, sysfs_cb, NULL);
         if (r < 0)
                 return EXIT_FAILURE;
 
