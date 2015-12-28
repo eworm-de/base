@@ -30,7 +30,27 @@
 #include "sysctl.h"
 #include "util.h"
 
-/* mount all remaining device filesystem read-only */
+static bool has_option(const char *options, const char *option) {
+        const char *s;
+        size_t l;
+
+        l = strlen(option);
+        s = options;
+        for (;;) {
+                s = strstr(s, option);
+                if (!s)
+                        return false;
+
+                if ((s == options || s[-1] == ',') && (s[l] == '\0' || s[l] == ','))
+                        return true;
+
+                s += l;
+        };
+
+        return false;
+}
+
+/* Mount all remaining device filesystem read-only. */
 static int remount_filesystems(void) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         int r;
@@ -40,13 +60,13 @@ static int remount_filesystems(void) {
                 return -errno;
 
         for (;;) {
-                _c_cleanup_(c_freep) char *path = NULL, *source = NULL, *options = NULL;
+                _c_cleanup_(c_freep) char *root = NULL, *path = NULL, *source = NULL, *options = NULL;
 
                 r = fscanf(f,
                            "%*s "       /* mount id */
                            "%*s "       /* parent id */
                            "%*s "       /* dev_t */
-                           "%*s "       /* root */
+                           "%ms "       /* root */
                            "%ms "       /* mount point */
                            "%*s"        /* mount flags */
                            "%*[^-]"     /* optional fields */
@@ -55,16 +75,27 @@ static int remount_filesystems(void) {
                            "%ms"        /* mount source */
                            "%ms"        /* mount options */
                            "%*[^\n]",
-                           &path, &source, &options);
+                           &root, &path, &source, &options);
                 if (r == EOF)
                         break;
-                if (r != 3)
+                if (r != 4)
                         continue;
 
+                /* Simple mounts only. */
+                if (strcmp(root, "/") != 0)
+                        continue;
+
+                /* Devices only. */
                 if (!c_str_prefix(source, "/dev/"))
                         continue;
 
-                mount(NULL, path, NULL, MS_REMOUNT|MS_RDONLY, NULL);
+                if (has_option(options, "ro"))
+                        continue;
+
+                if (mount(NULL, path, NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0)
+                        kmsg(LOG_INFO, "Mounted filesystem at %s (%s) as read-only.", path, source);
+                else
+                        kmsg(LOG_WARNING, "Unable to mount filesystem at %s (%s) as read-only.", path, source);
 
         }
 
@@ -76,10 +107,12 @@ static int system_reboot(int cmd) {
         unsigned int i;
 
         for (i = 0; i < 10; i++) {
-                if (mount(NULL, "/bus1", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0)
+                if (mount(NULL, "/bus1", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0) {
+                        kmsg(LOG_INFO, "Mounted filesystem at /bus1 as read-only.");
                         break;
+                }
 
-                kmsg(LOG_INFO, "Filesystem busy. Sending all process the KILL signal: %m\n");
+                kmsg(LOG_WARNING, "Filesystem at /bus1 is busy. Sending all processes the KILL signal: %m\n");
                 kill(-1, SIGKILL);
                 sleep(1);
         }
