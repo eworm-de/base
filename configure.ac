@@ -148,7 +148,6 @@ AC_MSG_RESULT([
         prefix:                 ${prefix}
         exec_prefix:            ${exec_prefix}
         includedir:             ${includedir}
-        libdir:                 ${libdir}
 
         CFLAGS:                 ${OUR_CFLAGS} ${CFLAGS}
         CPPFLAGS:               ${OUR_CPPFLAGS} ${CPPFLAGS}

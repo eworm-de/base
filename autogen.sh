@@ -15,7 +15,7 @@ fi
 cd $oldpwd
 
 if [[ "$1" == "b" ]]; then
-        $topdir/configure --enable-debug --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib/x86_64-linux-gnu
+        $topdir/configure --enable-debug --prefix=/usr --sysconfdir=/etc --localstatedir=/var
         make clean
 elif [[ "$1" == "c" ]]; then
         $topdir/configure --enable-debug $args
