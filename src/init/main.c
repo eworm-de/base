@@ -350,7 +350,7 @@ static void dump_process(int sig) {
         }
 
         if (pid == 0) {
-                struct sigaction sa = {
+                static const struct sigaction sa = {
                         .sa_handler = SIG_DFL,
                 };
 

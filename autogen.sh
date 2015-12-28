@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -8,19 +8,19 @@ cd $topdir
 
 autoreconf --force --install --symlink
 
-if [ -f "$topdir/.config.args" ]; then
+if [[ -f "$topdir/.config.args" ]]; then
         args="$args $(cat $topdir/.config.args)"
 fi
 
 cd $oldpwd
 
-if [ "x$1" = "xb" ]; then
+if [[ "$1" == "b" ]]; then
         $topdir/configure --enable-debug --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib/x86_64-linux-gnu
         make clean
-elif [ "x$1" = "xc" ]; then
+elif [[ "$1" == "c" ]]; then
         $topdir/configure --enable-debug $args
         make clean
-elif [ "x$1" = "xl" ]; then
+elif [[ "$1" == "l" ]]; then
         $topdir/configure CC=clang $args
         make clean
 else
