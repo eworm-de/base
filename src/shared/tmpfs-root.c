@@ -52,7 +52,7 @@ int tmpfs_root(const char *rootdir) {
         };
         unsigned int i;
 
-        if (mount("tmpfs", rootdir, "tmpfs", MS_NOSUID|MS_STRICTATIME, "mode=0755,size=5M") < 0)
+        if (mount("tmpfs", rootdir, "tmpfs", MS_NOSUID|MS_NOEXEC|MS_NODEV|MS_STRICTATIME, "mode=0755,size=5M") < 0)
                 return -errno;
 
         rootfd = openat(AT_FDCWD, rootdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);

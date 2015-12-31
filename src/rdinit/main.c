@@ -138,12 +138,12 @@ static int kernel_filesystem_mount(bool early) {
                 const char *options;
                 unsigned long flags;
         } mount_early[] = {
-                { "devtmpfs", "/dev",         "devtmpfs", "mode=755",  MS_NOSUID|MS_STRICTATIME },
+                { "devtmpfs", "/dev",         "devtmpfs", "mode=755",  MS_NOSUID|MS_NOEXEC|MS_STRICTATIME },
                 { "devpts",   "/dev/pts",     "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
                 { "proc",     "/proc",        "proc",     "hidepid=2", MS_NOSUID|MS_NOEXEC|MS_NODEV },
                 { "sysfs",    "/sys",         "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
         }, mount_late[] = {
-                { "bus1fs",   "/sys/fs/bus1", "bus1fs",   NULL,        MS_NOSUID|MS_NOEXEC },
+                { "bus1fs",   "/sys/fs/bus1", "bus1fs",   NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
         };
 
         if (early) {
@@ -426,7 +426,7 @@ static int partition_mount(const char *partition, const char *dir) {
                 return -errno;
 
         kmsg(LOG_INFO, "Mounting partition %s (%s).", partition, fstype);
-        if (mount(partition, dir, fstype, 0, NULL) < 0)
+        if (mount(partition, dir, fstype, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;
@@ -461,7 +461,7 @@ static int system_image_mount(const char *image, const char *dir) {
         if (ioctl(fd_loop, LOOP_SET_FD, fd_image) < 0)
                 return -errno;
 
-        if (mount(loopdev, dir, "squashfs", MS_RDONLY, NULL) < 0)
+        if (mount(loopdev, dir, "squashfs", MS_RDONLY|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;
