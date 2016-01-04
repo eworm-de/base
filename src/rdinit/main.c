@@ -221,7 +221,7 @@ finish:
 
 C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
 
-static int disk_probe(const char *disk, Manager *m) {
+static int disk_find_partition(const char *disk, Manager *m) {
         const char *s;
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         blkid_partlist pl;
@@ -287,12 +287,12 @@ static int disk_probe(const char *disk, Manager *m) {
         return -ENODEV;
 }
 
-static int partition_probe(const char *partition, char **fstype) {
+static int filesystem_probe(const char *volume, char **fstype) {
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         const char *s;
         int r;
 
-        b = blkid_new_probe_from_filename(partition);
+        b = blkid_new_probe_from_filename(volume);
         if (!b)
                 return -EIO;
 
@@ -321,7 +321,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         if (asprintf(&device, "/dev/%s", devname) < 0)
                 return -ENOMEM;
 
-        r = disk_probe(device, m);
+        r = disk_find_partition(device, m);
         if (r < 0)
                 return 0;
 
@@ -416,7 +416,7 @@ static int partition_mount(const char *partition, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
-        r = partition_probe(partition, &fstype);
+        r = filesystem_probe(partition, &fstype);
         if (r < 0) {
                 kmsg(LOG_ERR, "No partition or no filesystem found on partition %s.", partition);
                 return r;
@@ -437,7 +437,9 @@ static int system_image_mount(const char *image, const char *dir) {
         _c_cleanup_(c_closep) int fd_loop = -1;
         _c_cleanup_(c_closep) int fd_image = -1;
         _c_cleanup_(c_freep) char *loopdev = NULL;
+        _c_cleanup_(c_freep) char *fstype = NULL;
         int n;
+        int r;
 
         fd_loopctl = open("/dev/loop-control", O_RDWR|O_CLOEXEC);
         if (fd_loopctl < 0)
@@ -461,7 +463,11 @@ static int system_image_mount(const char *image, const char *dir) {
         if (ioctl(fd_loop, LOOP_SET_FD, fd_image) < 0)
                 return -errno;
 
-        if (mount(loopdev, dir, "squashfs", MS_RDONLY|MS_NODEV, NULL) < 0)
+        r = filesystem_probe(loopdev, &fstype);
+        if (r < 0)
+                return r;
+
+        if (mount(loopdev, dir, fstype, MS_RDONLY|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;
