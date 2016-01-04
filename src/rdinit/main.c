@@ -196,13 +196,13 @@ static int modules_load(void) {
                         ctx = kmod_new(NULL, NULL);
                         if (!ctx) {
                                 r = -ENOMEM;
-                                goto err;
+                                goto finish;
                         }
 
                         kmod_set_log_fn(ctx, module_log, NULL);
                         r = kmod_load_resources(ctx);
                         if (r < 0)
-                                goto err;
+                                goto finish;
                 }
 
                 r = kmod_module_new_from_name(ctx, modules[i].name, &mod);
@@ -214,7 +214,7 @@ static int modules_load(void) {
                 kmod_module_unref(mod);
         }
 
-err:
+finish:
         kmod_unref(ctx);
         return r;
 }

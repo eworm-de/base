@@ -41,11 +41,11 @@ static void *module_thread(void *p) {
 
         r = kmod_load_resources(ctx);
         if (r < 0)
-                goto out;
+                goto finish;
 
         r = kmod_module_new_from_lookup(ctx, modalias, &list);
         if (r < 0)
-                goto out;
+                goto finish;
 
         if (list) {
                 struct kmod_list *l;
@@ -62,7 +62,7 @@ static void *module_thread(void *p) {
                 kmod_module_unref_list(list);
         }
 
-out:
+finish:
         kmod_unref(ctx);
         return NULL;
 }

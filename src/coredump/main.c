@@ -124,26 +124,26 @@ static int stacktrace(int core_fd, char **error) {
         elf_version(EV_CURRENT);
         c.elf = elf_begin(core_fd, ELF_C_READ_MMAP, NULL);
         if (!c.elf)
-                goto out;
+                goto finish;
 
         c.dwfl = dwfl_begin(&cbs);
         if (!c.dwfl)
-                goto out;
+                goto finish;
 
         if (dwfl_core_file_report(c.dwfl, c.elf, NULL) < 0)
-                goto out;
+                goto finish;
 
         if (dwfl_report_end(c.dwfl, NULL, NULL) != 0)
-                goto out;
+                goto finish;
 
         if (dwfl_core_file_attach(c.dwfl, c.elf) < 0)
-                goto out;
+                goto finish;
 
         if (dwfl_getthreads(c.dwfl, thread_cb, &c) < 0)
-                goto out;
+                goto finish;
 
         r = 0;
-out:
+finish:
         if (c.dwfl)
                 dwfl_end(c.dwfl);
         if (c.elf)
