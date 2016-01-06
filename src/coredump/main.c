@@ -281,9 +281,8 @@ int main(int argc, char **argv) {
                 kmsg(LOG_INFO, "%s[%d] wrote coredump to /var/coredump/%s (%zd kB).", comm, pid, core_file, core_size / 1024);
         }
 
-        /* Drop privileges */
+        /* Drop privileges. */
         if (setresgid(BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP) < 0 ||
-            setgroups(0, NULL) < 0 ||
             setresuid(BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP) < 0)
                 return EXIT_FAILURE;
 

@@ -36,7 +36,7 @@
 typedef struct Manager Manager;
 
 struct Manager {
-        Service devices;
+        Service *devices;
 
         int fd_signal;
         int fd_ep;
@@ -46,6 +46,7 @@ struct Manager {
 static Manager *manager_free(Manager *m) {
         c_close(m->fd_ep);
         c_close(m->fd_signal);
+        service_free(m->devices);
         free(m);
         return NULL;
 }
@@ -54,13 +55,16 @@ C_DEFINE_CLEANUP(Manager *, manager_free);
 static int manager_new(Manager **manager) {
         _c_cleanup_(manager_freep) Manager *m = NULL;
         sigset_t mask;
+        int r;
 
         m = calloc(1, sizeof(Manager));
         if (!m)
                 return -ENOMEM;
 
-        m->devices.pid = -1;
-        m->devices.name = "org.bus1.devices";
+
+        r = service_new("org.bus1.devices", &m->devices);
+        if (r < 0)
+                return r;
 
         m->ep_signal.events = EPOLLIN;
         m->fd_signal = -1;
@@ -91,28 +95,27 @@ static int manager_new(Manager **manager) {
 }
 
 static int manager_start_services(Manager *m, pid_t died_pid) {
-        if (m->devices.pid > 0 && died_pid == m->devices.pid)
+        int r;
+
+        if (m->devices->pid > 0 && died_pid == m->devices->pid)
                 return -EIO;
 
-        if (m->devices.pid < 0) {
-                pid_t pid;
-
-                pid = service_activate(&m->devices);
-                if (pid < 0)
-                        return pid;
-
-                m->devices.pid = pid;
+        if (m->devices->pid < 0) {
+                r = service_activate(m->devices);
+                if (r < 0)
+                        return r;
         }
 
         return 0;
 }
 
 static int manager_stop_services(Manager *m) {
-        if (m->devices.pid > 0) {
-                if (kill(m->devices.pid, SIGTERM) < 0)
-                        return -errno;
+        int r;
 
-                m->devices.pid = -1;
+        if (m->devices->pid >= 0) {
+                r = service_terminate(m->devices);
+                if (r < 0)
+                        return r;
         }
 
         return 0;

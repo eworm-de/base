@@ -30,7 +30,54 @@
 #include "tmpfs-root.h"
 #include "util.h"
 
-pid_t service_activate(Service *s) {
+int service_new(const char *name, Service **service) {
+        _c_cleanup_(service_freep) Service *s = NULL;
+
+        s = calloc(1, sizeof(Service));
+        if (!s)
+                return -ENOMEM;
+
+        s->name = strdup(name);
+        if (!s->name)
+                return -ENOMEM;
+
+        s->pid = -1;
+
+        *service = s;
+        s = NULL;
+
+       return 0;
+}
+
+Service *service_free(Service *s) {
+        char *p;
+
+        for (p = s->argv[0]; p; p++)
+                free(p);
+        free(s->argv);
+
+        for (p = s->envp[0]; p; p++)
+                free(p);
+        free(s->envp);
+
+        free(s->name);
+        free(s);
+
+        return NULL;
+}
+
+int service_terminate(Service *s) {
+        assert(s->pid >= 0);
+
+        if (kill(s->pid, SIGTERM) < 0)
+                return -errno;
+
+        s->terminated = true;
+
+        return 0;
+}
+
+int service_activate(Service *s) {
         pid_t p;
         static const char *mounts[] = {
                 "/dev",
@@ -40,9 +87,21 @@ pid_t service_activate(Service *s) {
         };
         unsigned int i;
         _c_cleanup_(c_freep) char *datadir = NULL;
-        _c_cleanup_(c_freep) char *exe = NULL;
-        const char *argv[2] = {};
         int r;
+
+        assert(s->pid < 0);
+        assert(!s->terminated);
+
+        if (!s->argv) {
+                _c_cleanup_(c_freep) char *exe = NULL;
+
+                s->argv = calloc(2, sizeof(char *));
+                if (!s->argv)
+                        return -ENOMEM;
+
+                if (asprintf(&s->argv[0], "/usr/bin/%s", s->name) < 0)
+                        return -ENOMEM;
+        }
 
         if (s->persistent_data) {
                 if (asprintf(&datadir, "/var/bus1/%s", s->name) < 0)
@@ -55,8 +114,11 @@ pid_t service_activate(Service *s) {
         p = c_sys_clone(SIGCHLD|CLONE_NEWNS|CLONE_NEWIPC, NULL);
         if (p < 0)
                 return -errno;
-        if (p > 0)
-                return p;
+
+        if (p > 0) {
+                s->pid = p;
+                return 0;
+        }
 
         if (prctl(PR_SET_PDEATHSIG, SIGTERM) < 0)
                 return -errno;
@@ -96,12 +158,14 @@ pid_t service_activate(Service *s) {
         if (chdir("/") < 0)
                 return -errno;
 
-        if (asprintf(&exe, "/usr/bin/%s", s->name) < 0)
-                return -ENOMEM;
+        if (s->gid > 0 && setresgid(s->gid, s->gid, s->gid) < 0)
+                return -errno;
+
+        if (s->uid > 0 && setresuid(s->uid, s->uid, s->uid) < 0)
+                return -errno;
 
         kmsg(LOG_INFO, "Activating service %s.", s->name);
-        argv[0] = exe;
-        execve(argv[0], (char **)argv, NULL);
+        execve(s->argv[0], s->argv, s->envp);
 
         return -errno;
 }

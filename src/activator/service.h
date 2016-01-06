@@ -19,11 +19,21 @@
 typedef struct Service Service;
 
 struct Service {
-        const char *name;
-        pid_t pid;
+        char *name;
 
+        uid_t uid;
+        uid_t gid;
         bool persistent_data;
+        char **argv;
+        char **envp;
+
+        pid_t pid;
+        bool terminated;
 };
 
-pid_t service_activate(Service *s);
+int service_new(const char *name, Service **s);
+Service *service_free(Service *s);
+C_DEFINE_CLEANUP(Service *, service_free);
 
+int service_activate(Service *s);
+int service_terminate(Service *s);
