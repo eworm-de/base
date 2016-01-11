@@ -1,22 +1,30 @@
 bus1 - Base System Tools
 
 org.bus1.rdinit: /init to use in the initrd:
-        - mouts /dev, /sys, /proc, /dev/pts, /sys/fs/bus1
+        - mounts /dev, /sys, /proc, /dev/pts, /sys/fs/bus1
+        - starts org.bus1.acvitvator
+                - starts org.bus1.devices
         - reads the kernel commandline:
-        - "disk=UUID" looks (and waits) for the disk with the given GPT UUID,
-          on that disk, it looks for the first GPT partition with the GPT
-          partition type UUID of e0243462-d2d0-4c3b-ad28-b365f2da3b4d
-        - "partition=<partition device node>" specifies the partition to mount
-        - starts org.bus1.devices
-        - mounts the bus1 partition to /bus1
-        - mounts the system squashfs image in /bus1/system/<release>.img to /usr
-        - symlinks /bus1/data to /var
+                - disk=<UUID> locates the disk with the given GPT UUID
+                        - the first EFI System Partition
+                        - the first GPT partition with the type UUID of
+                          e0243462-d2d0-4c3b-ad28-b365f2da3b4d
+                - as an alternative it locates the devices:
+                        - boot=/dev/<device>
+                        - var=/dev/<device>
+        - mounts the boot partition to /boot
+        - mounts the system image named <release>.img to /usr
+                - the image is located relative to the
+                  loader=<path to boot loader> variable
+                - as an alternative is is located in the /boot
+                  root directory
+        - mounts the data partition to /var
         - executes org.bus1.init
 
 org.bus1.init: init process PID1
         - starts org.bus1.activator
-        - starts tty login if /dev/tty1 exists
-        - starts serial console if console=<device> is given on the kernel
+        - starts a tty login if /dev/tty1 exists
+        - starts a serial console if console=<device> is given on the kernel
           command line
 
 org.bus1.activator: system service activator

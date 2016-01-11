@@ -107,12 +107,12 @@ static int system_reboot(int cmd) {
         unsigned int i;
 
         for (i = 0; i < 10; i++) {
-                if (mount(NULL, "/bus1", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0) {
-                        kmsg(LOG_INFO, "Mounted filesystem at /bus1 as read-only.");
+                if (mount(NULL, "/var", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0) {
+                        kmsg(LOG_INFO, "Mounted filesystem at /var as read-only.");
                         break;
                 }
 
-                kmsg(LOG_WARNING, "Filesystem at /bus1 is busy. Sending all processes the KILL signal: %m\n");
+                kmsg(LOG_WARNING, "Filesystem at /var is busy. Sending all processes the KILL signal: %m\n");
                 kill(-1, SIGKILL);
                 sleep(1);
         }
@@ -157,15 +157,13 @@ struct Manager {
         int fd_ep;
         struct epoll_event ep_signal;
 
-        /* org.bus1.activator */
-        pid_t activator_pid;
-
-        /* console login */
-        pid_t login_pid;
-
-        /* serial console login */
-        pid_t serial_pid;
+        char *loader_dir;       /* Boot loader directory in /boot. */
+        char *loader_name;      /* Boot loader file name. */
         char *serial_device;
+
+        pid_t activator_pid;    /* org.bus1.activator */
+        pid_t login_pid;        /* console login */
+        pid_t serial_pid;       /* serial console login */
 };
 
 static Manager *manager_free(Manager *m) {
@@ -377,6 +375,37 @@ static void dump_process(int sig) {
         system_reboot(RB_AUTOBOOT);
 }
 
+static int manager_parse_kernel_cmdline(Manager *m) {
+        int r;
+
+        r = kernel_cmdline_option("loader", &m->loader_dir);
+        if (r < 0)
+                return r;
+
+        if (m->loader_dir) {
+                char *s;
+
+                if (m->loader_dir[0] != '/')
+                        return -EINVAL;
+
+                s = strrchr(m->loader_dir, '/');
+                if (!s)
+                        return -EINVAL;
+
+                *s = '\0';
+                m->loader_name = s + 1;
+                if (m->loader_name == '\0')
+                        return -EINVAL;
+        }
+
+        /* serial console getty */
+        r = kernel_cmdline_option("console", &m->serial_device);
+        if (r < 0)
+                return r;
+
+        return 0;
+}
+
 int main(int argc, char **argv) {
         static const struct sigaction sa = {
                 .sa_handler = dump_process,
@@ -422,8 +451,7 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
-        /* serial console getty */
-        r = kernel_cmdline_option("console", &m->serial_device);
+        r = manager_parse_kernel_cmdline(m);
         if (r < 0)
                 goto fail;
 

@@ -42,20 +42,24 @@
 typedef struct Manager Manager;
 
 struct Manager {
-        char *disk;
-        char *partition;
-
         int fd_signal;
         int fd_ep;
         struct epoll_event ep_signal;
+
+        char *disk_uuid;         /* Boot disk GPT UUID. */
+        char *device_data;       /* Data device mounted at /var. */
+        char *device_boot;       /* Boot device mounted at /boot. */
+        char *loader_dir;        /* Boot loader directory in /boot. */
 
         /* org.bus1.activator */
         pid_t activator_pid;
 };
 
 static Manager *manager_free(Manager *m) {
-        free(m->disk);
-        free(m->partition);
+        free(m->disk_uuid);
+        free(m->device_data);
+        free(m->device_boot);
+        free(m->loader_dir);
         c_close(m->fd_ep);
         c_close(m->fd_signal);
         free(m);
@@ -221,14 +225,16 @@ finish:
 
 C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
 
-static int disk_find_partition(const char *disk, Manager *m) {
+static int disk_find_partitions(const char *disk, Manager *m) {
         const char *s;
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         blkid_partlist pl;
         int i;
         int r;
 
-        assert(!m->partition);
+        assert(m->disk_uuid);
+        assert(!m->device_boot);
+        assert(!m->device_data);
 
         b = blkid_new_probe_from_filename(disk);
         if (!b)
@@ -251,10 +257,10 @@ static int disk_find_partition(const char *disk, Manager *m) {
         if (r < 0)
                 return r;
 
-        if (strcmp(s, m->disk) != 0)
+        if (strcmp(s, m->disk_uuid) != 0)
                 return -ENODEV;
 
-        kmsg(LOG_INFO, "Found disk %s (%s).", disk, m->disk);
+        kmsg(LOG_INFO, "Found disk %s (%s).", disk, m->disk_uuid);
 
         pl = blkid_probe_get_partitions(b);
         if(!pl)
@@ -262,29 +268,40 @@ static int disk_find_partition(const char *disk, Manager *m) {
 
         for (i = 0; i < blkid_partlist_numof_partitions(pl); i++) {
                 blkid_partition p;
+                struct {
+                        const char *type;
+                        char **device;
+                } partitions[] = {
+                        { C_STRINGIFY(BUS1_GPT_TYPE_UUID_BOOT), &m->device_boot },
+                        { C_STRINGIFY(BUS1_GPT_TYPE_UUID_DATA), &m->device_data },
+                };
+                unsigned int n;
 
                 p = blkid_partlist_get_partition(pl, i);
                 s = blkid_partition_get_type_string(p);
                 if (!s)
                         continue;
 
-                if (strcmp(s, C_STRINGIFY(BUS1_GPT_PARTITION_TYPE_UUID)) != 0)
-                        continue;
+                for (n = 0; n < C_ARRAY_SIZE(partitions); n++) {
+                        if (strcmp(s, partitions[n].type) != 0)
+                                continue;
 
-                if (isdigit(disk[strlen(disk) - 1])) {
-                        if (asprintf(&m->partition, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
-                                return -ENOMEM;
-                } else {
-                        if (asprintf(&m->partition, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
-                                return -ENOMEM;
+                        if (isdigit(disk[strlen(disk) - 1])) {
+                                if (asprintf(partitions[n].device, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
+                                        return -ENOMEM;
+                        } else {
+                                if (asprintf(partitions[n].device, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
+                                        return -ENOMEM;
+                        }
+
+                        kmsg(LOG_INFO, "Found partition type %s at %s.", *partitions[n].device, partitions[n].type);
                 }
-
-                kmsg(LOG_INFO, "Found partition type bus1 at %s.", m->partition);
-
-                return 0;
         }
 
-        return -ENODEV;
+        if (!m->device_boot || !m->device_data)
+                return -ENODEV;
+
+        return 0;
 }
 
 static int filesystem_probe(const char *volume, char **fstype) {
@@ -321,7 +338,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         if (asprintf(&device, "/dev/%s", devname) < 0)
                 return -ENOMEM;
 
-        r = disk_find_partition(device, m);
+        r = disk_find_partitions(device, m);
         if (r < 0)
                 return 0;
 
@@ -390,8 +407,8 @@ static int manager_run(Manager *m) {
                 }
 
                 //FIXME: hook up device events
-                if (m->partition)
-                        r = access(m->partition, R_OK) == 0;
+                if (m->device_boot)
+                        r = access(m->device_boot, R_OK) == 0 && access(m->device_data, R_OK) == 0;
                 else
                         r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, m);
                 if (r < 0)
@@ -404,35 +421,45 @@ static int manager_run(Manager *m) {
                         break;
         }
 
-        if (m->partition)
-                kmsg(LOG_ERR, "Partition %s not found.", m->disk);
-        if (m->disk)
-                kmsg(LOG_ERR, "Disk %s not found.", m->disk);
+        if (m->disk_uuid)
+                kmsg(LOG_ERR, "Disk %s not found.", m->disk_uuid);
+        if (m->device_boot)
+                kmsg(LOG_ERR, "Boot device %s not found.", m->device_boot);
+        if (m->device_data)
+                kmsg(LOG_ERR, "Data device %s not found.", m->device_data);
 
         return -ENODEV;
 }
 
-static int partition_mount(const char *partition, const char *dir) {
-        _c_cleanup_(c_freep) char *fstype = NULL;
-        int r;
-
-        r = filesystem_probe(partition, &fstype);
-        if (r < 0) {
-                kmsg(LOG_ERR, "No partition or no filesystem found on partition %s.", partition);
-                return r;
-        }
-
+static int mount_boot(const char *device, const char *dir) {
         if (mkdir(dir, 0755) < 0)
                 return -errno;
 
-        kmsg(LOG_INFO, "Mounting partition %s (%s).", partition, fstype);
-        if (mount(partition, dir, fstype, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
+        kmsg(LOG_INFO, "Mounting boot device %s (vfat) at /boot.", device);
+        if (mount(device, dir, "vfat", MS_RDONLY|MS_NOSUID|MS_NOEXEC|MS_NODEV, "umask=0027") < 0)
                 return -errno;
 
         return 0;
 }
 
-static int system_image_mount(const char *image, const char *dir) {
+static int mount_var(const char *device, const char *dir) {
+        _c_cleanup_(c_freep) char *fstype = NULL;
+        int r;
+
+        r = filesystem_probe(device, &fstype);
+        if (r < 0) {
+                kmsg(LOG_ERR, "No device or no filesystem found at %s.", device);
+                return r;
+        }
+
+        kmsg(LOG_INFO, "Mounting data device %s (%s) at /var.", device, fstype);
+        if (mount(device, dir, fstype, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
+                return -errno;
+
+        return 0;
+}
+
+static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_closep) int fd_loopctl = -1;
         _c_cleanup_(c_closep) int fd_loop = -1;
         _c_cleanup_(c_closep) int fd_image = -1;
@@ -467,6 +494,7 @@ static int system_image_mount(const char *image, const char *dir) {
         if (r < 0)
                 return r;
 
+        kmsg(LOG_INFO, "Mounting %s (%s) at /usr.", loopdev, fstype);
         if (mount(loopdev, dir, fstype, MS_RDONLY|MS_NODEV, NULL) < 0)
                 return -errno;
 
@@ -622,6 +650,44 @@ static int rdshell(const char *release) {
         return 0;
 }
 
+static int manager_parse_kernel_cmdline(Manager *m) {
+        int r;
+
+        r = kernel_cmdline_option("loader", &m->loader_dir);
+        if (r < 0)
+                return r;
+
+        if (m->loader_dir) {
+                char *s;
+
+                if (m->loader_dir[0] != '/')
+                        return -EINVAL;
+
+                s = strrchr(m->loader_dir, '/');
+                if (!s)
+                        return -EINVAL;
+
+                *s = '\0';
+        }
+
+        r = kernel_cmdline_option("disk", &m->disk_uuid);
+        if (r < 0)
+                return r;
+
+        r = kernel_cmdline_option("data", &m->device_data);
+        if (r < 0)
+                return r;
+
+        r = kernel_cmdline_option("boot", &m->device_boot);
+        if (r < 0)
+                return r;
+
+        if ((!!m->device_data != !!m->device_boot) || (m->disk_uuid && m->device_data))
+                return -EINVAL;
+
+        return 0;
+}
+
 int main(int argc, char **argv) {
         static char name[] = "org.bus1.rdinit";
         _c_cleanup_(c_fclosep) FILE *log = NULL;
@@ -707,16 +773,9 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = kernel_cmdline_option("partition", &m->partition);
-        if (r < 0)
-                goto fail;
-
-        r = kernel_cmdline_option("disk", &m->disk);
-        if (r < 0)
-                goto fail;
-
-        if (!m->partition && !m->disk) {
-                kmsg(LOG_EMERG, "Missing disk= or partition= on the kernel command line.");
+        r = manager_parse_kernel_cmdline(m);
+        if (r < 0) {
+                kmsg(LOG_EMERG, "Expecting disk= or var=, usr= on the kernel command line.");
                 r = -EINVAL;
                 goto fail;
         }
@@ -729,16 +788,16 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = partition_mount(m->partition, "/sysroot/bus1");
+        r = mount_boot(m->device_boot, "/sysroot/boot");
         if (r < 0)
-                goto fail;
+                return r;
 
-        if (asprintf(&image, "/sysroot/bus1/system/%s.img", release) < 0) {
+        if (asprintf(&image, "/sysroot/boot%s/%s.img", m->loader_dir ?: "", release) < 0) {
                 r = -ENOMEM;
                 goto fail;
         }
 
-        r = system_image_mount(image, "/sysroot/usr");
+        r = mount_usr(image, "/sysroot/usr");
         if (r < 0) {
                 kmsg(LOG_EMERG, "Unable to mount system image %s: %s.", image, strerror(-r));
                 goto fail;
@@ -749,10 +808,9 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
-        if (mount("/sysroot/bus1/data", "/sysroot/var", NULL, MS_BIND, NULL) < 0) {
-                r = -errno;
+        r = mount_var(m->device_data, "/sysroot/var");
+        if (r < 0)
                 goto fail;
-        }
 
         if (shell) {
                 r = rdshell(release);
