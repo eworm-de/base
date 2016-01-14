@@ -16,11 +16,4 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int uuid_parse(const char *str, uint8_t *uuid);
-int bytes_to_hexstr(const uint8_t *bytes, size_t len, char **str);
-int hexstr_to_bytes(const char *str, uint8_t *bytes);
-char *escape_hex(const char *in);
-int child_reap(pid_t *p);
-pid_t service_start(const char *prog);
-int bus1_read_release(char **release);
-int kernel_cmdline_option(const char *key, char **value);
+int image_setup(const char *image, const char *name, char **device);

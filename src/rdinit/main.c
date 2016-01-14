@@ -23,7 +23,6 @@
 #include <signal.h>
 #include <ctype.h>
 #include <libkmod.h>
-#include <linux/loop.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
@@ -37,6 +36,7 @@
 #include "../devices/sysfs.h"
 #include "kmsg.h"
 #include "tmpfs-root.h"
+#include "image.h"
 #include "util.h"
 
 typedef struct Manager Manager;
@@ -270,11 +270,13 @@ static int disk_find_partitions(const char *disk, Manager *m) {
                 blkid_partition p;
                 struct {
                         const char *type;
+                        const uint8_t uuid[16];
                         char **device;
                 } partitions[] = {
-                        { C_STRINGIFY(BUS1_GPT_TYPE_UUID_BOOT), &m->device_boot },
-                        { C_STRINGIFY(BUS1_GPT_TYPE_UUID_DATA), &m->device_data },
+                        { "boot", BUS1_GPT_TYPE_BOOT_UUID, &m->device_boot },
+                        { "data", BUS1_GPT_TYPE_DATA_UUID, &m->device_data },
                 };
+                uint8_t uuid[16];
                 unsigned int n;
 
                 p = blkid_partlist_get_partition(pl, i);
@@ -282,8 +284,11 @@ static int disk_find_partitions(const char *disk, Manager *m) {
                 if (!s)
                         continue;
 
+                if (uuid_parse(s, uuid) < 0)
+                        continue;
+
                 for (n = 0; n < C_ARRAY_SIZE(partitions); n++) {
-                        if (strcmp(s, partitions[n].type) != 0)
+                        if (memcmp(uuid, partitions[n].uuid, sizeof(uuid)) != 0)
                                 continue;
 
                         if (isdigit(disk[strlen(disk) - 1])) {
@@ -294,7 +299,7 @@ static int disk_find_partitions(const char *disk, Manager *m) {
                                         return -ENOMEM;
                         }
 
-                        kmsg(LOG_INFO, "Found partition type %s at %s.", partitions[n].type, *partitions[n].device);
+                        kmsg(LOG_INFO, "Found %s partition at %s.", partitions[n].type, *partitions[n].device);
                 }
         }
 
@@ -460,42 +465,20 @@ static int mount_var(const char *device, const char *dir) {
 }
 
 static int mount_usr(const char *image, const char *dir) {
-        _c_cleanup_(c_closep) int fd_loopctl = -1;
-        _c_cleanup_(c_closep) int fd_loop = -1;
-        _c_cleanup_(c_closep) int fd_image = -1;
-        _c_cleanup_(c_freep) char *loopdev = NULL;
+        _c_cleanup_(c_freep) char *device = NULL;
         _c_cleanup_(c_freep) char *fstype = NULL;
-        int n;
         int r;
 
-        fd_loopctl = open("/dev/loop-control", O_RDWR|O_CLOEXEC);
-        if (fd_loopctl < 0)
-                return -errno;
-
-        n = ioctl(fd_loopctl, LOOP_CTL_GET_FREE);
-        if (n < 0)
-                return -errno;
-
-        if (asprintf(&loopdev, "/dev/loop%d", n) < 0)
-                return -ENOMEM;
-
-        fd_loop = open(loopdev, O_RDWR|O_CLOEXEC);
-        if (fd_loop < 0)
-                return -errno;
-
-        fd_image = open(image, O_RDONLY|O_CLOEXEC);
-        if (fd_image < 0)
-                return -errno;
-
-        if (ioctl(fd_loop, LOOP_SET_FD, fd_image) < 0)
-                return -errno;
-
-        r = filesystem_probe(loopdev, &fstype);
+        r = image_setup(image, "org.bus1.base", &device);
         if (r < 0)
                 return r;
 
-        kmsg(LOG_INFO, "Mounting %s (%s) at /usr.", loopdev, fstype);
-        if (mount(loopdev, dir, fstype, MS_RDONLY|MS_NODEV, NULL) < 0)
+        r = filesystem_probe(device, &fstype);
+        if (r < 0)
+                return r;
+
+        kmsg(LOG_INFO, "Mounting %s (%s) at /usr.", device, fstype);
+        if (mount(device, dir, fstype, MS_RDONLY|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;

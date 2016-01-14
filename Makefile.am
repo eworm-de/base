@@ -19,6 +19,7 @@ SUBDIRS = .
 
 CLEANFILES = $(BUILT_SOURCES)
 bin_PROGRAMS =
+noinst_PROGRAMS =
 noinst_LIBRARIES =
 
 AM_CPPFLAGS = \
@@ -39,6 +40,8 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
+	src/shared/image.h \
+	src/shared/image.c \
 	src/shared/kmsg.h \
 	src/shared/kmsg.c \
 	src/shared/tmpfs-root.h \
@@ -148,6 +151,21 @@ org_bus1_coredump_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(ELFUTILS_LIBS)
+
+# ------------------------------------------------------------------------------
+noinst_PROGRAMS += \
+	org.bus1.imageinfo
+
+org_bus1_imageinfo_SOURCES = \
+	src/imageinfo/main.c
+
+org_bus1_imageinfo_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
+
+org_bus1_imageinfo_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS)
 
 # ------------------------------------------------------------------------------
 .PHONY: install-tree

@@ -22,6 +22,61 @@
 
 #include "util.h"
 
+int uuid_parse(const char *str, uint8_t *uuid) {
+        int id[16];
+        unsigned int i;
+
+        if (sscanf(str, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+                   &id[0], &id[1], &id[2], &id[3], &id[4], &id[5], &id[6], &id[7],
+                   &id[8], &id[9], &id[10], &id[11], &id[12], &id[13], &id[14], &id[15]) != 16)
+                return -EINVAL;
+
+        for (i = 0; i < 16; i++)
+                uuid[i] = id[i];
+
+        return 0;
+}
+
+int hexstr_to_bytes(const char *str, uint8_t *bytes) {
+        size_t len;
+        unsigned int i;
+        char buf[3] = {};
+
+        len = strlen(str);
+        if (len % 2)
+                return -EINVAL;
+
+        len /= 2;
+
+        for (i = 0; i < len; i++) {
+                char *endp;
+
+                memcpy(buf, str + (i * 2), 2);
+                bytes[i] = strtoul(buf, &endp, 16);
+                if (endp != buf + 2)
+                        return -EINVAL;
+        }
+
+        return 0;
+}
+
+int bytes_to_hexstr(const uint8_t *bytes, size_t len, char **str) {
+        char *s;
+        unsigned int i;
+
+        s = malloc((len * 2) + 1);
+        if (!s)
+                return -ENOMEM;
+
+        for(i = 0; i < len; i++)
+                sprintf(s + (i * 2), "%02x", bytes[i]);
+
+        s[len * 2] = '\0';
+        *str = s;
+
+        return 0;
+}
+
 char *escape_hex(const char *in) {
         static const char hex[16] = "0123456789abcdef";
         const char *i;

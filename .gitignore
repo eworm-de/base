@@ -24,8 +24,9 @@ Makefile.in
 /build-aux/
 /m4/
 /install-tree/
-/org.bus1.devices
-/org.bus1.rdinit
-/org.bus1.init
 /org.bus1.activator
 /org.bus1.coredump
+/org.bus1.devices
+/org.bus1.imageinfo
+/org.bus1.init
+/org.bus1.rdinit
