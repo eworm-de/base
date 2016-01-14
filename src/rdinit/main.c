@@ -294,7 +294,7 @@ static int disk_find_partitions(const char *disk, Manager *m) {
                                         return -ENOMEM;
                         }
 
-                        kmsg(LOG_INFO, "Found partition type %s at %s.", *partitions[n].device, partitions[n].type);
+                        kmsg(LOG_INFO, "Found partition type %s at %s.", partitions[n].type, *partitions[n].device);
                 }
         }
 
