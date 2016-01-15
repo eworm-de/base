@@ -129,6 +129,12 @@ AC_CHECK_LIB([dw], [dwfl_core_file_attach],
 ELFUTILS_LIBS="-lelf -ldw"
 AC_SUBST(ELFUTILS_LIBS)
 
+AM_PATH_LIBGCRYPT(1.6.1,,[AC_MSG_ERROR([*** gcrypt not found])])
+GCRYPT_LIBS="$LIBGCRYPT_LIBS"
+GCRYPT_CFLAGS="$LIBGCRYPT_CFLAGS"
+AC_SUBST(GCRYPT_LIBS)
+AC_SUBST(GCRYPT_CFLAGS)
+
 # ------------------------------------------------------------------------------
 # system features
 

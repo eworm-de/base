@@ -18,9 +18,11 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 #include <bus1/b1-image-info.h>
+#include <linux/random.h>
 #include <sys/stat.h>
 
 #include "util.h"
+#include "hash-tree.h"
 
 static int image_info_print(const char *data) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
@@ -58,63 +60,82 @@ static int image_info_print(const char *data) {
 
         printf("\n");
         printf("=================================================================================\n");
-        printf("Image Info for:  %s \n", data);
-        printf("data size:       %" PRIu64 "\n", info.data.size);
-        printf("hash offset:     %" PRIu64 "\n", info.hash.offset);
-        printf("data block size: %" PRIu64 "\n", info.hash.data_block_size);
-        printf("block size       %" PRIu64 "\n", info.hash.block_size);
-        printf("hash algorithm:  %s\n", info.hash.algorithm);
+        printf("Info for:        %s \n", data);
+        printf("Image Name:      %s\n", info.super.object_label);
+        printf("Data size:       %" PRIu64 "\n", info.data.size);
+        printf("Hash offset:     %" PRIu64 "\n", info.hash.offset);
+        printf("Data block size: %" PRIu64 "\n", info.hash.data_block_size);
+        printf("Block size:      %" PRIu64 "\n", info.hash.block_size);
+        printf("Hash algorithm:  %s\n", info.hash.algorithm);
 
         r = bytes_to_hexstr(info.hash.salt, info.hash.salt_size, &salt);
         if (r < 0)
                 return r;
 
-        printf("salt:            %s\n", salt);
-        printf("salt size:       %" PRIu64 "\n", info.hash.salt_size);
+        printf("Salt:            %s\n", salt);
+        printf("Salt size:       %" PRIu64 "\n", info.hash.salt_size);
 
         r = bytes_to_hexstr(info.hash.root_hash, info.hash.root_hash_size, &root_hash);
         if (r < 0)
                 return r;
 
-        printf("root hash        %s\n", root_hash);
-        printf("root hash size:  %" PRIu64 "\n", info.hash.root_hash_size);
+        printf("Root hash        %s\n", root_hash);
+        printf("Root hash size:  %" PRIu64 "\n", info.hash.root_hash_size);
         printf("=================================================================================\n");
 
         return 0;
 }
 
-static int image_info_write(const char *data_file,
-                            const char *hash_file,
-                            const char *salt,
-                            const char *root_hash) {
+static int image_append_hash(const char *data_file, const char *name) {
+        _c_cleanup_(c_fclosep) FILE *f = NULL;
+        struct stat sb;
         Bus1ImageInfo info = {
                 .super.super_uuid = BUS1_SUPER_HEADER_UUID,
                 .super.type_uuid = BUS1_IMAGE_INFO_UUID,
                 .super.type_tag = "org.bus1.image",
-                .super.object_label = "org.bus1.base",
                 .hash.algorithm = "sha256",
                 .hash.data_block_size = 4096,
                 .hash.block_size = 4096,
                 .hash.salt_size = 32,
                 .hash.root_hash_size = 32,
         };
-        struct stat sb;
+        int r;
 
-        if (stat(data_file, &sb) < 0)
+        if (name)
+                strncpy(info.super.object_label, name, sizeof(info.super.object_label) - 1);
+
+        f = fopen(data_file, "r+");
+        if (!f)
+                return -errno;
+
+        setvbuf(f, NULL, _IONBF, 0);
+
+        if (fstat(fileno(f), &sb) < 0)
                 return -errno;
 
         info.data.size = sb.st_size;
         info.hash.offset = sb.st_size;
 
-        if (stat(hash_file, &sb) < 0)
+        if (getrandom(info.hash.salt, info.hash.salt_size, GRND_NONBLOCK) < 0)
+                return EXIT_FAILURE;
+
+        r  = hash_tree_create(info.hash.algorithm,
+                              data_file,
+                              info.hash.data_block_size,
+                              info.data.size / info.hash.data_block_size,
+                              data_file,
+                              info.hash.block_size,
+                              info.data.size / info.hash.data_block_size,
+                              info.hash.salt,
+                              info.hash.salt_size,
+                              info.hash.root_hash);
+        if (r < 0)
+                return EXIT_FAILURE;
+
+        if (fseeko(f, 0, SEEK_END) < 0)
                 return -errno;
 
-        info.hash.size = sb.st_size;
-
-        hexstr_to_bytes(salt, info.hash.salt);
-        hexstr_to_bytes(root_hash, info.hash.root_hash);
-
-        if (write(STDOUT_FILENO, &info, sizeof(info)) != sizeof(info))
+        if (fwrite(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
         return 0;
@@ -122,26 +143,23 @@ static int image_info_write(const char *data_file,
 
 int main(int argc, char **argv) {
         const char *data_file = argv[1];
-        const char *hash_file = argv[2];
-        const char *salt = argv[3];
-        const char *root_hash = argv[4];
+        int r;
 
-        if (argc == 2) {
-                if (image_info_print(data_file) >= 0)
-                        return EXIT_SUCCESS;
-
-                return EXIT_FAILURE;
-        }
-
-        if (argc != 5) {
-                fprintf(stderr, "Expecting %s <data> <hash> <salt> <root-hash>\n", program_invocation_short_name);
+        if (argc < 2 || argc > 3) {
+                fprintf(stderr, "Usage: %s <image> <name>\n", program_invocation_short_name);
                 return EXIT_FAILURE;
         }
 
         if (image_info_print(data_file) >= 0)
                 return EXIT_SUCCESS;
 
-        if (image_info_write(data_file, hash_file, salt, root_hash) < 0)
+        r = image_append_hash(data_file, argv[2]);
+        if (r < 0) {
+                fprintf(stderr, "Error writing %s: %s\n", data_file, strerror(-r));
+                return EXIT_FAILURE;
+        }
+
+        if (image_info_print(data_file) < 0)
                 return EXIT_FAILURE;
 
         return EXIT_SUCCESS;

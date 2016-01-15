@@ -157,15 +157,19 @@ noinst_PROGRAMS += \
 	org.bus1.imageinfo
 
 org_bus1_imageinfo_SOURCES = \
+	src/imageinfo/hash-tree.h \
+	src/imageinfo/hash-tree.c \
 	src/imageinfo/main.c
 
 org_bus1_imageinfo_CFLAGS = \
 	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
+	$(BUS1_CFLAGS) \
+	$(GCRYPT_CFLAGS)
 
 org_bus1_imageinfo_LDADD = \
 	libshared.a \
-	$(BUS1_LIBS)
+	$(BUS1_LIBS) \
+	$(GCRYPT_LIBS)
 
 # ------------------------------------------------------------------------------
 .PHONY: install-tree

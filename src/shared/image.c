@@ -78,16 +78,16 @@ static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, s
         return 0;
 };
 
-static int device_setup_verity(const char *device,
-                               const char *name,
-                               uint64_t data_size,
-                               uint64_t hash_offset,
-                               unsigned int data_block_size,
-                               unsigned int hash_block_size,
-                               const char *hash_name,
-                               const char *salt,
-                               const char *root_hash,
-                               char **map_device) {
+static int device_setup_hash_tree(const char *device,
+                                  const char *name,
+                                  uint64_t data_size,
+                                  uint64_t hash_offset,
+                                  unsigned int data_block_size,
+                                  unsigned int hash_block_size,
+                                  const char *hash_name,
+                                  const char *salt,
+                                  const char *root_hash,
+                                  char **map_device) {
         _c_cleanup_(c_freep) struct dm_ioctl *io = NULL;
         _c_cleanup_(c_closep) int fd = -1;
         uint64_t dm_dev;
@@ -237,16 +237,16 @@ int image_setup(const char *image, const char *name, char **device) {
         if (r < 0)
                 return r;
 
-        r = device_setup_verity(loopdev,
-                                name,
-                                data_size,
-                                hash_offset,
-                                data_block_size,
-                                hash_block_size,
-                                hash_name,
-                                salt,
-                                root_hash,
-                                &dev);
+        r = device_setup_hash_tree(loopdev,
+                                   name,
+                                   data_size,
+                                   hash_offset,
+                                   data_block_size,
+                                   hash_block_size,
+                                   hash_name,
+                                   salt,
+                                   root_hash,
+                                   &dev);
         if (r < 0)
                 return r;
 
