@@ -163,6 +163,7 @@ static int image_get_info(FILE *f,
                           char **root_hash) {
         struct stat sb;
         Bus1ImageInfo info;
+        static const char super_uuid[] = BUS1_SUPER_HEADER_UUID;
         static const char info_uuid[] = BUS1_IMAGE_INFO_UUID;
         int r;
 
@@ -178,7 +179,10 @@ static int image_get_info(FILE *f,
         if (fread(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
-        if (memcmp(info.uuid, info_uuid, sizeof(info_uuid)) != 0)
+        if (memcmp(info.super.super_uuid, super_uuid, sizeof(super_uuid)) != 0)
+                return -EINVAL;
+
+        if (memcmp(info.super.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
 
         *data_size = info.data.size;

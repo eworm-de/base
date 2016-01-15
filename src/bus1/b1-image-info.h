@@ -34,11 +34,12 @@
 
  */
 
+#include <bus1/b1-super-header.h>
+
 #define BUS1_IMAGE_INFO_UUID { 0xb7, 0x46, 0xc4, 0xf5, 0xc3, 0xc4, 0x47, 0x37, 0x8a, 0x4c, 0x54, 0xbe, 0xe4, 0x75, 0x69, 0x2a }
 
 struct Bus1ImageInfo {
-        uint8_t uuid[16];                       /* UUID acting as magic and version */
-        char name[256];                         /* Reverse domain name identifier of image */
+        Bus1SuperHeader super;
 
         struct {
                 uint64_t offset;                /* Absolute offset of filesystem image, usually 0 */

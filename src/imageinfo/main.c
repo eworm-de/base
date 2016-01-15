@@ -26,6 +26,7 @@ static int image_info_print(const char *data) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         struct stat sb;
         Bus1ImageInfo info;
+        static const char super_uuid[] = BUS1_SUPER_HEADER_UUID;
         static const char info_uuid[] = BUS1_IMAGE_INFO_UUID;
         _c_cleanup_(c_freep) char *salt = NULL;
         _c_cleanup_(c_freep) char *root_hash = NULL;
@@ -49,7 +50,10 @@ static int image_info_print(const char *data) {
         if (fread(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
-        if (memcmp(info.uuid, info_uuid, sizeof(info_uuid)) != 0)
+        if (memcmp(info.super.super_uuid, super_uuid, sizeof(super_uuid)) != 0)
+                return -EINVAL;
+
+        if (memcmp(info.super.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
 
         printf("\n");
@@ -84,9 +88,10 @@ static int image_info_write(const char *data_file,
                             const char *salt,
                             const char *root_hash) {
         Bus1ImageInfo info = {
-                .uuid = BUS1_IMAGE_INFO_UUID,
-                .name = "org.bus.base",
-
+                .super.super_uuid = BUS1_SUPER_HEADER_UUID,
+                .super.type_uuid = BUS1_IMAGE_INFO_UUID,
+                .super.type_tag = "org.bus1.image",
+                .super.object_label = "org.bus1.base",
                 .hash.algorithm = "sha256",
                 .hash.data_block_size = 4096,
                 .hash.block_size = 4096,
