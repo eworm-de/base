@@ -469,6 +469,7 @@ static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
+        kmsg(LOG_INFO, "Setting up integrity validation of org.bus1.base image.");
         r = image_setup(image, "org.bus1.base", &device);
         if (r < 0)
                 return r;

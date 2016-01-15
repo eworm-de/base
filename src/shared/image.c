@@ -145,10 +145,10 @@ static int device_setup_verity(const char *device,
         if (ioctl(fd, DM_DEV_SUSPEND, io) < 0)
                 return -errno;
 
-        /* Get device name (we need to extract the major from the kernel internal dev_t format). */
+        /* Get device name (we need to extract the minor from the kernel internal dev_t format). */
         minor = (dm_dev & 0xff) | ((dm_dev >> 12) & 0xfff00);
         if (asprintf(map_device, "/dev/dm-%u", minor) < 0)
-                return -errno;
+                return -ENOMEM;
 
         return 0;
 }
