@@ -60,27 +60,29 @@ static int image_info_print(const char *data) {
 
         printf("\n");
         printf("=================================================================================\n");
-        printf("Info for:        %s \n", data);
-        printf("Image Name:      %s\n", info.super.object_label);
-        printf("Data size:       %" PRIu64 "\n", info.data.size);
-        printf("Hash offset:     %" PRIu64 "\n", info.hash.offset);
-        printf("Data block size: %" PRIu64 "\n", info.hash.data_block_size);
-        printf("Block size:      %" PRIu64 "\n", info.hash.block_size);
-        printf("Hash algorithm:  %s\n", info.hash.algorithm);
+        printf("Info for:         %s \n", data);
+        printf("Image Name:       %s\n", info.super.object_label);
+        printf("Data offset:      %" PRIu64 " bytes\n", le64toh(info.data.offset));
+        printf("Data size:        %" PRIu64 " bytes\n", le64toh(info.data.size));
+        printf("Hash tree offset: %" PRIu64 " bytes\n", le64toh(info.hash.offset));
+        printf("Hash tree size:   %" PRIu64 " bytes\n", le64toh(info.hash.size));
+        printf("Hash algorithm:   %s\n", info.hash.algorithm);
+        printf("Hash digest size: %" PRIu64 " bits\n", le64toh(info.hash.digest_size));
+        printf("Hash Block size:  %" PRIu64 " bits\n", le64toh(info.hash.hash_block_size));
+        printf("Data block size:  %" PRIu64 " bits\n", le64toh(info.hash.data_block_size));
 
-        r = bytes_to_hexstr(info.hash.salt, info.hash.salt_size, &salt);
+        r = bytes_to_hexstr(info.hash.salt, info.hash.salt_size / 8, &salt);
         if (r < 0)
                 return r;
 
-        printf("Salt:            %s\n", salt);
-        printf("Salt size:       %" PRIu64 "\n", info.hash.salt_size);
+        printf("Salt:             %s\n", salt);
+        printf("Salt size:        %" PRIu64 " bits\n", le64toh(info.hash.salt_size));
 
-        r = bytes_to_hexstr(info.hash.root_hash, info.hash.root_hash_size, &root_hash);
+        r = bytes_to_hexstr(info.hash.root_hash, info.hash.digest_size / 8, &root_hash);
         if (r < 0)
                 return r;
 
-        printf("Root hash        %s\n", root_hash);
-        printf("Root hash size:  %" PRIu64 "\n", info.hash.root_hash_size);
+        printf("Root hash:        %s\n", root_hash);
         printf("=================================================================================\n");
 
         return 0;
@@ -89,15 +91,21 @@ static int image_info_print(const char *data) {
 static int image_append_hash(const char *data_file, const char *name) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         struct stat sb;
+        uint64_t digest_size = 256;
+        uint64_t data_size;
+        uint64_t hash_size;
+        uint64_t hash_block_size = 4096;
+        uint64_t data_block_size = 4096;
+        uint64_t salt_size = 256;
         Bus1ImageInfo info = {
                 .super.super_uuid = BUS1_SUPER_HEADER_UUID,
                 .super.type_uuid = BUS1_IMAGE_INFO_UUID,
                 .super.type_tag = "org.bus1.image",
                 .hash.algorithm = "sha256",
-                .hash.data_block_size = 4096,
-                .hash.block_size = 4096,
-                .hash.salt_size = 32,
-                .hash.root_hash_size = 32,
+                .hash.digest_size = htole64(digest_size),
+                .hash.hash_block_size = htole64(hash_block_size),
+                .hash.data_block_size = htole64(data_block_size),
+                .hash.salt_size = htole64(salt_size),
         };
         int r;
 
@@ -113,24 +121,29 @@ static int image_append_hash(const char *data_file, const char *name) {
         if (fstat(fileno(f), &sb) < 0)
                 return -errno;
 
-        info.data.size = sb.st_size;
-        info.hash.offset = sb.st_size;
+        data_size = sb.st_size;
+        info.data.size = htole64(data_size);
+        info.hash.offset = htole64(data_size);
 
-        if (getrandom(info.hash.salt, info.hash.salt_size, GRND_NONBLOCK) < 0)
+        if (getrandom(info.hash.salt, info.hash.salt_size / 8, GRND_NONBLOCK) < 0)
                 return EXIT_FAILURE;
 
         r  = hash_tree_create(info.hash.algorithm,
+                              digest_size / 8,
                               data_file,
-                              info.hash.data_block_size,
-                              info.data.size / info.hash.data_block_size,
+                              data_block_size,
+                              data_size / data_block_size,
                               data_file,
-                              info.hash.block_size,
-                              info.data.size / info.hash.data_block_size,
+                              hash_block_size,
+                              data_size / data_block_size,
                               info.hash.salt,
-                              info.hash.salt_size,
-                              info.hash.root_hash);
+                              salt_size / 8,
+                              info.hash.root_hash,
+                              &hash_size);
         if (r < 0)
                 return EXIT_FAILURE;
+
+        info.hash.size = htole64(hash_size);
 
         if (fseeko(f, 0, SEEK_END) < 0)
                 return -errno;

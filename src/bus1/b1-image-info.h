@@ -42,28 +42,27 @@ struct Bus1ImageInfo {
         Bus1SuperHeader super;
 
         struct {
-                uint64_t offset;                /* Absolute offset of filesystem image, usually 0 */
-                uint64_t size;                  /* Size of filesystem image */
+                uint64_t offset;                /* Absolute offset of filesystem image in bytes, usually 0 */
+                uint64_t size;                  /* Size of filesystem image in bytes */
         } data;
 
         struct {
-                uint64_t offset;                /* Absolute offset of hash tree blocks */
-                uint64_t size;                  /* Size of hsh tree blocks */
+                uint64_t offset;                /* Absolute offset of hash tree blocks in bytes */
+                uint64_t size;                  /* Size of hash tree blocks in bytes */
                 char algorithm[32];             /* Hash algorithm used to create hash blocks */
-
-                uint64_t data_block_size;       /* Input chunk size */
-                uint64_t block_size;            /* Hash block size */
+                uint64_t digest_size;           /* Size of hash digest in bits */
+                uint64_t hash_block_size;       /* Hash block size in bits */
+                uint64_t data_block_size;       /* Input block size in bits */
 
                 uint8_t salt[256];              /* Salt used while hashing input data */
-                uint64_t salt_size;             /* Size of salt in bytes */
+                uint64_t salt_size;             /* Size of salt in bits */
 
                 uint8_t root_hash[256];         /* Root hash value to validate against */
-                uint64_t root_hash_size;        /* Size of root hash in bytes */
         } hash;
 
         struct {
                 uint64_t offset;                /* Absolute offset of signature */
-                uint64_t size;                  /* Size of signature */
+                uint64_t size;                  /* Size of signature in bytes */
                 char signature_type[32];        /* Type of signature */
         } signature;
 };

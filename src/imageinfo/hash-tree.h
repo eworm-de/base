@@ -17,12 +17,14 @@
 ***/
 
 int hash_tree_create(const char *hash_name,
+                     uint64_t digest_size,
                      const char *data_device,
-                     size_t data_block_size,
-                     off_t n_data_blocks,
+                     uint64_t data_block_size,
+                     uint64_t n_data_blocks,
                      const char *hash_device,
-                     size_t hash_block_size,
-                     off_t hash_offset,
+                     uint64_t hash_block_size,
+                     uint64_t hash_offset,
                      const uint8_t *salt,
-                     size_t salt_size,
-                     uint8_t *root_hash);
+                     uint64_t salt_size,
+                     uint8_t *root_hash,
+                     uint64_t *hash_tree_size);

@@ -115,7 +115,7 @@ static int device_setup_hash_tree(const char *device,
         io = c_free(io);
 
         /* Load verity target:
-             <target version> <data device> <hash device> <data block siz>e <hash block size> <hash offset> <hash algorithm> <root hash> <salt>
+             <target version> <data device> <hash device> <data block size> <hash block size> <hash offset> <hash algorithm> <root hash> <salt>
              1 /dev/loop0 /dev/loop 4096 4096 46207 1 sha256 bde126215de2ce8d706b1b8117ba4f463ae1a329b547167457eb220d6d83fa85 dc1d34bde3c80c579b8a1fd30d3b1d860160ee44bfd8e37cd0dd7b406353779f
          */
         target_parameter_len = asprintf(&target_parameter, "1 %s %s %u %u %" PRIu64 " %" PRIu64 " %s %s %s",
@@ -168,6 +168,7 @@ static int image_get_info(FILE *f,
         Bus1ImageInfo info;
         static const char super_uuid[] = BUS1_SUPER_HEADER_UUID;
         static const char info_uuid[] = BUS1_IMAGE_INFO_UUID;
+        size_t l;
         int r;
 
         if (fstat(fileno(f), &sb) < 0)
@@ -188,19 +189,27 @@ static int image_get_info(FILE *f,
         if (memcmp(info.super.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
 
-        *data_size = info.data.size;
-        *hash_offset = info.hash.offset;
-        *data_block_size = info.hash.data_block_size;
-        *hash_block_size = info.hash.block_size;
+        *data_size = le64toh(info.data.size);
+        *hash_offset = le64toh(info.hash.offset);
+        *data_block_size = le64toh(info.hash.data_block_size);
+        *hash_block_size = le64toh(info.hash.hash_block_size);
         *hash_name = strdup(info.hash.algorithm);
         if (!*hash_name)
                 return -ENOMEM;
 
-        r = bytes_to_hexstr(info.hash.salt, info.hash.salt_size, salt);
+        l = le64toh(info.hash.salt_size) / 8;
+        if (l >= 256)
+                return -EINVAL;
+
+        r = bytes_to_hexstr(info.hash.salt, l, salt);
         if (r < 0)
                 return r;
 
-        r = bytes_to_hexstr(info.hash.root_hash, info.hash.root_hash_size, root_hash);
+        l = le64toh(info.hash.digest_size) / 8;
+        if (l >= 256)
+                return -EINVAL;
+
+        r = bytes_to_hexstr(info.hash.root_hash, l, root_hash);
         if (r < 0)
                 return r;
 

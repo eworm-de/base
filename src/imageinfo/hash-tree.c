@@ -23,16 +23,16 @@
 #include "util.h"
 
 static int hash_write(FILE *f_in, FILE *f_out,
-                      off_t data_block, size_t data_block_size,
-                      off_t hash_block, size_t hash_block_size,
-                      off_t n_data_blocks,
+                      uint64_t data_block, uint64_t data_block_size,
+                      uint64_t hash_block, uint64_t hash_block_size,
+                      uint64_t n_data_blocks,
                       gcry_md_hd_t crypt_ctx, int crypt_hash_type,
                       const uint8_t *salt, size_t salt_size,
                       uint8_t *digest, size_t digest_size) {
         _c_cleanup_(c_freep) uint8_t *null_block = NULL;
         _c_cleanup_(c_freep) uint8_t *data_buffer = NULL;
         size_t hashes_per_block;
-        off_t n_blocks;
+        uint64_t n_blocks;
         size_t n_bytes;
         unsigned i;
 
@@ -85,41 +85,45 @@ static int hash_write(FILE *f_in, FILE *f_out,
 C_DEFINE_CLEANUP(gcry_md_hd_t, gcry_md_close);
 
 int hash_tree_create(const char *hash_name,
+                     uint64_t digest_size,
                      const char *data_device,
-                     size_t data_block_size,
-                     off_t n_data_blocks,
+                     uint64_t data_block_size,
+                     uint64_t n_data_blocks,
                      const char *hash_device,
-                     size_t hash_block_size,
-                     off_t hash_offset,
+                     uint64_t hash_block_size,
+                     uint64_t hash_offset,
                      const uint8_t *salt,
-                     size_t salt_size,
-                     uint8_t *root_hash) {
+                     uint64_t salt_size,
+                     uint8_t *root_hash,
+                     uint64_t *hash_tree_size) {
         _c_cleanup_(gcry_md_closep) gcry_md_hd_t crypt_ctx = NULL;
         int crypt_hash_type;
-        size_t digest_size;
         int n_level;
+        uint64_t hash_size = 0;
         struct hash_level {
-                off_t offset;
-                off_t size;
+                uint64_t offset;
+                uint64_t size;
         };
         size_t hash_per_block_bits;
         _c_cleanup_(c_freep) struct hash_level *levels = NULL;
         _c_cleanup_(c_freep) uint8_t *digest = NULL;
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
         _c_cleanup_(c_fclosep) FILE *f_hash = NULL;
-        off_t s;
+        uint64_t s;
         int i;
         int r;
 
         assert(hash_name);
-        assert(hash_device);
+        assert(digest_size);
         assert(data_device);
-        assert(hash_block_size > 0);
         assert(data_block_size > 0);
         assert(n_data_blocks > 2);
-        assert(root_hash);
+        assert(hash_device);
+        assert(hash_block_size > 0);
         assert(salt);
         assert(salt_size);
+        assert(root_hash);
+        assert(hash_tree_size);
 
         if (gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P) == 0) {
                 gcry_control(GCRYCTL_DISABLE_SECMEM);
@@ -130,7 +134,8 @@ int hash_tree_create(const char *hash_name,
         if (crypt_hash_type <= 0)
                 return -EINVAL;
 
-        digest_size = gcry_md_get_algo_dlen(crypt_hash_type);
+        if (digest_size != gcry_md_get_algo_dlen(crypt_hash_type))
+                return -EINVAL;
 
         if (gcry_md_open(&crypt_ctx, crypt_hash_type, 0) != 0)
                 return -EINVAL;
@@ -142,13 +147,14 @@ int hash_tree_create(const char *hash_name,
         levels = calloc(n_level, sizeof(struct hash_level));
         for (i = n_level - 1; i >= 0; i--) {
                 levels[i].offset = hash_offset;
-                s = (n_data_blocks + ((off_t)1 << ((i + 1) * hash_per_block_bits)) - 1) >> ((i + 1) * hash_per_block_bits);
+                s = (n_data_blocks + (1ULL << ((i + 1) * hash_per_block_bits)) - 1) >> ((i + 1) * hash_per_block_bits);
                 levels[i].size = s;
 
-                if ((hash_offset + s) < hash_offset || (hash_offset + s) < 0)
+                if ((hash_offset + s) < hash_offset)
                         return -EINVAL;
 
                 hash_offset += s;
+                hash_size += s * hash_block_size;
         }
 
         f_data = fopen(data_device, "re");
@@ -200,6 +206,7 @@ int hash_tree_create(const char *hash_name,
                        digest, digest_size);
 
         memcpy(root_hash, digest, digest_size);
+        *hash_tree_size = hash_size;
 
         return r;
 }
