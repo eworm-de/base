@@ -114,7 +114,10 @@ static int device_setup_hash_tree(const char *device,
         dm_dev = io->dev;
         io = c_free(io);
 
-        /* Load verity target. */
+        /* Load verity target:
+             <target version> <data device> <hash device> <data block siz>e <hash block size> <hash offset> <hash algorithm> <root hash> <salt>
+             1 /dev/loop0 /dev/loop 4096 4096 46207 1 sha256 bde126215de2ce8d706b1b8117ba4f463ae1a329b547167457eb220d6d83fa85 dc1d34bde3c80c579b8a1fd30d3b1d860160ee44bfd8e37cd0dd7b406353779f
+         */
         target_parameter_len = asprintf(&target_parameter, "1 %s %s %u %u %" PRIu64 " %" PRIu64 " %s %s %s",
                                         device, device, data_block_size, hash_block_size,
                                         data_size / data_block_size, hash_offset / data_block_size,
