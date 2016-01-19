@@ -21,15 +21,25 @@
 #include <linux/random.h>
 #include <sys/stat.h>
 
-#include "util.h"
+#include "image.h"
+#include "image-setup.h"
 #include "hash-tree.h"
+#include "util.h"
+#include "uuid.h"
 
-static int image_info_print(const char *data) {
+int image_print_info(const char *data) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
-        struct stat sb;
-        Bus1ImageInfo info;
-        static const char super_uuid[] = BUS1_SUPER_HEADER_UUID;
-        static const char info_uuid[] = BUS1_IMAGE_INFO_UUID;
+        _c_cleanup_(c_freep) char *image_name = NULL;
+        uint8_t image_uuid[16];
+        uint64_t data_offset;
+        uint64_t data_size;
+        uint64_t hash_offset;
+        uint64_t hash_size;
+        _c_cleanup_(c_freep) char *hash_algorithm = NULL;
+        uint64_t hash_digest_size;
+        uint64_t hash_block_size;
+        uint64_t data_block_size;
+        _c_cleanup_(c_freep) char *uuid = NULL;
         _c_cleanup_(c_freep) char *salt = NULL;
         _c_cleanup_(c_freep) char *root_hash = NULL;
         int r;
@@ -40,55 +50,46 @@ static int image_info_print(const char *data) {
 
         setvbuf(f, NULL, _IONBF, 0);
 
-        if (fstat(fileno(f), &sb) < 0)
-                return -errno;
-
-        if (sb.st_size <= (off_t)sizeof(Bus1ImageInfo))
-                return -EINVAL;
-
-        if (fseeko(f, sb.st_size - sizeof(Bus1ImageInfo), SEEK_SET) < 0)
-                return -errno;
-
-        if (fread(&info, sizeof(info), 1, f) != 1)
-                return -EIO;
-
-        if (memcmp(info.super.super_uuid, super_uuid, sizeof(super_uuid)) != 0)
-                return -EINVAL;
-
-        if (memcmp(info.super.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
-                return -EINVAL;
-
-        printf("\n");
-        printf("=================================================================================\n");
-        printf("Info for:         %s \n", data);
-        printf("Image Name:       %s\n", info.super.object_label);
-        printf("Data offset:      %" PRIu64 " bytes\n", le64toh(info.data.offset));
-        printf("Data size:        %" PRIu64 " bytes\n", le64toh(info.data.size));
-        printf("Hash tree offset: %" PRIu64 " bytes\n", le64toh(info.hash.offset));
-        printf("Hash tree size:   %" PRIu64 " bytes\n", le64toh(info.hash.size));
-        printf("Hash algorithm:   %s\n", info.hash.algorithm);
-        printf("Hash digest size: %" PRIu64 " bits\n", le64toh(info.hash.digest_size));
-        printf("Hash Block size:  %" PRIu64 " bits\n", le64toh(info.hash.hash_block_size));
-        printf("Data block size:  %" PRIu64 " bits\n", le64toh(info.hash.data_block_size));
-
-        r = bytes_to_hexstr(info.hash.salt, info.hash.salt_size / 8, &salt);
+        r = image_get_info(f,
+                           &image_name,
+                           image_uuid,
+                           &data_offset,
+                           &data_size,
+                           &hash_offset,
+                           &hash_size,
+                           &hash_algorithm,
+                           &hash_digest_size,
+                           &hash_block_size,
+                           &data_block_size,
+                           &salt,
+                           &root_hash);
         if (r < 0)
                 return r;
 
+        r = uuid_to_string(image_uuid, &uuid);
+        if (r < 0)
+                return r;
+
+        printf("==================================================================================\n");
+        printf("Info for:         %s\n", data);
+        printf("Image Name:       %s\n", image_name);
+        printf("Image UUID:       %s\n", uuid);
+        printf("Data offset:      %" PRIu64 " bytes\n", data_offset);
+        printf("Data size:        %" PRIu64 " bytes\n", data_size);
+        printf("Hash tree offset: %" PRIu64 " bytes\n", hash_offset);
+        printf("Hash tree size:   %" PRIu64 " bytes\n", hash_size);
+        printf("Hash algorithm:   %s\n", hash_algorithm);
+        printf("Hash digest size: %" PRIu64 " bits\n", hash_digest_size);
+        printf("Hash Block size:  %" PRIu64 " bits\n", hash_block_size);
+        printf("Data block size:  %" PRIu64 " bits\n", data_block_size);
         printf("Salt:             %s\n", salt);
-        printf("Salt size:        %" PRIu64 " bits\n", le64toh(info.hash.salt_size));
-
-        r = bytes_to_hexstr(info.hash.root_hash, info.hash.digest_size / 8, &root_hash);
-        if (r < 0)
-                return r;
-
         printf("Root hash:        %s\n", root_hash);
-        printf("=================================================================================\n");
+        printf("==================================================================================\n");
 
         return 0;
 }
 
-static int image_append_hash(const char *data_file, const char *name) {
+int image_append_hash(const char *data_file, const char *name) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         struct stat sb;
         uint64_t digest_size = 256;
@@ -98,7 +99,7 @@ static int image_append_hash(const char *data_file, const char *name) {
         uint64_t data_block_size = 4096;
         uint64_t salt_size = 256;
         Bus1ImageInfo info = {
-                .super.super_uuid = BUS1_SUPER_HEADER_UUID,
+                .super.super_uuid = BUS1_SUPER_INFO_UUID,
                 .super.type_uuid = BUS1_IMAGE_INFO_UUID,
                 .super.type_tag = "org.bus1.image",
                 .hash.algorithm = "sha256",
@@ -109,8 +110,14 @@ static int image_append_hash(const char *data_file, const char *name) {
         };
         int r;
 
-        if (name)
-                strncpy(info.super.object_label, name, sizeof(info.super.object_label) - 1);
+        assert(data_file);
+        assert(name);
+
+        strncpy(info.super.object_label, name, sizeof(info.super.object_label) - 1);
+
+        r = uuid_set_random(info.super.object_uuid);
+        if (r < 0)
+                return EXIT_FAILURE;
 
         f = fopen(data_file, "r+");
         if (!f)
@@ -152,28 +159,4 @@ static int image_append_hash(const char *data_file, const char *name) {
                 return -EIO;
 
         return 0;
-}
-
-int main(int argc, char **argv) {
-        const char *data_file = argv[1];
-        int r;
-
-        if (argc < 2 || argc > 3) {
-                fprintf(stderr, "Usage: %s <image> <name>\n", program_invocation_short_name);
-                return EXIT_FAILURE;
-        }
-
-        if (image_info_print(data_file) >= 0)
-                return EXIT_SUCCESS;
-
-        r = image_append_hash(data_file, argv[2]);
-        if (r < 0) {
-                fprintf(stderr, "Error writing %s: %s\n", data_file, strerror(-r));
-                return EXIT_FAILURE;
-        }
-
-        if (image_info_print(data_file) < 0)
-                return EXIT_FAILURE;
-
-        return EXIT_SUCCESS;
 }

@@ -34,10 +34,13 @@
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
+#include "file-util.h"
 #include "kmsg.h"
 #include "tmpfs-root.h"
-#include "image.h"
+#include "image-setup.h"
+#include "encrypt-setup.h"
 #include "util.h"
+#include "uuid.h"
 
 typedef struct Manager Manager;
 
@@ -284,7 +287,7 @@ static int disk_find_partitions(const char *disk, Manager *m) {
                 if (!s)
                         continue;
 
-                if (uuid_parse(s, uuid) < 0)
+                if (uuid_from_string(s, uuid) < 0)
                         continue;
 
                 for (n = 0; n < C_ARRAY_SIZE(partitions); n++) {
@@ -309,9 +312,10 @@ static int disk_find_partitions(const char *disk, Manager *m) {
         return 0;
 }
 
-static int filesystem_probe(const char *volume, char **fstype) {
+static int filesystem_probe(const char *volume, char **fstypep) {
         _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
         const char *s;
+        char *fstype;
         int r;
 
         b = blkid_new_probe_from_filename(volume);
@@ -326,9 +330,11 @@ static int filesystem_probe(const char *volume, char **fstype) {
         if (r < 0)
                 return r;
 
-        *fstype = strdup(s);
-        if (!*fstype)
+        fstype = strdup(s);
+        if (!fstype)
                 return -ENOMEM;
+
+        *fstypep = fstype;
 
         return 0;
 }
@@ -447,18 +453,25 @@ static int mount_boot(const char *device, const char *dir) {
         return 0;
 }
 
-static int mount_var(const char *device, const char *dir) {
+static int mount_var(const char *device, const char *dir, const char *key) {
+        _c_cleanup_(c_freep) char *device_crypt = NULL;
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
-        r = filesystem_probe(device, &fstype);
+        r = encrypt_setup(device, "org.bus1.data", key, &device_crypt);
         if (r < 0) {
-                kmsg(LOG_ERR, "No device or no filesystem found at %s.", device);
+                kmsg(LOG_ERR, "Unable to unlock data volume %s: %s", device, strerror(-r));
                 return r;
         }
 
-        kmsg(LOG_INFO, "Mounting data device %s (%s) at /var.", device, fstype);
-        if (mount(device, dir, fstype, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
+        r = filesystem_probe(device_crypt, &fstype);
+        if (r < 0) {
+                kmsg(LOG_ERR, "No device or no filesystem found at %s: %s", device_crypt, strerror(-r));
+                return r;
+        }
+
+        kmsg(LOG_INFO, "Mounting data device %s (%s) at /var.", device_crypt, fstype);
+        if (mount(device_crypt, dir, fstype, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;
@@ -469,8 +482,7 @@ static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
-        kmsg(LOG_INFO, "Setting up integrity validation of org.bus1.base image.");
-        r = image_setup(image, "org.bus1.base", &device);
+        r = image_setup(image, "org.bus1.system", &device);
         if (r < 0)
                 return r;
 
@@ -679,6 +691,8 @@ int main(int argc, char **argv) {
         _c_cleanup_(c_freep) char *release = NULL;
         bool shell = false;
         _c_cleanup_(c_freep) char *image = NULL;
+        _c_cleanup_(c_freep) char *key_file = NULL;
+        _c_cleanup_(c_freep) char *key = NULL;
         _c_cleanup_(c_freep) char *init = NULL;
         struct timezone tz = {};
         const char *init_argv[] = {
@@ -729,7 +743,7 @@ int main(int argc, char **argv) {
                 goto fail;
         shell = !!r;
 
-        r = bus1_read_release(&release);
+        r = file_read_line("/usr/lib/bus1-release", &release);
         if (r < 0)
                 goto fail;
 
@@ -781,6 +795,7 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
+        kmsg(LOG_INFO, "Setting up cryptographic integrity validation of system image %s.img.", release);
         r = mount_usr(image, "/sysroot/usr");
         if (r < 0) {
                 kmsg(LOG_EMERG, "Unable to mount system image %s: %s.", image, strerror(-r));
@@ -792,7 +807,18 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
-        r = mount_var(m->device_data, "/sysroot/var");
+        if (asprintf(&key_file, "/sysroot/boot%s/bus1-key.txt", m->loader_dir ?: "") < 0) {
+                r = -ENOMEM;
+                goto fail;
+        }
+
+        kmsg(LOG_INFO, "Reading data volume decryption key bus1-key.txt from boot volume.");
+        r = file_read_line(key_file, &key);
+        if (r < 0)
+                goto fail;
+
+        kmsg(LOG_INFO, "Setting up decryption of data volume %s.", m->device_data);
+        r = mount_var(m->device_data, "/sysroot/var", key);
         if (r < 0)
                 goto fail;
 

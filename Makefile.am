@@ -40,14 +40,18 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
-	src/shared/image.h \
-	src/shared/image.c \
+	src/shared/file-util.h \
+	src/shared/file-util.c \
+	src/shared/image-setup.h \
+	src/shared/image-setup.c \
 	src/shared/kmsg.h \
 	src/shared/kmsg.c \
 	src/shared/tmpfs-root.h \
 	src/shared/tmpfs-root.c \
 	src/shared/util.h \
-	src/shared/util.c
+	src/shared/util.c \
+	src/shared/uuid.h \
+	src/shared/uuid.c
 
 libshared_a_CFLAGS = \
 	$(AM_CFLAGS) \
@@ -77,6 +81,8 @@ bin_PROGRAMS += \
 org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.h \
 	src/devices/sysfs.c \
+	src/rdinit/encrypt-setup.h \
+	src/rdinit/encrypt-setup.c \
 	src/rdinit/main.c
 
 org_bus1_rdinit_CFLAGS = \
@@ -154,19 +160,26 @@ org_bus1_coredump_LDADD = \
 
 # ------------------------------------------------------------------------------
 noinst_PROGRAMS += \
-	org.bus1.imageinfo
+	org.bus1.diskctl
 
-org_bus1_imageinfo_SOURCES = \
-	src/imageinfo/hash-tree.h \
-	src/imageinfo/hash-tree.c \
-	src/imageinfo/main.c
+org_bus1_diskctl_SOURCES = \
+	src/bus1/b1-super-info.h \
+	src/bus1/b1-encrypt-info.h \
+	src/bus1/b1-image-info.h \
+	src/diskctl/encrypt.h \
+	src/diskctl/encrypt.c \
+	src/diskctl/hash-tree.h \
+	src/diskctl/hash-tree.c \
+	src/diskctl/image.h \
+	src/diskctl/image.c \
+	src/diskctl/main.c
 
-org_bus1_imageinfo_CFLAGS = \
+org_bus1_diskctl_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
 	$(GCRYPT_CFLAGS)
 
-org_bus1_imageinfo_LDADD = \
+org_bus1_diskctl_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(GCRYPT_LIBS)

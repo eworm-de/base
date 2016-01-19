@@ -23,10 +23,11 @@
 #include <sys/stat.h>
 
 #include "bus1/b1-image-info.h"
-#include "image.h"
+#include "file-util.h"
+#include "image-setup.h"
 #include "util.h"
 
-static int loop_attach_image(FILE *f, char **device) {
+static int image_attach_loop(FILE *f, char **device) {
         _c_cleanup_(c_closep) int fd_loopctl = -1;
         _c_cleanup_(c_closep) int fd_loop = -1;
         _c_cleanup_(c_freep) char *loopdev = NULL;
@@ -78,16 +79,16 @@ static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, s
         return 0;
 };
 
-static int device_setup_hash_tree(const char *device,
-                                  const char *name,
-                                  uint64_t data_size,
-                                  uint64_t hash_offset,
-                                  unsigned int data_block_size,
-                                  unsigned int hash_block_size,
-                                  const char *hash_name,
-                                  const char *salt,
-                                  const char *root_hash,
-                                  char **map_device) {
+static int image_setup_device(const char *device,
+                              const char *name,
+                              uint64_t data_size,
+                              uint64_t hash_offset,
+                              unsigned int data_block_size,
+                              unsigned int hash_block_size,
+                              const char *hash_name,
+                              const char *salt,
+                              const char *root_hash,
+                              char **map_device) {
         _c_cleanup_(c_freep) struct dm_ioctl *io = NULL;
         _c_cleanup_(c_closep) int fd = -1;
         uint64_t dm_dev;
@@ -156,28 +157,38 @@ static int device_setup_hash_tree(const char *device,
         return 0;
 }
 
-static int image_get_info(FILE *f,
-                          uint64_t *data_size,
-                          uint64_t *hash_offset,
-                          unsigned int *data_block_size,
-                          unsigned int *hash_block_size,
-                          char **hash_name,
-                          char **salt,
-                          char **root_hash) {
-        struct stat sb;
+int image_get_info(FILE *f,
+                   char **image_name,
+                   uint8_t *image_uuid,
+                   uint64_t *data_offset,
+                   uint64_t *data_size,
+                   uint64_t *hash_offset,
+                   uint64_t *hash_size,
+                   char **hash_algorithm,
+                   uint64_t *hash_digest_size,
+                   uint64_t *hash_block_size,
+                   uint64_t *data_block_size,
+                   char **salt,
+                   char **root_hash) {
+        uint64_t size;
         Bus1ImageInfo info;
-        static const char super_uuid[] = BUS1_SUPER_HEADER_UUID;
+        static const char super_uuid[] = BUS1_SUPER_INFO_UUID;
         static const char info_uuid[] = BUS1_IMAGE_INFO_UUID;
+        _c_cleanup_(c_freep) char *name = NULL;
+        _c_cleanup_(c_freep) char *algorithm = NULL;
+        _c_cleanup_(c_freep) char *salt_str = NULL;
+        _c_cleanup_(c_freep) char *hash_str = NULL;
         size_t l;
         int r;
 
-        if (fstat(fileno(f), &sb) < 0)
-                return -errno;
+        r = file_get_size(f, &size);
+        if (r < 0)
+                return r;
 
-        if (sb.st_size <= (off_t)sizeof(Bus1ImageInfo))
+        if (size < sizeof(Bus1ImageInfo))
                 return -EINVAL;
 
-        if (fseeko(f, sb.st_size - sizeof(Bus1ImageInfo), SEEK_SET) < 0)
+        if (fseeko(f, size - sizeof(Bus1ImageInfo), SEEK_SET) < 0)
                 return -errno;
 
         if (fread(&info, sizeof(info), 1, f) != 1)
@@ -189,19 +200,19 @@ static int image_get_info(FILE *f,
         if (memcmp(info.super.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
 
-        *data_size = le64toh(info.data.size);
-        *hash_offset = le64toh(info.hash.offset);
-        *data_block_size = le64toh(info.hash.data_block_size);
-        *hash_block_size = le64toh(info.hash.hash_block_size);
-        *hash_name = strdup(info.hash.algorithm);
-        if (!*hash_name)
+        name = strdup(info.super.object_label);
+        if (!name)
+                return -ENOMEM;
+
+        algorithm = strdup(info.hash.algorithm);
+        if (!name)
                 return -ENOMEM;
 
         l = le64toh(info.hash.salt_size) / 8;
         if (l >= 256)
                 return -EINVAL;
 
-        r = bytes_to_hexstr(info.hash.salt, l, salt);
+        r = bytes_to_hexstr(info.hash.salt, l, &salt_str);
         if (r < 0)
                 return r;
 
@@ -209,9 +220,53 @@ static int image_get_info(FILE *f,
         if (l >= 256)
                 return -EINVAL;
 
-        r = bytes_to_hexstr(info.hash.root_hash, l, root_hash);
+        r = bytes_to_hexstr(info.hash.root_hash, l, &hash_str);
         if (r < 0)
                 return r;
+
+        if (image_name) {
+                *image_name = name;
+                name = NULL;
+        }
+
+        if (image_uuid)
+                memcpy(image_uuid, info.super.object_uuid, 16);
+
+        if (data_offset)
+                *data_offset = le64toh(info.data.offset);
+
+        if (data_size)
+                *data_size = le64toh(info.data.size);
+
+        if (hash_offset)
+                *hash_offset = le64toh(info.hash.offset);
+
+        if (hash_size)
+                *hash_size = le64toh(info.hash.size);
+
+        if (hash_algorithm) {
+                *hash_algorithm = algorithm;
+                algorithm = NULL;
+        }
+
+        if (hash_digest_size)
+                *hash_digest_size = le64toh(info.hash.digest_size);
+
+        if (hash_block_size)
+                *hash_block_size = le64toh(info.hash.hash_block_size);
+
+        if (data_block_size)
+                *data_block_size = le64toh(info.hash.data_block_size);
+
+        if (salt) {
+                *salt = salt_str;
+                salt_str = NULL;
+        }
+
+        if (root_hash) {
+                *root_hash = hash_str;
+                hash_str = NULL;
+        }
 
         return 0;
 }
@@ -220,9 +275,9 @@ int image_setup(const char *image, const char *name, char **device) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t data_size;
         uint64_t hash_offset;
-        unsigned int data_block_size;
-        unsigned int hash_block_size;
-        _c_cleanup_(c_freep) char *hash_name = NULL;
+        _c_cleanup_(c_freep) char *hash_algorithm = NULL;
+        uint64_t hash_block_size;
+        uint64_t data_block_size;
         _c_cleanup_(c_freep) char *salt = NULL;
         _c_cleanup_(c_freep) char *root_hash = NULL;
         _c_cleanup_(c_freep) char *loopdev = NULL;
@@ -236,29 +291,35 @@ int image_setup(const char *image, const char *name, char **device) {
         setvbuf(f, NULL, _IONBF, 0);
 
         r = image_get_info(f,
+                           NULL,
+                           NULL,
+                           NULL,
                            &data_size,
                            &hash_offset,
-                           &data_block_size,
+                           NULL,
+                           &hash_algorithm,
+                           NULL,
                            &hash_block_size,
-                           &hash_name, &salt,
+                           &data_block_size,
+                           &salt,
                            &root_hash);
         if (r < 0)
                 return r;
 
-        r = loop_attach_image(f, &loopdev);
+        r = image_attach_loop(f, &loopdev);
         if (r < 0)
                 return r;
 
-        r = device_setup_hash_tree(loopdev,
-                                   name,
-                                   data_size,
-                                   hash_offset,
-                                   data_block_size,
-                                   hash_block_size,
-                                   hash_name,
-                                   salt,
-                                   root_hash,
-                                   &dev);
+        r = image_setup_device(loopdev,
+                               name,
+                               data_size,
+                               hash_offset,
+                               data_block_size,
+                               hash_block_size,
+                               hash_algorithm,
+                               salt,
+                               root_hash,
+                               &dev);
         if (r < 0)
                 return r;
 

@@ -17,25 +17,12 @@
 
 #include <bus1/c-macro.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 
 #include "util.h"
-
-int uuid_parse(const char *str, uint8_t *uuid) {
-        int id[16];
-        unsigned int i;
-
-        if (sscanf(str, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-                   &id[0], &id[1], &id[2], &id[3], &id[4], &id[5], &id[6], &id[7],
-                   &id[8], &id[9], &id[10], &id[11], &id[12], &id[13], &id[14], &id[15]) != 16)
-                return -EINVAL;
-
-        for (i = 0; i < 16; i++)
-                uuid[i] = id[i];
-
-        return 0;
-}
 
 int hexstr_to_bytes(const char *str, uint8_t *bytes) {
         size_t len;
@@ -199,30 +186,4 @@ int kernel_cmdline_option(const char *key, char **value) {
                 return -ENOMEM;
 
         return true;
-}
-
-int bus1_read_release(char **release) {
-        _c_cleanup_(c_fclosep) FILE *f = NULL;
-        char line[4096];
-        size_t len;
-
-        f = fopen("/usr/lib/bus1-release", "re");
-        if (!f)
-                return -errno;
-
-        if (fgets(line, sizeof(line), f) == NULL)
-                return -errno;
-
-        len = strlen(line);
-        if (len < 1)
-                return -EINVAL;
-
-        if (line[len - 1] == '\n')
-                line[len - 1] = '\0';
-
-        *release = strdup(line);
-        if (!*release)
-                return -ENOMEM;
-
-        return 0;
 }

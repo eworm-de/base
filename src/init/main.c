@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include "file-util.h"
 #include "kmsg.h"
 #include "sysctl.h"
 #include "util.h"
@@ -441,7 +442,7 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = bus1_read_release(&release);
+        r = file_read_line("/usr/lib/bus1-release", &release);
         if (r < 0)
                 goto fail;
 

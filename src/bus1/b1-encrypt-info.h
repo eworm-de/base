@@ -16,21 +16,23 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <sys/syscall.h>
+#include <bus1/b1-super-info.h>
 
-#ifndef HAVE_DECL_GETRANDOM
-static inline int getrandom(void *buffer, size_t count, unsigned flags) {
-        return syscall(__NR_getrandom, buffer, count, flags);
-}
-#endif
+#define BUS1_ENCRYPT_INFO_UUID { 0x59, 0x33, 0x18, 0x42, 0x97, 0x21, 0x42, 0x37, 0xa7, 0xca, 0xff, 0x9b, 0x94, 0x5b, 0x92, 0x8b }
 
-static inline unsigned log2u(unsigned int x) {
-        return sizeof(unsigned int) * 8 - c_clz(x) - 1;
-}
+struct Bus1EncryptInfo {
+        Bus1SuperHeader super;
 
-int bytes_to_hexstr(const uint8_t *bytes, size_t len, char **str);
-int hexstr_to_bytes(const char *str, uint8_t *bytes);
-char *escape_hex(const char *in);
-int child_reap(pid_t *p);
-pid_t service_start(const char *prog);
-int kernel_cmdline_option(const char *key, char **value);
+        struct {
+                uint64_t offset;
+                uint64_t size;
+        } data;
+
+        struct {
+                char cypher[32];
+                char chain_mode[32];
+                char iv_mode[32];
+        } encrypt;
+};
+
+typedef struct Bus1EncryptInfo Bus1EncryptInfo;
