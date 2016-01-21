@@ -85,8 +85,8 @@ bin_PROGRAMS += \
 org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.h \
 	src/devices/sysfs.c \
-	src/rdinit/encrypt-setup.h \
-	src/rdinit/encrypt-setup.c \
+	src/rdinit/disk-encrypt.h \
+	src/rdinit/disk-encrypt.c \
 	src/rdinit/main.c
 
 org_bus1_rdinit_CFLAGS = \

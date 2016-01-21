@@ -66,8 +66,6 @@ static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, s
                 return -ENOMEM;
 
         dm->version[0] = 4;
-        dm->version[1] = 0;
-        dm->version[2] = 0;
 
         dm->data_size = sizeof(struct dm_ioctl) + data_size;
         dm->data_start = sizeof(struct dm_ioctl);

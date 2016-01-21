@@ -22,7 +22,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
-#include "encrypt-setup.h"
+#include "disk-encrypt.h"
 #include "file-util.h"
 #include "util.h"
 
@@ -69,8 +69,6 @@ static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, s
                 return -ENOMEM;
 
         io->version[0] = 4;
-        io->version[1] = 0;
-        io->version[2] = 0;
 
         io->data_size = sizeof(struct dm_ioctl) + data_size;
         io->data_start = sizeof(struct dm_ioctl);
@@ -152,7 +150,7 @@ static int encrypt_setup_device(const char *device, const char *name, uint64_t o
         return 0;
 }
 
-int encrypt_setup(const char *device, const char *name, const char *key, char **devicep) {
+int disk_encrypt_setup(const char *device, const char *name, const char *key, char **devicep) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset;
         uint64_t size;

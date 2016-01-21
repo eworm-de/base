@@ -42,7 +42,7 @@
 #include "util.h"
 #include "uuid-util.h"
 
-#include "encrypt-setup.h"
+#include "disk-encrypt.h"
 
 typedef struct Manager Manager;
 
@@ -460,7 +460,7 @@ static int mount_var(const char *device, const char *dir, const char *key) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
-        r = encrypt_setup(device, "org.bus1.data", key, &device_crypt);
+        r = disk_encrypt_setup(device, "org.bus1.data", key, &device_crypt);
         if (r < 0) {
                 kmsg(LOG_ERR, "Unable to unlock data volume %s: %s", device, strerror(-r));
                 return r;
