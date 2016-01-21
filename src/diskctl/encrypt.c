@@ -73,7 +73,7 @@ int encrypt_print_info(const char *data) {
         printf("Data offset: %" PRIu64 " bytes\n", le64toh(info.data.offset));
         printf("Data size:   %" PRIu64 " bytes\n", le64toh(info.data.size));
         printf("Encryption:  %s-%s-%s\n", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode);
-        printf("==================================================\n");
+        printf("=================================================\n");
 
         return 0;
 }
@@ -123,8 +123,6 @@ int encrypt_setup_volume(const char *data_file, const char *name) {
         if (!f)
                 return -errno;
 
-        setvbuf(f, NULL, _IONBF, 0);
-
         r = file_get_size(f, &size);
         if (r < 0)
                 return r;
@@ -139,6 +137,9 @@ int encrypt_setup_volume(const char *data_file, const char *name) {
 
         if (fwrite(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
+
+        if (fflush(f) < 0)
+                return -errno;
 
         return 0;
 }

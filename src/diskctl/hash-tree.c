@@ -20,9 +20,10 @@
 #include <gcrypt.h>
 
 #include "hash-tree.h"
+#include "file-util.h"
 #include "util.h"
 
-static int hash_write(FILE *f_in, FILE *f_out,
+static int hash_write(FILE *f_data, FILE *f_hash,
                       uint64_t data_block, uint64_t data_block_size,
                       uint64_t hash_block, uint64_t hash_block_size,
                       uint64_t n_data_blocks,
@@ -44,10 +45,16 @@ static int hash_write(FILE *f_in, FILE *f_out,
         if (!null_block || !data_buffer)
                 return -ENOMEM;
 
-        if (fseeko(f_in, data_block * data_block_size, SEEK_SET))
+        if (fflush(f_data) < 0)
                 return -errno;
 
-        if (f_out && fseeko(f_out, hash_block * hash_block_size, SEEK_SET))
+        if (fflush(f_hash) < 0)
+                return -errno;
+
+        if (fseeko(f_data, data_block * data_block_size, SEEK_SET))
+                return -errno;
+
+        if (f_hash && fseeko(f_hash, hash_block * hash_block_size, SEEK_SET))
                 return -errno;
 
         while (n_blocks--) {
@@ -57,7 +64,7 @@ static int hash_write(FILE *f_in, FILE *f_out,
                         if (n_data_blocks-- == 0)
                                 break;
 
-                        if (fread(data_buffer, data_block_size, 1, f_in) != 1)
+                        if (fread(data_buffer, data_block_size, 1, f_data) != 1)
                                 return -EIO;
 
                         gcry_md_reset(crypt_ctx);
@@ -65,17 +72,17 @@ static int hash_write(FILE *f_in, FILE *f_out,
                         gcry_md_write(crypt_ctx, data_buffer, data_block_size);
                         memcpy(digest, gcry_md_read(crypt_ctx, crypt_hash_type), digest_size);
 
-                        if (!f_out)
+                        if (!f_hash)
                                 break;
 
-                        if (fwrite(digest, digest_size, 1, f_out) != 1)
+                        if (fwrite(digest, digest_size, 1, f_hash) != 1)
                                 return -EIO;
 
                         n_bytes -= digest_size;
                 }
 
-                if (f_out && n_bytes)
-                        if (fwrite(null_block, n_bytes, 1, f_out) != 1)
+                if (f_hash && n_bytes)
+                        if (fwrite(null_block, n_bytes, 1, f_hash) != 1)
                                 return -EIO;
         }
 
@@ -84,18 +91,22 @@ static int hash_write(FILE *f_in, FILE *f_out,
 
 C_DEFINE_CLEANUP(gcry_md_hd_t, gcry_md_close);
 
-int hash_tree_create(const char *hash_name,
-                     uint64_t digest_size,
-                     const char *data_device,
-                     uint64_t data_block_size,
-                     uint64_t n_data_blocks,
-                     const char *hash_device,
-                     uint64_t hash_block_size,
-                     uint64_t hash_offset,
-                     const uint8_t *salt,
-                     uint64_t salt_size,
-                     uint8_t *root_hash,
-                     uint64_t *hash_tree_size) {
+int hash_tree_write(const char *filename_data,
+                    const char *filename_hash,
+                    const char *hash_name,
+                    uint64_t digest_size,
+                    uint64_t data_block_size,
+                    uint64_t n_data_blocks,
+                    uint64_t hash_block_size,
+                    uint64_t hash_offset,
+                    const uint8_t *salt,
+                    uint64_t salt_size,
+                    uint8_t *root_hash,
+                    uint64_t *hash_tree_sizep) {
+        _c_cleanup_(c_fclosep) FILE *f_data = NULL;
+        _c_cleanup_(c_fclosep) FILE *f_hash_read = NULL;
+        _c_cleanup_(c_fclosep) FILE *f_hash_write = NULL;
+        uint64_t data_size;
         _c_cleanup_(gcry_md_closep) gcry_md_hd_t crypt_ctx = NULL;
         int crypt_hash_type;
         int n_level;
@@ -107,23 +118,38 @@ int hash_tree_create(const char *hash_name,
         size_t hash_per_block_bits;
         _c_cleanup_(c_freep) struct hash_level *levels = NULL;
         _c_cleanup_(c_freep) uint8_t *digest = NULL;
-        _c_cleanup_(c_fclosep) FILE *f_data = NULL;
-        _c_cleanup_(c_fclosep) FILE *f_hash = NULL;
         uint64_t s;
         int i;
         int r;
 
+        assert(filename_data);
+        assert(filename_hash);
         assert(hash_name);
         assert(digest_size);
-        assert(data_device);
         assert(data_block_size > 0);
         assert(n_data_blocks > 2);
-        assert(hash_device);
         assert(hash_block_size > 0);
         assert(salt);
         assert(salt_size);
-        assert(root_hash);
-        assert(hash_tree_size);
+
+        f_data = fopen(filename_data, "re");
+        if (!f_data)
+                return -errno;
+
+        r = file_get_size(f_data, &data_size);
+        if (r < 0)
+                return r;
+
+        if (data_size % 4096)
+                return -EINVAL;
+
+        f_hash_read = fopen(filename_hash, "re");
+        if (!f_hash_read)
+                return -errno;
+
+        f_hash_write = fopen(filename_hash, "r+e");
+        if (!f_hash_write)
+                return -errno;
 
         if (gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P) == 0) {
                 gcry_control(GCRYCTL_DISABLE_SECMEM);
@@ -157,19 +183,11 @@ int hash_tree_create(const char *hash_name,
                 hash_size += s * hash_block_size;
         }
 
-        f_data = fopen(data_device, "re");
-        if (!f_data)
-                return -errno;
-
-        f_hash = fopen(hash_device, "r+e");
-        if (!f_hash)
-                return -errno;
-
         digest = calloc(1, digest_size);
         if (!digest)
                 return -ENOMEM;
 
-        r = hash_write(f_data, f_hash,
+        r = hash_write(f_data, f_hash_write,
                        0, data_block_size,
                        levels[0].offset, hash_block_size,
                        n_data_blocks,
@@ -180,13 +198,7 @@ int hash_tree_create(const char *hash_name,
                 return r;
 
         for (i = 1; i < n_level; i++) {
-                _c_cleanup_(c_fclosep) FILE *f_hash2 = NULL;
-
-                f_hash2 = fopen(hash_device, "re");
-                if (!f_hash2)
-                        return -errno;
-
-                r = hash_write(f_hash2, f_hash,
+                r = hash_write(f_hash_read, f_hash_write,
                                levels[i - 1].offset, hash_block_size,
                                levels[i].offset, hash_block_size,
                                levels[i - 1].size,
@@ -197,7 +209,7 @@ int hash_tree_create(const char *hash_name,
                         return r;
         }
 
-        r = hash_write(f_hash, NULL,
+        r = hash_write(f_hash_write, NULL,
                        levels[n_level - 1].offset, hash_block_size,
                        0, hash_block_size,
                        1,
@@ -205,8 +217,11 @@ int hash_tree_create(const char *hash_name,
                        salt, salt_size,
                        digest, digest_size);
 
-        memcpy(root_hash, digest, digest_size);
-        *hash_tree_size = hash_size;
+        if (root_hash)
+                memcpy(root_hash, digest, digest_size);
+
+        if (hash_tree_sizep)
+                *hash_tree_sizep = hash_size;
 
         return r;
 }

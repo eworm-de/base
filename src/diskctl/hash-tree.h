@@ -16,15 +16,15 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int hash_tree_create(const char *hash_name,
-                     uint64_t digest_size,
-                     const char *data_device,
-                     uint64_t data_block_size,
-                     uint64_t n_data_blocks,
-                     const char *hash_device,
-                     uint64_t hash_block_size,
-                     uint64_t hash_offset,
-                     const uint8_t *salt,
-                     uint64_t salt_size,
-                     uint8_t *root_hash,
-                     uint64_t *hash_tree_size);
+int hash_tree_write(const char *filename_data,
+                    const char *filename_hash,
+                    const char *hash_name,
+                    uint64_t digest_size,
+                    uint64_t data_block_size,
+                    uint64_t n_data_blocks,
+                    uint64_t hash_block_size,
+                    uint64_t hash_offset,
+                    const uint8_t *salt,
+                    uint64_t salt_size,
+                    uint8_t *root_hash,
+                    uint64_t *hash_tree_sizep);

@@ -25,6 +25,7 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 
+#include "file-util.h"
 #include "kmsg-util.h"
 #include "string-util.h"
 #include "util.h"
@@ -111,7 +112,7 @@ static int thread_cb(Dwfl_Thread *thread, void *userdata) {
         return DWARF_CB_OK;
 }
 
-static int stacktrace(int core_fd, char **error) {
+static int stacktrace_log(FILE *f, char **error) {
         static const Dwfl_Callbacks cbs = {
                 .find_elf = dwfl_build_id_find_elf,
                 .find_debuginfo = dwfl_standard_find_debuginfo,
@@ -119,11 +120,11 @@ static int stacktrace(int core_fd, char **error) {
         struct cb_data c = {};
         int r = -EINVAL;
 
-        if (lseek(core_fd, 0, SEEK_SET) == (off_t)-1)
+        if (fseeko(f, 0, SEEK_SET) < 0)
                 return -errno;
 
         elf_version(EV_CURRENT);
-        c.elf = elf_begin(core_fd, ELF_C_READ_MMAP, NULL);
+        c.elf = elf_begin(fileno(f), ELF_C_READ_MMAP, NULL);
         if (!c.elf)
                 goto finish;
 
@@ -159,50 +160,6 @@ finish:
         return r;
 }
 
-static ssize_t copy_file(int fd_in, int fd_out) {
-        ssize_t size = 0;
-
-        for (;;) {
-                char buf[64 * 1024];
-                ssize_t in;
-                ssize_t n;
-                char *p;
-
-                in = read(fd_in, buf, sizeof(buf));
-                if (in == 0)
-                        break;
-                if (in < 0) {
-                        if (errno == EINTR)
-                                continue;
-
-                        return -errno;
-                }
-
-                p = buf;
-                n = in;
-                while (n > 0) {
-                        ssize_t out;
-
-                        out = write(fd_out, p, n);
-                        if (out == 0)
-                                return -EIO;
-                        if (out < 0) {
-                                if (errno == EINTR)
-                                        continue;
-
-                                return -errno;
-                        }
-
-                        p += out;
-                        n -= out;
-
-                        size += out;
-                }
-        }
-
-        return size;
-}
-
 int main(int argc, char **argv) {
         enum {
                 ARG_0,
@@ -219,10 +176,12 @@ int main(int argc, char **argv) {
         gid_t gid;
         int sig;
         const char *comm;
-        _c_cleanup_(c_closep) int core_fd = -1;
-        size_t core_size;
+        int fd;
+        _c_cleanup_(c_fclosep) FILE *f_core = NULL;
+        uint64_t core_size;
         _c_cleanup_(c_closep) int dfd = -1;
         _c_cleanup_(c_freep) char *error = NULL;
+        int r;
 
         prctl(PR_SET_DUMPABLE, 0);
 
@@ -238,16 +197,20 @@ int main(int argc, char **argv) {
         log = kmsg(LOG_INFO, "%s[%d] caught signal %d (%s) uid=%d:%d", comm, pid, sig, strsignal(sig), uid, gid);
 
         /* Allocate an unlinked file on disk. */
-        core_fd = open("/var", O_TMPFILE|O_RDWR|O_CLOEXEC, 0660);
-        if (core_fd < 0)
+        fd = open("/var", O_TMPFILE|O_RDWR|O_CLOEXEC, 0660);
+        if (fd < 0)
                 return EXIT_FAILURE;
 
-        if (fchownat(core_fd, "", BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, AT_EMPTY_PATH) < 0)
+        f_core = fdopen(fd, "r+e");
+        if (!f_core)
+                return EXIT_FAILURE;
+
+        if (fchownat(fileno(f_core), "", BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, AT_EMPTY_PATH) < 0)
                 return EXIT_FAILURE;
 
         /* Stream the coredump from the kernel to the file. */
-        core_size = copy_file(STDIN_FILENO, core_fd);
-        if (core_size <= 0)
+        r = file_copy(stdin, f_core, &core_size);
+        if (r < 0)
                 return EXIT_FAILURE;
 
         /* Safe coredump to disk. */
@@ -270,7 +233,7 @@ int main(int argc, char **argv) {
                 if (asprintf(&core_file, "%d-%s", uid, comm_escaped) < 0)
                         return EXIT_FAILURE;
 
-                if (asprintf(&proc_file, "/proc/self/fd/%d", core_fd) < 0)
+                if (asprintf(&proc_file, "/proc/self/fd/%d", fileno(f_core)) < 0)
                         return EXIT_FAILURE;
 
                 if (unlinkat(dfd, core_file, 0) < 0 && errno != ENOENT)
@@ -287,7 +250,7 @@ int main(int argc, char **argv) {
             setresuid(BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP) < 0)
                 return EXIT_FAILURE;
 
-        if (stacktrace(core_fd, &error) < 0)
+        if (stacktrace_log(f_core, &error) < 0)
                 kmsg(LOG_INFO, "Unable to generate stack trace: %s.", error);
 
         return EXIT_SUCCESS;

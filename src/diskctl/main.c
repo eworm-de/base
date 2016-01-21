@@ -24,52 +24,72 @@
 
 int main(int argc, char **argv) {
         const char *verb = argv[1];
-        const char *data_file = argv[2];
-        const char *name = argv[3];
         int r;
 
         if (!verb)
                 goto fail;
 
         if (strcmp(verb, "image") == 0) {
-                if (argc != 4) {
-                        fprintf(stderr, "Usage: %s image <image> <name>\n", program_invocation_short_name);
-                        return EXIT_FAILURE;
-                }
+                if (argc == 3) {
+                        const char *filename = argv[2];
 
-                if (image_print_info(data_file) >= 0)
+                        if (image_print_info(filename) < 0)
+                                return EXIT_FAILURE;
+
                         return EXIT_SUCCESS;
-
-                r = image_append_hash(data_file, name);
-                if (r < 0) {
-                        fprintf(stderr, "Error writing %s: %s\n", data_file, strerror(-r));
-                        return EXIT_FAILURE;
                 }
 
-                if (image_print_info(data_file) < 0)
-                        return EXIT_FAILURE;
+                if (argc == 5) {
+                        const char *name = argv[2];
+                        const char *filename_in = argv[3];
+                        const char *filename_out = argv[4];
 
-                return EXIT_SUCCESS;
+                        r = image_write(filename_in, filename_out, name);
+                        if (r < 0) {
+                                fprintf(stderr, "Error writing %s: %s\n", filename_out, strerror(-r));
+                                return EXIT_FAILURE;
+                        }
+
+                        if (image_print_info(filename_out) < 0)
+                                return EXIT_FAILURE;
+
+                        return EXIT_SUCCESS;
+                }
+
+                fprintf(stderr, "Usage: %s image <name> <data file> <image file>\n", program_invocation_short_name);
+                return EXIT_FAILURE;
 
         } else if (strcmp(verb, "encrypt") == 0) {
-                if (argc != 4) {
-                        fprintf(stderr, "Usage: %s encrypt <device> <name>\n", program_invocation_short_name);
-                        return EXIT_FAILURE;
-                }
+                if (argc == 3) {
+                        const char *filename = argv[2];
 
-                if (encrypt_print_info(data_file) >= 0)
+                        if (encrypt_print_info(filename) < 0)
+                                return EXIT_FAILURE;
+
                         return EXIT_SUCCESS;
-
-                r = encrypt_setup_volume(data_file, name);
-                if (r < 0) {
-                        fprintf(stderr, "Error writing %s: %s\n", data_file, strerror(-r));
-                        return EXIT_FAILURE;
                 }
 
-                if (encrypt_print_info(data_file) < 0)
-                        return EXIT_FAILURE;
+                if (argc == 4) {
+                        const char *name = argv[2];
+                        const char *filename = argv[3];
 
-                return EXIT_SUCCESS;
+                        if (encrypt_print_info(filename) >= 0)
+                                return EXIT_SUCCESS;
+
+                        r = encrypt_setup_volume(filename, name);
+                        if (r < 0) {
+                                fprintf(stderr, "Error writing %s: %s\n", filename, strerror(-r));
+                                return EXIT_FAILURE;
+                        }
+
+                        if (encrypt_print_info(filename) < 0)
+                                return EXIT_FAILURE;
+
+                        return EXIT_SUCCESS;
+                }
+
+                fprintf(stderr, "Usage: %s encrypt <name> <device>\n", program_invocation_short_name);
+                return EXIT_FAILURE;
         }
 
 fail:

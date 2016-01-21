@@ -16,5 +16,5 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int image_append_hash(const char *data_file, const char *name);
-int image_print_info(const char *data);
+int image_write(const char *filename_in, const char *filename_out, const char *name);
+int image_print_info(const char *filename);

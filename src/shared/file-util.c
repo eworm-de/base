@@ -77,3 +77,50 @@ int file_read_line(const char *filename, char **linep) {
 
         return 0;
 }
+
+int file_copy(FILE *f_in, FILE *f_out, uint64_t *sizep) {
+        uint64_t size = 0;
+
+        for (;;) {
+                char buf[128 * 1024];
+                ssize_t in;
+                ssize_t n;
+                char *p;
+
+                in = read(fileno(f_in), buf, sizeof(buf));
+                if (in == 0)
+                        break;
+                if (in < 0) {
+                        if (errno == EINTR)
+                                continue;
+
+                        return -errno;
+                }
+
+                p = buf;
+                n = in;
+                while (n > 0) {
+                        ssize_t out;
+
+                        out = write(fileno(f_out), p, n);
+                        if (out == 0)
+                                return -EIO;
+                        if (out < 0) {
+                                if (errno == EINTR)
+                                        continue;
+
+                                return -errno;
+                        }
+
+                        p += out;
+                        n -= out;
+
+                        size += out;
+                }
+        }
+
+        if (sizep)
+                *sizep = size;
+
+        return 0;
+}

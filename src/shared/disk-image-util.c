@@ -27,11 +27,15 @@
 #include "file-util.h"
 #include "string-util.h"
 #include "util.h"
+#include "kmsg-util.h"
 
-static int image_attach_loop(FILE *f, char **device) {
+static int image_attach_loop(FILE *f, uint64_t offset, char **devicep) {
         _c_cleanup_(c_closep) int fd_loopctl = -1;
         _c_cleanup_(c_closep) int fd_loop = -1;
-        _c_cleanup_(c_freep) char *loopdev = NULL;
+        _c_cleanup_(c_freep) char *device = NULL;
+        struct loop_info64 info = {
+                .lo_offset = offset,
+        };
         int n;
 
         fd_loopctl = open("/dev/loop-control", O_RDWR|O_CLOEXEC);
@@ -42,18 +46,21 @@ static int image_attach_loop(FILE *f, char **device) {
         if (n < 0)
                 return -errno;
 
-        if (asprintf(&loopdev, "/dev/loop%d", n) < 0)
+        if (asprintf(&device, "/dev/loop%d", n) < 0)
                 return -ENOMEM;
 
-        fd_loop = open(loopdev, O_RDWR|O_CLOEXEC);
+        fd_loop = open(device, O_RDWR|O_CLOEXEC);
         if (fd_loop < 0)
                 return -errno;
 
         if (ioctl(fd_loop, LOOP_SET_FD, fileno(f)) < 0)
                 return -errno;
 
-        *device = loopdev;
-        loopdev = NULL;
+        if (ioctl(fd_loop, LOOP_SET_STATUS64, &info) < 0)
+                return -errno;
+
+        *devicep = device;
+        device = NULL;
 
         return 0;
 }
@@ -115,12 +122,13 @@ static int image_setup_device(const char *device,
         io = c_free(io);
 
         /* Load verity target:
-             <target version> <data device> <hash device> <data block size> <hash block size> <hash offset> <hash algorithm> <root hash> <salt>
+             <target version> <data device> <hash device> <data block size> <hash block size> <number of data blocks> <hash offset> <hash algorithm> <root hash> <salt>
              1 /dev/loop0 /dev/loop 4096 4096 46207 1 sha256 bde126215de2ce8d706b1b8117ba4f463ae1a329b547167457eb220d6d83fa85 dc1d34bde3c80c579b8a1fd30d3b1d860160ee44bfd8e37cd0dd7b406353779f
          */
         target_parameter_len = asprintf(&target_parameter, "1 %s %s %u %u %" PRIu64 " %" PRIu64 " %s %s %s",
-                                        device, device, data_block_size, hash_block_size,
-                                        data_size / data_block_size, hash_offset / data_block_size,
+                                        device, device,
+                                        data_block_size, hash_block_size,
+                                        data_size / data_block_size, hash_offset / hash_block_size,
                                         hash_name, root_hash, salt);
         if (target_parameter_len < 0)
                 return -ENOMEM;
@@ -131,7 +139,6 @@ static int image_setup_device(const char *device,
 
         io->target_count = 1;
         target = (struct dm_target_spec *)((uint8_t *)io + sizeof(struct dm_ioctl));
-        target->sector_start = 0;
         target->length = data_size / 512;
         strcpy(target->target_type, "verity");
         memcpy((uint8_t *)target + sizeof(struct dm_target_spec), target_parameter, target_parameter_len);
@@ -169,7 +176,6 @@ int disk_image_get_info(FILE *f,
                         uint64_t *data_block_size,
                         char **salt,
                         char **root_hash) {
-        uint64_t size;
         Bus1DiskImageHeader info;
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
         static const char info_uuid[] = BUS1_DISK_IMAGE_HEADER_UUID;
@@ -179,16 +185,6 @@ int disk_image_get_info(FILE *f,
         _c_cleanup_(c_freep) char *hash_str = NULL;
         size_t l;
         int r;
-
-        r = file_get_size(f, &size);
-        if (r < 0)
-                return r;
-
-        if (size < sizeof(Bus1DiskImageHeader))
-                return -EINVAL;
-
-        if (fseeko(f, size - sizeof(Bus1DiskImageHeader), SEEK_SET) < 0)
-                return -errno;
 
         if (fread(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
@@ -272,6 +268,7 @@ int disk_image_get_info(FILE *f,
 
 int disk_image_setup(const char *image, const char *name, char **device) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
+        uint64_t data_offset;
         uint64_t data_size;
         uint64_t hash_offset;
         _c_cleanup_(c_freep) char *hash_algorithm = NULL;
@@ -287,11 +284,9 @@ int disk_image_setup(const char *image, const char *name, char **device) {
         if (!f)
                 return -errno;
 
-        setvbuf(f, NULL, _IONBF, 0);
-
         r = disk_image_get_info(f, NULL,
                                 NULL,
-                                NULL,
+                                &data_offset,
                                 &data_size,
                                 &hash_offset,
                                 NULL,
@@ -304,16 +299,24 @@ int disk_image_setup(const char *image, const char *name, char **device) {
         if (r < 0)
                 return r;
 
-        r = image_attach_loop(f, &loopdev);
+        if (data_offset % 4096 ||
+            data_size % 4096 ||
+            hash_offset % 4096 ||
+            hash_block_size % 4096 ||
+            data_block_size % 4096 ||
+            data_offset > hash_offset)
+                return -EINVAL;
+
+        r = image_attach_loop(f, data_offset, &loopdev);
         if (r < 0)
                 return r;
 
         r = image_setup_device(loopdev,
                                name,
                                data_size,
-                               hash_offset,
-                               data_block_size,
+                               hash_offset - data_offset,
                                hash_block_size,
+                               data_block_size,
                                hash_algorithm,
                                salt,
                                root_hash,

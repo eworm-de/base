@@ -162,8 +162,6 @@ int disk_encrypt_setup(const char *device, const char *name, const char *key, ch
         if (!f)
                 return -errno;
 
-        setvbuf(f, NULL, _IONBF, 0);
-
         r = encrypt_get_info(f, &offset, &size, &crypt_type);
         if (r < 0)
                 return r;
