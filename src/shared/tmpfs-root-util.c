@@ -20,7 +20,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 
-#include "tmpfs-root.h"
+#include "tmpfs-root-util.h"
 
 int tmpfs_root(const char *rootdir) {
         _c_cleanup_(c_closep) int rootfd = -1;

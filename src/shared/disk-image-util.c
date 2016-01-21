@@ -23,8 +23,9 @@
 #include <sys/stat.h>
 
 #include "bus1/b1-image-info.h"
+#include "disk-image-util.h"
 #include "file-util.h"
-#include "image-setup.h"
+#include "string-util.h"
 #include "util.h"
 
 static int image_attach_loop(FILE *f, char **device) {
@@ -157,19 +158,19 @@ static int image_setup_device(const char *device,
         return 0;
 }
 
-int image_get_info(FILE *f,
-                   char **image_name,
-                   uint8_t *image_uuid,
-                   uint64_t *data_offset,
-                   uint64_t *data_size,
-                   uint64_t *hash_offset,
-                   uint64_t *hash_size,
-                   char **hash_algorithm,
-                   uint64_t *hash_digest_size,
-                   uint64_t *hash_block_size,
-                   uint64_t *data_block_size,
-                   char **salt,
-                   char **root_hash) {
+int disk_image_get_info(FILE *f,
+                        char **image_name,
+                        uint8_t *image_uuid,
+                        uint64_t *data_offset,
+                        uint64_t *data_size,
+                        uint64_t *hash_offset,
+                        uint64_t *hash_size,
+                        char **hash_algorithm,
+                        uint64_t *hash_digest_size,
+                        uint64_t *hash_block_size,
+                        uint64_t *data_block_size,
+                        char **salt,
+                        char **root_hash) {
         uint64_t size;
         Bus1ImageInfo info;
         static const char super_uuid[] = BUS1_SUPER_INFO_UUID;
@@ -271,7 +272,7 @@ int image_get_info(FILE *f,
         return 0;
 }
 
-int image_setup(const char *image, const char *name, char **device) {
+int disk_image_setup(const char *image, const char *name, char **device) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t data_size;
         uint64_t hash_offset;
@@ -290,19 +291,18 @@ int image_setup(const char *image, const char *name, char **device) {
 
         setvbuf(f, NULL, _IONBF, 0);
 
-        r = image_get_info(f,
-                           NULL,
-                           NULL,
-                           NULL,
-                           &data_size,
-                           &hash_offset,
-                           NULL,
-                           &hash_algorithm,
-                           NULL,
-                           &hash_block_size,
-                           &data_block_size,
-                           &salt,
-                           &root_hash);
+        r = disk_image_get_info(f, NULL,
+                                NULL,
+                                NULL,
+                                &data_size,
+                                &hash_offset,
+                                NULL,
+                                &hash_algorithm,
+                                NULL,
+                                &hash_block_size,
+                                &data_block_size,
+                                &salt,
+                                &root_hash);
         if (r < 0)
                 return r;
 

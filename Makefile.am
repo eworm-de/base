@@ -42,16 +42,20 @@ noinst_LIBRARIES += \
 libshared_a_SOURCES = \
 	src/shared/file-util.h \
 	src/shared/file-util.c \
-	src/shared/image-setup.h \
-	src/shared/image-setup.c \
-	src/shared/kmsg.h \
-	src/shared/kmsg.c \
-	src/shared/tmpfs-root.h \
-	src/shared/tmpfs-root.c \
+	src/shared/disk-image-util.h \
+	src/shared/disk-image-util.c \
+	src/shared/kmsg-util.h \
+	src/shared/kmsg-util.c \
+	src/shared/process-util.h \
+	src/shared/process-util.c \
+	src/shared/string-util.h \
+	src/shared/string-util.c \
+	src/shared/tmpfs-root-util.h \
+	src/shared/tmpfs-root-util.c \
 	src/shared/util.h \
 	src/shared/util.c \
-	src/shared/uuid.h \
-	src/shared/uuid.c
+	src/shared/uuid-util.h \
+	src/shared/uuid-util.c
 
 libshared_a_CFLAGS = \
 	$(AM_CFLAGS) \

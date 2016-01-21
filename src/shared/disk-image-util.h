@@ -16,18 +16,18 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int image_get_info(FILE *f,
-                   char **image_name,
-                   uint8_t *image_uuid,
-                   uint64_t *data_offset,
-                   uint64_t *data_size,
-                   uint64_t *hash_offset,
-                   uint64_t *hash_size,
-                   char **hash_algorithm,
-                   uint64_t *hash_digest_size,
-                   uint64_t *hash_block_size,
-                   uint64_t *data_block_size,
-                   char **salt,
-                   char **root_hash);
+int disk_image_get_info(FILE *f,
+                        char **image_name,
+                        uint8_t *image_uuid,
+                        uint64_t *data_offset,
+                        uint64_t *data_size,
+                        uint64_t *hash_offset,
+                        uint64_t *hash_size,
+                        char **hash_algorithm,
+                        uint64_t *hash_digest_size,
+                        uint64_t *hash_block_size,
+                        uint64_t *data_block_size,
+                        char **salt,
+                        char **root_hash);
 
-int image_setup(const char *image, const char *name, char **device);
+int disk_image_setup(const char *image, const char *name, char **device);

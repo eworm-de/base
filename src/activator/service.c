@@ -26,8 +26,8 @@
 #include <sys/wait.h>
 
 #include "service.h"
-#include "kmsg.h"
-#include "tmpfs-root.h"
+#include "kmsg-util.h"
+#include "tmpfs-root-util.h"
 #include "util.h"
 
 int service_new(const char *name, Service **service) {

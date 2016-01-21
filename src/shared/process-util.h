@@ -16,16 +16,5 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <sys/syscall.h>
-
-#ifndef HAVE_DECL_GETRANDOM
-static inline int getrandom(void *buffer, size_t count, unsigned flags) {
-        return syscall(__NR_getrandom, buffer, count, flags);
-}
-#endif
-
-static inline unsigned log2u(unsigned int x) {
-        return sizeof(unsigned int) * 8 - c_clz(x) - 1;
-}
-
-int kernel_cmdline_option(const char *key, char **value);
+int process_reap_children(pid_t *p);
+pid_t process_start_program(const char *program);

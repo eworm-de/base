@@ -25,7 +25,7 @@
 #include "encrypt.h"
 #include "file-util.h"
 #include "util.h"
-#include "uuid.h"
+#include "uuid-util.h"
 
 #ifndef BLKDISCARD
 #define BLKDISCARD _IO(0x12,119)

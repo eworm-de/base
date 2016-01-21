@@ -21,11 +21,11 @@
 #include <linux/random.h>
 #include <sys/stat.h>
 
+#include "disk-image-util.h"
 #include "image.h"
-#include "image-setup.h"
 #include "hash-tree.h"
 #include "util.h"
-#include "uuid.h"
+#include "uuid-util.h"
 
 int image_print_info(const char *data) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
@@ -50,19 +50,18 @@ int image_print_info(const char *data) {
 
         setvbuf(f, NULL, _IONBF, 0);
 
-        r = image_get_info(f,
-                           &image_name,
-                           image_uuid,
-                           &data_offset,
-                           &data_size,
-                           &hash_offset,
-                           &hash_size,
-                           &hash_algorithm,
-                           &hash_digest_size,
-                           &hash_block_size,
-                           &data_block_size,
-                           &salt,
-                           &root_hash);
+        r = disk_image_get_info(f, &image_name,
+                                image_uuid,
+                                &data_offset,
+                                &data_size,
+                                &hash_offset,
+                                &hash_size,
+                                &hash_algorithm,
+                                &hash_digest_size,
+                                &hash_block_size,
+                                &data_block_size,
+                                &salt,
+                                &root_hash);
         if (r < 0)
                 return r;
 

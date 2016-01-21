@@ -27,7 +27,8 @@
 #include <sys/wait.h>
 
 #include "file-util.h"
-#include "kmsg.h"
+#include "kmsg-util.h"
+#include "process-util.h"
 #include "sysctl.h"
 #include "util.h"
 
@@ -224,7 +225,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
                 pid_t pid;
 
                 kmsg(LOG_INFO, "Starting org.bus1.activator.");
-                pid = service_start("/usr/bin/org.bus1.activator");
+                pid = process_start_program("/usr/bin/org.bus1.activator");
                 if (pid < 0)
                         return pid;
 
@@ -315,7 +316,7 @@ static int manager_run(Manager *m) {
                         case SIGCHLD: {
                                 pid_t pid;
 
-                                r = child_reap(&pid);
+                                r = process_reap_children(&pid);
                                 if (r < 0)
                                         return r;
 
@@ -429,7 +430,7 @@ int main(int argc, char **argv) {
         }
 
         /* clean up zombies from the initrd */
-        if (child_reap(NULL) < 0) {
+        if (process_reap_children(NULL) < 0) {
                 r = -errno;
                 goto fail;
         }

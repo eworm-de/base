@@ -34,13 +34,15 @@
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
+#include "disk-image-util.h"
 #include "file-util.h"
-#include "kmsg.h"
-#include "tmpfs-root.h"
-#include "image-setup.h"
-#include "encrypt-setup.h"
+#include "kmsg-util.h"
+#include "process-util.h"
+#include "tmpfs-root-util.h"
 #include "util.h"
-#include "uuid.h"
+#include "uuid-util.h"
+
+#include "encrypt-setup.h"
 
 typedef struct Manager Manager;
 
@@ -116,7 +118,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
                 pid_t pid;
 
                 kmsg(LOG_INFO, "Starting org.bus1.activator.");
-                pid = service_start("/usr/bin/org.bus1.activator");
+                pid = process_start_program("/usr/bin/org.bus1.activator");
                 if (pid < 0)
                         return pid;
 
@@ -398,7 +400,7 @@ static int manager_run(Manager *m) {
                         case SIGCHLD: {
                                 pid_t pid;
 
-                                r = child_reap(&pid);
+                                r = process_reap_children(&pid);
                                 if (r < 0)
                                         return r;
 
@@ -482,7 +484,7 @@ static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_freep) char *fstype = NULL;
         int r;
 
-        r = image_setup(image, "org.bus1.system", &device);
+        r = disk_image_setup(image, "org.bus1.system", &device);
         if (r < 0)
                 return r;
 
@@ -832,7 +834,7 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = child_reap(NULL);
+        r = process_reap_children(NULL);
         if (r < 0)
                 goto fail;
 

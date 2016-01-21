@@ -28,10 +28,12 @@
 #include <sys/signalfd.h>
 #include <sys/wait.h>
 
-#include "kmsg.h"
-#include "service.h"
-#include "tmpfs-root.h"
+#include "kmsg-util.h"
+#include "process-util.h"
+#include "tmpfs-root-util.h"
 #include "util.h"
+
+#include "service.h"
 
 typedef struct Manager Manager;
 
@@ -154,7 +156,7 @@ static int manager_run(Manager *m) {
                         case SIGCHLD: {
                                 pid_t pid = -1;
 
-                                r = child_reap(&pid);
+                                r = process_reap_children(&pid);
                                 if (r < 0)
                                         return r;
 

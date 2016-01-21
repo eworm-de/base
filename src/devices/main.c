@@ -21,7 +21,7 @@
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
 
-#include "kmsg.h"
+#include "kmsg-util.h"
 #include "module.h"
 #include "permissions.h"
 #include "sysfs.h"

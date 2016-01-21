@@ -25,7 +25,8 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 
-#include "kmsg.h"
+#include "kmsg-util.h"
+#include "string-util.h"
 #include "util.h"
 
 struct cb_data {

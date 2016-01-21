@@ -19,7 +19,7 @@
 #include <linux/random.h>
 #include <sys/ioctl.h>
 
-#include "uuid.h"
+#include "uuid-util.h"
 #include "util.h"
 
 int uuid_from_string(const char *str, uint8_t *uuid) {
