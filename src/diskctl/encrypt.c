@@ -17,7 +17,7 @@
 
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
-#include <bus1/b1-encrypt-info.h>
+#include <bus1/b1-disk-encrypt-header.h>
 #include <linux/random.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -34,9 +34,9 @@
 int encrypt_print_info(const char *data) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t size;
-        Bus1EncryptInfo info;
-        static const char super_uuid[] = BUS1_SUPER_INFO_UUID;
-        static const char encrypt_uuid[] = BUS1_ENCRYPT_INFO_UUID;
+        Bus1DiskEncryptHeader info;
+        static const char meta_uuid[] = BUS1_META_HEADER_UUID;
+        static const char encrypt_uuid[] = BUS1_DISK_ENCRYPT_HEADER_UUID;
         _c_cleanup_(c_freep) char *uuid = NULL;
         int r;
 
@@ -50,25 +50,25 @@ int encrypt_print_info(const char *data) {
         if (r < 0)
                 return r;
 
-        if (size <= (off_t)sizeof(Bus1EncryptInfo))
+        if (size <= (off_t)sizeof(Bus1DiskEncryptHeader))
                 return -EINVAL;
 
         if (fread(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
-        if (memcmp(info.super.super_uuid, super_uuid, sizeof(super_uuid)) != 0)
+        if (memcmp(info.meta.meta_uuid, meta_uuid, sizeof(meta_uuid)) != 0)
                 return -EINVAL;
 
-        if (memcmp(info.super.type_uuid, encrypt_uuid, sizeof(encrypt_uuid)) != 0)
+        if (memcmp(info.meta.type_uuid, encrypt_uuid, sizeof(encrypt_uuid)) != 0)
                 return -EINVAL;
 
-        r = uuid_to_string(info.super.object_uuid, &uuid);
+        r = uuid_to_string(info.meta.object_uuid, &uuid);
         if (r < 0)
                 return r;
 
         printf("=================================================\n");
         printf("Info for:    %s\n", data);
-        printf("Volume Name: %s\n", info.super.object_label);
+        printf("Volume Name: %s\n", info.meta.object_label);
         printf("Volume UUID: %s\n", uuid);
         printf("Data offset: %" PRIu64 " bytes\n", le64toh(info.data.offset));
         printf("Data size:   %" PRIu64 " bytes\n", le64toh(info.data.size));
@@ -100,10 +100,10 @@ static int block_discard_range(FILE *f, uint64_t start, uint64_t len) {
 int encrypt_setup_volume(const char *data_file, const char *name) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset, size = 0;
-        Bus1EncryptInfo info = {
-                .super.super_uuid = BUS1_SUPER_INFO_UUID,
-                .super.type_uuid = BUS1_ENCRYPT_INFO_UUID,
-                .super.type_tag = "org.bus1.encrypt",
+        Bus1DiskEncryptHeader info = {
+                .meta.meta_uuid = BUS1_META_HEADER_UUID,
+                .meta.type_uuid = BUS1_DISK_ENCRYPT_HEADER_UUID,
+                .meta.type_tag = "org.bus1.encrypt",
                 .encrypt.cypher = "aes",
                 .encrypt.chain_mode = "xts",
                 .encrypt.iv_mode = "plain64",
@@ -113,9 +113,9 @@ int encrypt_setup_volume(const char *data_file, const char *name) {
         assert(data_file);
         assert(name);
 
-        strncpy(info.super.object_label, name, sizeof(info.super.object_label) - 1);
+        strncpy(info.meta.object_label, name, sizeof(info.meta.object_label) - 1);
 
-        r = uuid_set_random(info.super.object_uuid);
+        r = uuid_set_random(info.meta.object_uuid);
         if (r < 0)
                 return EXIT_FAILURE;
 

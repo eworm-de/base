@@ -34,12 +34,12 @@
 
  */
 
-#include <bus1/b1-super-info.h>
+#include <bus1/b1-meta-header.h>
 
-#define BUS1_IMAGE_INFO_UUID { 0xb7, 0x46, 0xc4, 0xf5, 0xc3, 0xc4, 0x47, 0x37, 0x8a, 0x4c, 0x54, 0xbe, 0xe4, 0x75, 0x69, 0x2a }
+#define BUS1_DISK_IMAGE_HEADER_UUID { 0xb7, 0x46, 0xc4, 0xf5, 0xc3, 0xc4, 0x47, 0x37, 0x8a, 0x4c, 0x54, 0xbe, 0xe4, 0x75, 0x69, 0x2a }
 
-struct Bus1ImageInfo {
-        Bus1SuperHeader super;
+struct Bus1DiskImageHeader {
+        Bus1MetaHeader meta;
 
         struct {
                 uint64_t offset;                /* Absolute offset of filesystem image in bytes, usually 0 */
@@ -67,4 +67,4 @@ struct Bus1ImageInfo {
         } signature;
 };
 
-typedef struct Bus1ImageInfo Bus1ImageInfo;
+typedef struct Bus1DiskImageHeader Bus1DiskImageHeader;

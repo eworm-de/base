@@ -30,14 +30,14 @@
   identifier and should be a valid UTF-8 string.
 
   Example #1 fancyfs:
-    967e8b2d-db0c-4c8b-b753-16aa2492b42b  Super Header UUID
+    967e8b2d-db0c-4c8b-b753-16aa2492b42b  Meta Header UUID
     a8562cf4-2297-4cf1-bdf6-3903811ff22f  FancyFS UUID
     fancyfs                               Filesystem type as tag
     d0b9e022-7543-4d4c-82ed-9700a1a21fa4  This FancyFS Filesystem
     Images                                Human readable lable
 
   Example #2 Application Image:
-    967e8b2d-db0c-4c8b-b753-16aa2492b42b  Super Header UUID
+    967e8b2d-db0c-4c8b-b753-16aa2492b42b  Meta Header UUID
     b746c4f5-c3c4-4737-8a4c-54bee475692a  Bus1 Image Format
     org.bus1.image
     80f2a24c-0bf4-442d-9148-d60f52876d87  This Application Image
@@ -54,16 +54,16 @@
 
   */
 
-#define BUS1_SUPER_INFO_UUID    { 0x96, 0x7e, 0x8b, 0x2d, 0xdb, 0x0c, 0x4c, 0x8b, 0xb7, 0x53, 0x16, 0xaa, 0x24, 0x92, 0xb4, 0x2b }
+#define BUS1_META_HEADER_UUID    { 0x96, 0x7e, 0x8b, 0x2d, 0xdb, 0x0c, 0x4c, 0x8b, 0xb7, 0x53, 0x16, 0xaa, 0x24, 0x92, 0xb4, 0x2b }
 
-struct Bus1SuperHeader {
-        uint8_t super_uuid[16];                 /* indentifier of a Super Header (mandatory) */
+struct Bus1MetaHeader {
+        uint8_t meta_uuid[16];                 /* indentifier of a meta header (mandatory) */
 
-        uint8_t type_uuid[16];                  /* Type of data using the Super Header (mandatory) */
+        uint8_t type_uuid[16];                  /* Type of data using the meta header (mandatory) */
         char type_tag[64];                      /* Human-readable type string */
 
-        uint8_t object_uuid[16];                /* Identifier for the object using the Super header */
+        uint8_t object_uuid[16];                /* Identifier for the object using the meta header */
         char object_label[256];                 /* Human readable label for this object */
 };
 
-typedef struct Bus1SuperHeader Bus1SuperHeader;
+typedef struct Bus1MetaHeader Bus1MetaHeader;

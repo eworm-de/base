@@ -167,9 +167,9 @@ noinst_PROGRAMS += \
 	org.bus1.diskctl
 
 org_bus1_diskctl_SOURCES = \
-	src/bus1/b1-super-info.h \
-	src/bus1/b1-encrypt-info.h \
-	src/bus1/b1-image-info.h \
+	src/bus1/b1-meta-header.h \
+	src/bus1/b1-disk-encrypt-header.h \
+	src/bus1/b1-disk-image-header.h \
 	src/diskctl/encrypt.h \
 	src/diskctl/encrypt.c \
 	src/diskctl/hash-tree.h \

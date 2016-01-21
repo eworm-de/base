@@ -17,7 +17,7 @@
 
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
-#include <bus1/b1-image-info.h>
+#include <bus1/b1-disk-image-header.h>
 #include <linux/random.h>
 #include <sys/stat.h>
 
@@ -97,10 +97,10 @@ int image_append_hash(const char *data_file, const char *name) {
         uint64_t hash_block_size = 4096;
         uint64_t data_block_size = 4096;
         uint64_t salt_size = 256;
-        Bus1ImageInfo info = {
-                .super.super_uuid = BUS1_SUPER_INFO_UUID,
-                .super.type_uuid = BUS1_IMAGE_INFO_UUID,
-                .super.type_tag = "org.bus1.image",
+        Bus1DiskImageHeader info = {
+                .meta.meta_uuid = BUS1_META_HEADER_UUID,
+                .meta.type_uuid = BUS1_DISK_IMAGE_HEADER_UUID,
+                .meta.type_tag = "org.bus1.image",
                 .hash.algorithm = "sha256",
                 .hash.digest_size = htole64(digest_size),
                 .hash.hash_block_size = htole64(hash_block_size),
@@ -112,9 +112,9 @@ int image_append_hash(const char *data_file, const char *name) {
         assert(data_file);
         assert(name);
 
-        strncpy(info.super.object_label, name, sizeof(info.super.object_label) - 1);
+        strncpy(info.meta.object_label, name, sizeof(info.meta.object_label) - 1);
 
-        r = uuid_set_random(info.super.object_uuid);
+        r = uuid_set_random(info.meta.object_uuid);
         if (r < 0)
                 return EXIT_FAILURE;
 

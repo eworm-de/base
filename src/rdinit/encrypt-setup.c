@@ -17,7 +17,7 @@
 
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
-#include <bus1/b1-encrypt-info.h>
+#include <bus1/b1-disk-encrypt-header.h>
 #include <linux/dm-ioctl.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -27,9 +27,9 @@
 #include "util.h"
 
 static int encrypt_get_info(FILE *f, uint64_t *offsetp, uint64_t *sizep, char **crypt_typep) {
-        Bus1EncryptInfo info;
-        static const char super_uuid[] = BUS1_SUPER_INFO_UUID;
-        static const char info_uuid[] = BUS1_ENCRYPT_INFO_UUID;
+        Bus1DiskEncryptHeader info;
+        static const char meta_uuid[] = BUS1_META_HEADER_UUID;
+        static const char info_uuid[] = BUS1_DISK_ENCRYPT_HEADER_UUID;
         _c_cleanup_(c_freep) char *crypt_type = NULL;
         uint64_t size;
         int r;
@@ -38,16 +38,16 @@ static int encrypt_get_info(FILE *f, uint64_t *offsetp, uint64_t *sizep, char **
         if (r < 0)
                 return r;
 
-        if (size < sizeof(Bus1EncryptInfo))
+        if (size < sizeof(Bus1DiskEncryptHeader))
                 return -EINVAL;
 
         if (fread(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
-        if (memcmp(info.super.super_uuid, super_uuid, sizeof(super_uuid)) != 0)
+        if (memcmp(info.meta.meta_uuid, meta_uuid, sizeof(meta_uuid)) != 0)
                 return -EINVAL;
 
-        if (memcmp(info.super.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
+        if (memcmp(info.meta.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
 
         if (asprintf(&crypt_type, "%s-%s-%-s", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode) < 0)

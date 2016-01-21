@@ -16,12 +16,12 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <bus1/b1-super-info.h>
+#include <bus1/b1-meta-header.h>
 
-#define BUS1_ENCRYPT_INFO_UUID { 0x59, 0x33, 0x18, 0x42, 0x97, 0x21, 0x42, 0x37, 0xa7, 0xca, 0xff, 0x9b, 0x94, 0x5b, 0x92, 0x8b }
+#define BUS1_DISK_ENCRYPT_HEADER_UUID { 0x59, 0x33, 0x18, 0x42, 0x97, 0x21, 0x42, 0x37, 0xa7, 0xca, 0xff, 0x9b, 0x94, 0x5b, 0x92, 0x8b }
 
-struct Bus1EncryptInfo {
-        Bus1SuperHeader super;
+struct Bus1DiskEncryptHeader {
+        Bus1MetaHeader meta;
 
         struct {
                 uint64_t offset;
@@ -35,4 +35,4 @@ struct Bus1EncryptInfo {
         } encrypt;
 };
 
-typedef struct Bus1EncryptInfo Bus1EncryptInfo;
+typedef struct Bus1DiskEncryptHeader Bus1DiskEncryptHeader;

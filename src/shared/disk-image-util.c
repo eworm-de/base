@@ -22,7 +22,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
-#include "bus1/b1-image-info.h"
+#include "bus1/b1-disk-image-header.h"
 #include "disk-image-util.h"
 #include "file-util.h"
 #include "string-util.h"
@@ -172,9 +172,9 @@ int disk_image_get_info(FILE *f,
                         char **salt,
                         char **root_hash) {
         uint64_t size;
-        Bus1ImageInfo info;
-        static const char super_uuid[] = BUS1_SUPER_INFO_UUID;
-        static const char info_uuid[] = BUS1_IMAGE_INFO_UUID;
+        Bus1DiskImageHeader info;
+        static const char meta_uuid[] = BUS1_META_HEADER_UUID;
+        static const char info_uuid[] = BUS1_DISK_IMAGE_HEADER_UUID;
         _c_cleanup_(c_freep) char *name = NULL;
         _c_cleanup_(c_freep) char *algorithm = NULL;
         _c_cleanup_(c_freep) char *salt_str = NULL;
@@ -186,22 +186,22 @@ int disk_image_get_info(FILE *f,
         if (r < 0)
                 return r;
 
-        if (size < sizeof(Bus1ImageInfo))
+        if (size < sizeof(Bus1DiskImageHeader))
                 return -EINVAL;
 
-        if (fseeko(f, size - sizeof(Bus1ImageInfo), SEEK_SET) < 0)
+        if (fseeko(f, size - sizeof(Bus1DiskImageHeader), SEEK_SET) < 0)
                 return -errno;
 
         if (fread(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
-        if (memcmp(info.super.super_uuid, super_uuid, sizeof(super_uuid)) != 0)
+        if (memcmp(info.meta.meta_uuid, meta_uuid, sizeof(meta_uuid)) != 0)
                 return -EINVAL;
 
-        if (memcmp(info.super.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
+        if (memcmp(info.meta.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
 
-        name = strdup(info.super.object_label);
+        name = strdup(info.meta.object_label);
         if (!name)
                 return -ENOMEM;
 
@@ -231,7 +231,7 @@ int disk_image_get_info(FILE *f,
         }
 
         if (image_uuid)
-                memcpy(image_uuid, info.super.object_uuid, 16);
+                memcpy(image_uuid, info.meta.object_uuid, 16);
 
         if (data_offset)
                 *data_offset = le64toh(info.data.offset);
