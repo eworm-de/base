@@ -360,7 +360,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
 
 static int manager_run(Manager *m) {
         _c_cleanup_(c_closep) int sysfd = -1;
-        c_usec start;
+        uint64_t start_usec;
         bool exit = false;
         int r;
 
@@ -368,10 +368,10 @@ static int manager_run(Manager *m) {
         if (sysfd < 0)
                 return -errno;
 
-        start = c_usec_from_clock(CLOCK_BOOTTIME);
+        start_usec = c_usec_from_clock(CLOCK_BOOTTIME);
 
         while (!exit) {
-                c_usec now;
+                uint64_t now_usec;
                 int n;
                 struct epoll_event ev;
 
@@ -429,8 +429,8 @@ static int manager_run(Manager *m) {
                 if (r == 1)
                         return 0;
 
-                now = c_usec_from_clock(CLOCK_BOOTTIME);
-                if (now - start > c_usec_from_sec(30))
+                now_usec = c_usec_from_clock(CLOCK_BOOTTIME);
+                if (now_usec - start_usec > c_usec_from_sec(30))
                         break;
         }
 
