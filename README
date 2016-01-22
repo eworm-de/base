@@ -12,12 +12,14 @@ org.bus1.rdinit: /init to use in the initrd:
                 - as an alternative it locates the devices:
                         - boot=/dev/<device>
                         - var=/dev/<device>
-        - mounts the boot partition to /boot
-        - mounts the system image named <release>.img to /usr
+        - mounts the boot partition to /boot (r/o)
+        - sets up verification of the system image named <release>.img
+        - mounts the system image to /usr
                 - the image is located relative to the
                   loader=<path to boot loader> variable
                 - as an alternative is is located in the /boot
                   root directory
+        - sets up decryption of the data partition
         - mounts the data partition to /var
         - executes org.bus1.init
 
@@ -41,6 +43,18 @@ org.bus1.devices: hotplug device manager and kernel module loader
         - crawls /sys for coldplug
         - adjusts platform permissions in /dev
         - loads kernel modules for plugged devices
+
+org.bus1.coredump:
+        - called by the kernel when a process crashes
+        - writes stacktrace to the kernel log buffer
+        - optionally writes the core file to /var/coredump/<user id>-<escaped binary name>
+
+org.bus1.diskctl:
+        - adds a metadata header to a filesystem image and creates a
+          cryptographic hash tree to provide data integrity validation;
+          used for the system image mounted at /usr
+        - adds a metadata header for an encrypted volume; used for the
+          data volume mounted at /var
 
 DETAILS:
         https://github.com/bus1/base
