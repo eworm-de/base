@@ -22,12 +22,12 @@
   a magic to identify the metadata block.
 
   The type UUID identifies the type of the data in the image. The
-  tag acts as a human-readable identifier, should contain only
-  these characters [a-zA-Z0-9-._].
+  tag acts as a human-readable identifier. It must contain only
+  the following characters [a-zA-Z0-9-._].
 
   The object UUID identifies the instance of an object, it is newly
   allocated, every time the header is used. The label is the human-readable
-  identifier and should be a valid UTF-8 string.
+  identifier and must be a valid UTF-8 string.
 
   Example #1 fancyfs:
     967e8b2d-db0c-4c8b-b753-16aa2492b42b  Meta Header UUID
@@ -45,12 +45,8 @@
 
   This allows probing tools to identify a raw image and prepare it for further
   handling. No type-specific knowledge about the format is needed to identify
-  the basic properties of an image. Filesystem probing and mounting tools do
-  not need to be updated for future filesystem or image formats.
-
-  The header is always 368 bytes long. It is usually placed at the start of the
-  image right before the type-specific metadata begins. For optional metadata
-  appended to the image, the header might be placed at the end of the image.
+  the basic properties of such an image. Filesystem probing and mounting tools
+  no longer need to be updated for future filesystem or image formats.
 
   */
 
