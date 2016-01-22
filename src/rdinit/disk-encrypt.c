@@ -114,7 +114,7 @@ static int encrypt_setup_device(const char *device, const char *name, uint64_t o
              <cipher>-<chain mode>-<iv mode> <key> <iv_offset> <device path> <offset> <options>
              aes-xts-plain64 0bdcc7f8a1794b92bfa5f9b39cd9b6c63458f47b8520440eab8d61c394fee62a 0 /dev/sda2 0
          */
-        target_parameter_len = asprintf(&target_parameter, "%s %s 0 %s %" PRIu64,
+        target_parameter_len = asprintf(&target_parameter, "%s %s 0 %s %" PRIu64 " 1 allow_discards",
                                         crypt_type, key, device, offset / 512);
         if (target_parameter_len < 0)
                 return -ENOMEM;
