@@ -111,6 +111,7 @@ int image_write(const char *filename_data, const char *filename_image, const cha
                 .hash.data_block_size = htole64(data_block_size),
                 .hash.salt_size = htole64(salt_size),
         };
+        uint64_t hashes_per_block;
         int r;
 
         assert(filename_data);
@@ -126,7 +127,9 @@ int image_write(const char *filename_data, const char *filename_image, const cha
         if (r < 0)
                 return r;
 
-        if (data_size < 4096)
+        /* We expect at least one stored hash block. */
+        hashes_per_block = hash_block_size / (digest_size / 8);
+        if (data_size < data_block_size * hashes_per_block)
                 return -EINVAL;
 
         f_image = fopen(filename_image, "w+e");
@@ -153,11 +156,11 @@ int image_write(const char *filename_data, const char *filename_image, const cha
         if (getrandom(info.hash.salt, info.hash.salt_size / 8, GRND_NONBLOCK) < 0)
                 return -errno;
 
-        r  = hash_tree_write(filename_data,
-                             filename_image,
+        r  = hash_tree_write(filename_image,
                              info.hash.algorithm,
                              digest_size / 8,
                              data_block_size,
+                             IMAGE_HEADER_SPACE / data_block_size,
                              data_size / data_block_size,
                              hash_block_size,
                              (IMAGE_HEADER_SPACE + data_size) / hash_block_size,

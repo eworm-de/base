@@ -23,13 +23,14 @@
 #include "file-util.h"
 #include "util.h"
 
+/* Calculate and store hash blocks from n data blocks. */
 static int hash_write(FILE *f_data, FILE *f_hash,
                       uint64_t data_block, uint64_t data_block_size,
                       uint64_t hash_block, uint64_t hash_block_size,
                       uint64_t n_data_blocks,
-                      gcry_md_hd_t crypt_ctx, int crypt_hash_type,
+                      gcry_md_hd_t crypt_ctx, int crypt_hash_type, unsigned int crypt_hash_size,
                       const uint8_t *salt, size_t salt_size,
-                      uint8_t *digest, size_t digest_size) {
+                      uint8_t *result) {
         _c_cleanup_(c_freep) uint8_t *null_block = NULL;
         _c_cleanup_(c_freep) uint8_t *data_buffer = NULL;
         size_t hashes_per_block;
@@ -37,7 +38,7 @@ static int hash_write(FILE *f_data, FILE *f_hash,
         size_t n_bytes;
         unsigned i;
 
-        hashes_per_block = hash_block_size / digest_size;
+        hashes_per_block = hash_block_size / crypt_hash_size;
         n_blocks = (n_data_blocks + hashes_per_block - 1) / hashes_per_block;
 
         null_block = calloc(1, hash_block_size);
@@ -70,15 +71,17 @@ static int hash_write(FILE *f_data, FILE *f_hash,
                         gcry_md_reset(crypt_ctx);
                         gcry_md_write(crypt_ctx, salt, salt_size);
                         gcry_md_write(crypt_ctx, data_buffer, data_block_size);
-                        memcpy(digest, gcry_md_read(crypt_ctx, crypt_hash_type), digest_size);
+
+                        if (result)
+                                memcpy(result, gcry_md_read(crypt_ctx, crypt_hash_type), crypt_hash_size);
 
                         if (!f_hash)
                                 break;
 
-                        if (fwrite(digest, digest_size, 1, f_hash) != 1)
+                        if (fwrite(gcry_md_read(crypt_ctx, crypt_hash_type), crypt_hash_size, 1, f_hash) != 1)
                                 return -EIO;
 
-                        n_bytes -= digest_size;
+                        n_bytes -= crypt_hash_size;
                 }
 
                 if (f_hash && n_bytes)
@@ -91,39 +94,35 @@ static int hash_write(FILE *f_data, FILE *f_hash,
 
 C_DEFINE_CLEANUP(gcry_md_hd_t, gcry_md_close);
 
-int hash_tree_write(const char *filename_data,
-                    const char *filename_hash,
+int hash_tree_write(const char *filename,
                     const char *hash_name,
                     uint64_t digest_size,
                     uint64_t data_block_size,
+                    uint64_t data_block_nr,
                     uint64_t n_data_blocks,
                     uint64_t hash_block_size,
-                    uint64_t hash_offset,
+                    uint64_t hash_block_nr,
                     const uint8_t *salt,
                     uint64_t salt_size,
                     uint8_t *root_hash,
                     uint64_t *hash_tree_sizep) {
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
-        _c_cleanup_(c_fclosep) FILE *f_hash_read = NULL;
-        _c_cleanup_(c_fclosep) FILE *f_hash_write = NULL;
+        _c_cleanup_(c_fclosep) FILE *f_hash = NULL;
         uint64_t data_size;
         _c_cleanup_(gcry_md_closep) gcry_md_hd_t crypt_ctx = NULL;
         int crypt_hash_type;
         int n_level;
         uint64_t hash_size = 0;
         struct hash_level {
-                uint64_t offset;
-                uint64_t size;
+                uint64_t block;
+                uint64_t n_blocks;
         };
         size_t hash_per_block_bits;
         _c_cleanup_(c_freep) struct hash_level *levels = NULL;
-        _c_cleanup_(c_freep) uint8_t *digest = NULL;
-        uint64_t s;
         int i;
         int r;
 
-        assert(filename_data);
-        assert(filename_hash);
+        assert(filename);
         assert(hash_name);
         assert(digest_size);
         assert(data_block_size > 0);
@@ -131,8 +130,9 @@ int hash_tree_write(const char *filename_data,
         assert(hash_block_size > 0);
         assert(salt);
         assert(salt_size);
+        assert(root_hash);
 
-        f_data = fopen(filename_data, "re");
+        f_data = fopen(filename, "re");
         if (!f_data)
                 return -errno;
 
@@ -143,12 +143,8 @@ int hash_tree_write(const char *filename_data,
         if (data_size % 4096)
                 return -EINVAL;
 
-        f_hash_read = fopen(filename_hash, "re");
-        if (!f_hash_read)
-                return -errno;
-
-        f_hash_write = fopen(filename_hash, "r+e");
-        if (!f_hash_write)
+        f_hash = fopen(filename, "r+e");
+        if (!f_hash)
                 return -errno;
 
         if (gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P) == 0) {
@@ -166,59 +162,60 @@ int hash_tree_write(const char *filename_data,
         if (gcry_md_open(&crypt_ctx, crypt_hash_type, 0) != 0)
                 return -EINVAL;
 
+        /* Calculate the number of levels. */
         hash_per_block_bits = log2u(hash_block_size / digest_size);
         for (n_level = 0; hash_per_block_bits * n_level < 64 && (n_data_blocks - 1) >> (hash_per_block_bits * n_level);)
                 n_level++;
 
+        /* Calculate sizes and offsets for the hash block layer. */
         levels = calloc(n_level, sizeof(struct hash_level));
         for (i = n_level - 1; i >= 0; i--) {
-                levels[i].offset = hash_offset;
-                s = (n_data_blocks + (1ULL << ((i + 1) * hash_per_block_bits)) - 1) >> ((i + 1) * hash_per_block_bits);
-                levels[i].size = s;
+                uint64_t n;
 
-                if ((hash_offset + s) < hash_offset)
+                levels[i].block = hash_block_nr;
+                n = (n_data_blocks + (1ULL << ((i + 1) * hash_per_block_bits)) - 1) >> ((i + 1) * hash_per_block_bits);
+                levels[i].n_blocks = n;
+
+                if ((hash_block_nr + n) < hash_block_nr)
                         return -EINVAL;
 
-                hash_offset += s;
-                hash_size += s * hash_block_size;
+                hash_block_nr += n;
+                hash_size += n * hash_block_size;
         }
 
-        digest = calloc(1, digest_size);
-        if (!digest)
-                return -ENOMEM;
-
-        r = hash_write(f_data, f_hash_write,
-                       0, data_block_size,
-                       levels[0].offset, hash_block_size,
+        /* Calculate and store hashes for the data blocks. */
+        r = hash_write(f_data, f_hash,
+                       data_block_nr, data_block_size,
+                       levels[0].block, hash_block_size,
                        n_data_blocks,
-                       crypt_ctx, crypt_hash_type,
+                       crypt_ctx, crypt_hash_type, digest_size,
                        salt, salt_size,
-                       digest, digest_size);
+                       NULL);
         if (r < 0)
                 return r;
 
+
+        /* Calculate and store hashes for the hash blocks layers. */
         for (i = 1; i < n_level; i++) {
-                r = hash_write(f_hash_read, f_hash_write,
-                               levels[i - 1].offset, hash_block_size,
-                               levels[i].offset, hash_block_size,
-                               levels[i - 1].size,
-                               crypt_ctx, crypt_hash_type,
+                r = hash_write(f_data, f_hash,
+                               levels[i - 1].block, hash_block_size,
+                               levels[i].block, hash_block_size,
+                               levels[i - 1].n_blocks,
+                               crypt_ctx, crypt_hash_type, digest_size,
                                salt, salt_size,
-                               digest, digest_size);
+                               NULL);
                 if (r < 0)
                         return r;
         }
 
-        r = hash_write(f_hash_write, NULL,
-                       levels[n_level - 1].offset, hash_block_size,
+        /* Calculate the root hash from the single root hash block.  */
+        r = hash_write(f_hash, NULL,
+                       levels[n_level - 1].block, hash_block_size,
                        0, hash_block_size,
                        1,
-                       crypt_ctx, crypt_hash_type,
+                       crypt_ctx, crypt_hash_type, digest_size,
                        salt, salt_size,
-                       digest, digest_size);
-
-        if (root_hash)
-                memcpy(root_hash, digest, digest_size);
+                       root_hash);
 
         if (hash_tree_sizep)
                 *hash_tree_sizep = hash_size;

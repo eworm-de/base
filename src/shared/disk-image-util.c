@@ -272,6 +272,7 @@ int disk_image_setup(const char *image, const char *name, char **device) {
         uint64_t data_size;
         uint64_t hash_offset;
         _c_cleanup_(c_freep) char *hash_algorithm = NULL;
+        uint64_t hash_digest_size;
         uint64_t hash_block_size;
         uint64_t data_block_size;
         _c_cleanup_(c_freep) char *salt = NULL;
@@ -291,7 +292,7 @@ int disk_image_setup(const char *image, const char *name, char **device) {
                                 &hash_offset,
                                 NULL,
                                 &hash_algorithm,
-                                NULL,
+                                &hash_digest_size,
                                 &hash_block_size,
                                 &data_block_size,
                                 &salt,
@@ -299,11 +300,12 @@ int disk_image_setup(const char *image, const char *name, char **device) {
         if (r < 0)
                 return r;
 
-        if (data_offset % 4096 ||
-            data_size % 4096 ||
-            hash_offset % 4096 ||
-            hash_block_size % 4096 ||
-            data_block_size % 4096 ||
+        if (data_offset % 4096 > 0 ||
+            data_size % 4096 > 0 ||
+            hash_offset % 4096 > 0 ||
+            hash_digest_size % 128 > 0 || hash_digest_size > 4096 ||
+            hash_block_size % 4096 > 0 ||
+            data_block_size % 4096 > 0 ||
             data_offset > hash_offset)
                 return -EINVAL;
 

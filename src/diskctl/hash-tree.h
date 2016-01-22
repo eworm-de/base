@@ -16,11 +16,11 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int hash_tree_write(const char *filename_data,
-                    const char *filename_hash,
+int hash_tree_write(const char *filename,
                     const char *hash_name,
                     uint64_t digest_size,
                     uint64_t data_block_size,
+                    uint64_t data_block_nr,
                     uint64_t n_data_blocks,
                     uint64_t hash_block_size,
                     uint64_t hash_offset,
