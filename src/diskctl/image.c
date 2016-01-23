@@ -23,8 +23,8 @@
 
 #include "disk-image-util.h"
 #include "file-util.h"
-#include "util.h"
 #include "uuid-util.h"
+#include "missing.h"
 
 #include "hash-tree.h"
 #include "image.h"

@@ -20,7 +20,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#include "util.h"
+#include <kernel-cmdline-util.h>
 
 int kernel_cmdline_option(const char *key, char **value) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;

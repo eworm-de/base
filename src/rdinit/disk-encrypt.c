@@ -24,7 +24,6 @@
 
 #include "disk-encrypt.h"
 #include "file-util.h"
-#include "util.h"
 
 static int encrypt_get_info(FILE *f, uint64_t *offsetp, uint64_t *sizep, char **crypt_typep) {
         Bus1DiskEncryptHeader info;

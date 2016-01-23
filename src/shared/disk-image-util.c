@@ -26,7 +26,6 @@
 #include "disk-image-util.h"
 #include "file-util.h"
 #include "string-util.h"
-#include "util.h"
 #include "kmsg-util.h"
 
 static int image_attach_loop(FILE *f, uint64_t offset, char **devicep) {

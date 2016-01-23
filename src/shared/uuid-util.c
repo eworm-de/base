@@ -20,7 +20,7 @@
 #include <sys/ioctl.h>
 
 #include "uuid-util.h"
-#include "util.h"
+#include "missing.h"
 
 int uuid_from_string(const char *str, uint8_t *uuid) {
         int id[16];

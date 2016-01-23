@@ -23,7 +23,6 @@
 #include <sys/wait.h>
 
 #include "file-util.h"
-#include "util.h"
 
 int file_get_size(FILE *f, size_t *size) {
         struct stat sb;

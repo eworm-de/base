@@ -19,7 +19,6 @@
 #include <string.h>
 
 #include "string-util.h"
-#include "util.h"
 
 int hexstr_to_bytes(const char *str, uint8_t *bytes) {
         size_t len;

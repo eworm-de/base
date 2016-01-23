@@ -31,7 +31,6 @@
 #include "kmsg-util.h"
 #include "process-util.h"
 #include "tmpfs-root-util.h"
-#include "util.h"
 
 #include "service.h"
 

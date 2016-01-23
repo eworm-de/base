@@ -29,8 +29,7 @@
 #include "file-util.h"
 #include "kmsg-util.h"
 #include "process-util.h"
-#include "sysctl.h"
-#include "util.h"
+#include "kernel-cmdline-util.h"
 
 static bool has_option(const char *options, const char *option) {
         const char *s;
@@ -434,10 +433,6 @@ int main(int argc, char **argv) {
                 r = -errno;
                 goto fail;
         }
-
-        r = sysctl_apply();
-        if (r < 0)
-                goto fail;
 
         r = manager_new(&m);
         if (r < 0)

@@ -40,10 +40,12 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
-	src/shared/file-util.h \
-	src/shared/file-util.c \
 	src/shared/disk-image-util.h \
 	src/shared/disk-image-util.c \
+	src/shared/file-util.h \
+	src/shared/file-util.c \
+	src/shared/kernel-cmdline-util.h \
+	src/shared/kernel-cmdline-util.c \
 	src/shared/kmsg-util.h \
 	src/shared/kmsg-util.c \
 	src/shared/process-util.h \
@@ -52,8 +54,6 @@ libshared_a_SOURCES = \
 	src/shared/string-util.c \
 	src/shared/tmpfs-root-util.h \
 	src/shared/tmpfs-root-util.c \
-	src/shared/util.h \
-	src/shared/util.c \
 	src/shared/uuid-util.h \
 	src/shared/uuid-util.c
 
@@ -66,8 +66,6 @@ bin_PROGRAMS += \
 	org.bus1.init
 
 org_bus1_init_SOURCES = \
-	src/init/sysctl.h \
-	src/init/sysctl.c \
 	src/init/main.c
 
 org_bus1_init_CFLAGS = \
@@ -87,6 +85,8 @@ org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.c \
 	src/rdinit/disk-encrypt.h \
 	src/rdinit/disk-encrypt.c \
+	src/rdinit/sysctl.h \
+	src/rdinit/sysctl.c \
 	src/rdinit/main.c
 
 org_bus1_rdinit_CFLAGS = \

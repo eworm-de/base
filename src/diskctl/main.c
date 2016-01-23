@@ -20,7 +20,6 @@
 
 #include "image.h"
 #include "encrypt.h"
-#include "util.h"
 
 int main(int argc, char **argv) {
         const char *verb = argv[1];

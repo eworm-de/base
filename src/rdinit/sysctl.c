@@ -19,7 +19,6 @@
 #include <bus1/c-shared.h>
 
 #include "sysctl.h"
-#include "util.h"
 
 static const struct {
         const char *path;

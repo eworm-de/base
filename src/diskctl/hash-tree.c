@@ -21,7 +21,10 @@
 
 #include "hash-tree.h"
 #include "file-util.h"
-#include "util.h"
+
+static inline unsigned log2u(unsigned int x) {
+        return sizeof(unsigned int) * 8 - c_clz(x) - 1;
+}
 
 /* Calculate and store hash blocks from n data blocks. */
 static int hash_write(FILE *f_data, FILE *f_hash,

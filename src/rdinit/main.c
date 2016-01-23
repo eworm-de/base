@@ -37,12 +37,13 @@
 #include "disk-image-util.h"
 #include "file-util.h"
 #include "kmsg-util.h"
+#include "kernel-cmdline-util.h"
 #include "process-util.h"
 #include "tmpfs-root-util.h"
-#include "util.h"
 #include "uuid-util.h"
 
 #include "disk-encrypt.h"
+#include "sysctl.h"
 
 typedef struct Manager Manager;
 
@@ -839,6 +840,10 @@ int main(int argc, char **argv) {
                 goto fail;
 
         r = switch_root("/sysroot");
+        if (r < 0)
+                goto fail;
+
+        r = sysctl_apply();
         if (r < 0)
                 goto fail;
 

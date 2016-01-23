@@ -28,7 +28,6 @@
 #include "file-util.h"
 #include "kmsg-util.h"
 #include "string-util.h"
-#include "util.h"
 
 struct cb_data {
         Dwfl *dwfl;

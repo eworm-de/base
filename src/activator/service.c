@@ -28,7 +28,6 @@
 #include "service.h"
 #include "kmsg-util.h"
 #include "tmpfs-root-util.h"
-#include "util.h"
 
 int service_new(const char *name, Service **service) {
         _c_cleanup_(service_freep) Service *s = NULL;
