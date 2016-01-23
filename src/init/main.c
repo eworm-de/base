@@ -15,6 +15,7 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <bus1/b1-platform.h>
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 #include <signal.h>
@@ -158,8 +159,13 @@ struct Manager {
         int fd_ep;
         struct epoll_event ep_signal;
 
+        char *release;
+
         char *loader_dir;       /* Boot loader directory in /boot. */
-        char *loader_name;      /* Boot loader file name. */
+        char *loader;           /* Boot loader file name. */
+        char *loader_rename;    /* Boot loader file name after rename. */
+        int boot_counter;       /* Boot candidate counter for an updated system. */
+
         char *serial_device;
 
         pid_t activator_pid;    /* org.bus1.activator */
@@ -168,6 +174,10 @@ struct Manager {
 };
 
 static Manager *manager_free(Manager *m) {
+        free(m->release);
+        free(m->loader_dir);
+        free(m->loader);
+        free(m->loader_rename);
         c_close(m->fd_ep);
         c_close(m->fd_signal);
         free(m->serial_device);
@@ -183,6 +193,8 @@ static int manager_new(Manager **manager) {
         m = calloc(1, sizeof(Manager));
         if (!m)
                 return -ENOMEM;
+
+        m->boot_counter = -1;
 
         m->activator_pid = -1;
         m->login_pid = -1;
@@ -376,33 +388,100 @@ static void dump_process(int sig) {
         system_reboot(RB_AUTOBOOT);
 }
 
+static int cmdline_parse_loader(Manager *m) {
+        _c_cleanup_(c_freep) char *loader_dir = NULL;
+        _c_cleanup_(c_freep) char *loader = NULL;
+        _c_cleanup_(c_freep) char *loader_rename = NULL;
+        size_t release_len;
+        char *s;
+        int counter = -1;
+        int r;
+
+        r = kernel_cmdline_option("loader", &loader_dir);
+        if (r < 0)
+                return r;
+
+        if (loader_dir[0] != '/')
+                return -EINVAL;
+
+        s = strrchr(loader_dir, '/');
+        if (!s)
+                return -EINVAL;
+
+        *s = '\0';
+
+        loader = strdup(s + 1);
+        if (!loader)
+                return -ENOMEM;
+
+        if (loader[0] == '\0')
+                return -EINVAL;
+
+        release_len = strlen(m->release);
+        if (strncasecmp(loader, m->release, release_len) != 0)
+                return -EINVAL;
+
+        s = loader + release_len;
+        if (strncasecmp(s, "-boot", 5) == 0) {
+                s += 5;
+                if (*s < '0' || *s > '9')
+                        return -EINVAL;
+
+                counter = *s - '0';
+                s++;
+
+                if (asprintf(&loader_rename, "%s%s", m->release, s) < 0)
+                        return -ENOMEM;
+        }
+
+        m->loader_dir = loader_dir;
+        loader_dir = NULL;
+        m->loader = loader;
+        loader = NULL;
+        m->loader_rename = loader_rename;
+        loader_rename = NULL;
+        m->boot_counter = counter;
+
+        return 0;
+}
+
 static int manager_parse_kernel_cmdline(Manager *m) {
         int r;
 
-        r = kernel_cmdline_option("loader", &m->loader_dir);
+        r = cmdline_parse_loader(m);
         if (r < 0)
                 return r;
 
-        if (m->loader_dir) {
-                char *s;
-
-                if (m->loader_dir[0] != '/')
-                        return -EINVAL;
-
-                s = strrchr(m->loader_dir, '/');
-                if (!s)
-                        return -EINVAL;
-
-                *s = '\0';
-                m->loader_name = s + 1;
-                if (m->loader_name == '\0')
-                        return -EINVAL;
-        }
-
-        /* serial console getty */
+        /* Serial console getty. */
         r = kernel_cmdline_option("console", &m->serial_device);
         if (r < 0)
                 return r;
+
+        return 0;
+}
+
+static int loader_reset_boot_counter(Manager *m) {
+        _c_cleanup_(c_freep) char *loader_dir = NULL;
+        _c_cleanup_(c_freep) char *loader = NULL;
+        _c_cleanup_(c_closep) int dfd = -1;
+
+        kmsg(LOG_INFO, "Successfully booted with loader %s. Removing boot counter.", m->loader);
+
+        if (asprintf(&loader_dir, "/boot/%s", m->loader_dir) < 0)
+                return -ENOMEM;
+
+        dfd = openat(AT_FDCWD, loader_dir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+        if (dfd < 0)
+                return -errno;
+
+        if (mount(NULL, "/boot", NULL, MS_REMOUNT|BUS1_BOOT_FILESYSTEM_OPTIONS, BUS1_BOOT_FILESYSTEM_FLAGS) < 0)
+                return -errno;
+
+        if (renameat(dfd, m->loader, dfd, m->loader_rename) < 0)
+                return -errno;
+
+        if (mount(NULL, "/boot", NULL, MS_REMOUNT|MS_RDONLY|BUS1_BOOT_FILESYSTEM_OPTIONS, BUS1_BOOT_FILESYSTEM_FLAGS) < 0)
+                return -errno;
 
         return 0;
 }
@@ -414,7 +493,6 @@ int main(int argc, char **argv) {
         };
         _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
-        _c_cleanup_(c_freep) char *release = NULL;
         int r;
 
         /* install dump process handler */
@@ -438,11 +516,11 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = file_read_line("/usr/lib/bus1-release", &release);
+        r = file_read_line("/usr/lib/bus1-release", &m->release);
         if (r < 0)
                 goto fail;
 
-        log = kmsg(LOG_INFO, "Release %s.", release);
+        log = kmsg(LOG_INFO, "Release %s.", m->release);
         if (!log) {
                 r = -errno;
                 goto fail;
@@ -454,6 +532,9 @@ int main(int argc, char **argv) {
 
         r = manager_start_services(m, -1);
         if (r < 0)
+                goto fail;
+
+        if (m->boot_counter > 0 && loader_reset_boot_counter(m) < 0)
                 goto fail;
 
         r = manager_run(m);

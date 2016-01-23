@@ -449,8 +449,8 @@ static int mount_boot(const char *device, const char *dir) {
         if (mkdir(dir, 0755) < 0)
                 return -errno;
 
-        kmsg(LOG_INFO, "Mounting boot device %s (vfat) at /boot.", device);
-        if (mount(device, dir, "vfat", MS_RDONLY|MS_NOSUID|MS_NOEXEC|MS_NODEV, "umask=0027") < 0)
+        kmsg(LOG_INFO, "Mounting boot device %s (" BUS1_BOOT_FILESYSTEM ") at /boot.", device);
+        if (mount(device, dir, BUS1_BOOT_FILESYSTEM, MS_RDONLY|BUS1_BOOT_FILESYSTEM_OPTIONS, BUS1_BOOT_FILESYSTEM_FLAGS) < 0)
                 return -errno;
 
         return 0;

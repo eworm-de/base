@@ -20,14 +20,6 @@
 
 #ifndef HAVE_DECL_GETRANDOM
 static inline int getrandom(void *buffer, size_t count, unsigned flags) {
-        int r;
-
-        r = syscall(__NR_getrandom, buffer, count, flags);
-        if (r < 0) {
-                errno = -r;
-                return -1;
-        }
-
-        return r;
+        return syscall(__NR_getrandom, buffer, count, flags);
 }
 #endif
