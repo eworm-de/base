@@ -38,7 +38,7 @@
 
 #define BUS1_DISK_IMAGE_HEADER_UUID { 0xb7, 0x46, 0xc4, 0xf5, 0xc3, 0xc4, 0x47, 0x37, 0x8a, 0x4c, 0x54, 0xbe, 0xe4, 0x75, 0x69, 0x2a }
 
-struct Bus1DiskImageHeader {
+typedef struct {
         Bus1MetaHeader meta;
 
         struct {
@@ -65,6 +65,4 @@ struct Bus1DiskImageHeader {
                 uint64_t size;                  /* Size of signature in bytes */
                 char signature_type[32];        /* Type of signature */
         } signature;
-};
-
-typedef struct Bus1DiskImageHeader Bus1DiskImageHeader;
+} Bus1DiskImageHeader;

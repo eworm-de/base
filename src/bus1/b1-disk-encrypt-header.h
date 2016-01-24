@@ -20,7 +20,7 @@
 
 #define BUS1_DISK_ENCRYPT_HEADER_UUID { 0x59, 0x33, 0x18, 0x42, 0x97, 0x21, 0x42, 0x37, 0xa7, 0xca, 0xff, 0x9b, 0x94, 0x5b, 0x92, 0x8b }
 
-struct Bus1DiskEncryptHeader {
+typedef struct {
         Bus1MetaHeader meta;
 
         struct {
@@ -33,6 +33,4 @@ struct Bus1DiskEncryptHeader {
                 char chain_mode[32];
                 char iv_mode[32];
         } encrypt;
-};
-
-typedef struct Bus1DiskEncryptHeader Bus1DiskEncryptHeader;
+} Bus1DiskEncryptHeader;

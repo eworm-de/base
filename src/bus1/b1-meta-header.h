@@ -52,7 +52,7 @@
 
 #define BUS1_META_HEADER_UUID    { 0x96, 0x7e, 0x8b, 0x2d, 0xdb, 0x0c, 0x4c, 0x8b, 0xb7, 0x53, 0x16, 0xaa, 0x24, 0x92, 0xb4, 0x2b }
 
-struct Bus1MetaHeader {
+typedef struct {
         uint8_t meta_uuid[16];                 /* indentifier of a meta header (mandatory) */
 
         uint8_t type_uuid[16];                  /* Type of data using the meta header (mandatory) */
@@ -60,6 +60,4 @@ struct Bus1MetaHeader {
 
         uint8_t object_uuid[16];                /* Identifier for the object using the meta header */
         char object_label[256];                 /* Human readable label for this object */
-};
-
-typedef struct Bus1MetaHeader Bus1MetaHeader;
+} Bus1MetaHeader;
