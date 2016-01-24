@@ -22,10 +22,6 @@
 #include "hash-tree.h"
 #include "file-util.h"
 
-static inline unsigned log2u(unsigned int x) {
-        return sizeof(unsigned int) * 8 - c_clz(x) - 1;
-}
-
 /* Calculate and store hash blocks from n data blocks. */
 static int hash_write(FILE *f_data, FILE *f_hash,
                       uint64_t data_block, uint64_t data_block_size,
@@ -166,7 +162,7 @@ int hash_tree_write(const char *filename,
                 return -EINVAL;
 
         /* Calculate the number of levels. */
-        hash_per_block_bits = log2u(hash_block_size / digest_size);
+        hash_per_block_bits = c_log2(hash_block_size / digest_size);
         for (n_level = 0; hash_per_block_bits * n_level < 64 && (n_data_blocks - 1) >> (hash_per_block_bits * n_level);)
                 n_level++;
 
