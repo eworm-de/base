@@ -24,6 +24,7 @@ org.bus1.rdinit: /init to use in the initrd:
         - executes org.bus1.init
 
 org.bus1.init: init process PID1
+        - resets the loader boot counter on successful bootup
         - starts org.bus1.activator
         - starts a tty login if /dev/tty1 exists
         - starts a serial console if console=<device> is given on the kernel

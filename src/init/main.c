@@ -535,7 +535,7 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        if (m->boot_counter > 0 && loader_reset_boot_counter(m) < 0)
+        if (m->boot_counter >= 0 && loader_reset_boot_counter(m) < 0)
                 goto fail;
 
         r = manager_run(m);
