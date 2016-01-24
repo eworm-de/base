@@ -37,6 +37,7 @@
 #include "disk-image-util.h"
 #include "file-util.h"
 #include "kmsg-util.h"
+#include "mount-util.h"
 #include "kernel-cmdline-util.h"
 #include "process-util.h"
 #include "tmpfs-root-util.h"
@@ -445,17 +446,6 @@ static int manager_run(Manager *m) {
         return -ENODEV;
 }
 
-static int mount_boot(const char *device, const char *dir) {
-        if (mkdir(dir, 0755) < 0)
-                return -errno;
-
-        kmsg(LOG_INFO, "Mounting boot device %s (" BUS1_BOOT_FILESYSTEM ") at /boot.", device);
-        if (mount(device, dir, BUS1_BOOT_FILESYSTEM, MS_RDONLY|BUS1_BOOT_FILESYSTEM_OPTIONS, BUS1_BOOT_FILESYSTEM_FLAGS) < 0)
-                return -errno;
-
-        return 0;
-}
-
 static int mount_var(const char *device, const char *dir, const char *key) {
         _c_cleanup_(c_freep) char *device_crypt = NULL;
         _c_cleanup_(c_freep) char *fstype = NULL;
@@ -789,7 +779,11 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = mount_boot(m->device_boot, "/sysroot/boot");
+        if (mkdir("/sysroot/boot", 0755) < 0 && errno != EEXIST)
+                goto fail;
+
+        kmsg(LOG_INFO, "Mounting boot device %s at /boot.", m->device_boot);
+        r = mount_boot(m->device_boot, "/sysroot/boot", 0);
         if (r < 0)
                 return r;
 

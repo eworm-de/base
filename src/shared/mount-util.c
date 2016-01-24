@@ -1,4 +1,3 @@
-#pragma once
 /***
   This file is part of bus1. See COPYING for details.
 
@@ -16,5 +15,15 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#define BUS1_GPT_TYPE_DATA_UUID         { 0xe0, 0x24, 0x34, 0x62, 0xd2, 0xd0, 0x4c, 0x3b, 0xad, 0x28, 0xb3, 0x65, 0xf2, 0xda, 0x3b, 0x4d }
-#define BUS1_GPT_TYPE_BOOT_UUID         { 0xc1, 0x2a, 0x73, 0x28, 0xf8, 0x1f, 0x11, 0xd2, 0xba, 0x4b, 0x00, 0xa0, 0xc9, 0x3e, 0xc9, 0x3b }
+#include <bus1/c-macro.h>
+#include <bus1/c-shared.h>
+#include <sys/mount.h>
+
+#include "mount-util.h"
+
+int mount_boot(const char *device, const char *directory, unsigned long flags) {
+        if (mount(device, directory ?: "/boot", "vfat", flags|MS_NOSUID|MS_NOEXEC|MS_NODEV, "umask=0027") < 0)
+                return -errno;
+
+        return 0;
+}

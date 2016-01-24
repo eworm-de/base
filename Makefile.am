@@ -48,6 +48,8 @@ libshared_a_SOURCES = \
 	src/shared/kernel-cmdline-util.c \
 	src/shared/kmsg-util.h \
 	src/shared/kmsg-util.c \
+	src/shared/mount-util.h \
+	src/shared/mount-util.c \
 	src/shared/process-util.h \
 	src/shared/process-util.c \
 	src/shared/string-util.h \

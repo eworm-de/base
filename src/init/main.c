@@ -29,6 +29,7 @@
 
 #include "file-util.h"
 #include "kmsg-util.h"
+#include "mount-util.h"
 #include "process-util.h"
 #include "kernel-cmdline-util.h"
 
@@ -474,13 +475,13 @@ static int loader_reset_boot_counter(Manager *m) {
         if (dfd < 0)
                 return -errno;
 
-        if (mount(NULL, "/boot", NULL, MS_REMOUNT|BUS1_BOOT_FILESYSTEM_OPTIONS, BUS1_BOOT_FILESYSTEM_FLAGS) < 0)
+        if (mount_boot(NULL, NULL, MS_REMOUNT) < 0)
                 return -errno;
 
         if (renameat(dfd, m->loader, dfd, m->loader_rename) < 0)
                 return -errno;
 
-        if (mount(NULL, "/boot", NULL, MS_REMOUNT|MS_RDONLY|BUS1_BOOT_FILESYSTEM_OPTIONS, BUS1_BOOT_FILESYSTEM_FLAGS) < 0)
+        if (mount_boot(NULL, NULL, MS_REMOUNT|MS_RDONLY) < 0)
                 return -errno;
 
         return 0;
