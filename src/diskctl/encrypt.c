@@ -67,8 +67,8 @@ int encrypt_print_info(const char *data) {
 
         printf("=================================================\n");
         printf("Info for:    %s\n", data);
-        printf("Volume Name: %s\n", info.meta.object_label);
-        printf("Volume UUID: %s\n", uuid);
+        printf("Image Name:  %s\n", info.meta.object_label);
+        printf("Image UUID:  %s\n", uuid);
         printf("Data type:   %s\n", info.data.type);
         printf("Data offset: %" PRIu64 " bytes\n", le64toh(info.data.offset));
         printf("Data size:   %" PRIu64 " bytes\n", le64toh(info.data.size));

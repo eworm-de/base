@@ -34,7 +34,7 @@
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
-#include "disk-image-util.h"
+#include "disk-sign-util.h"
 #include "file-util.h"
 #include "kmsg-util.h"
 #include "mount-util.h"
@@ -442,7 +442,7 @@ static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_freep) char *data_type = NULL;
         int r;
 
-        r = disk_image_setup(image, &device, &data_type);
+        r = disk_sign_setup(image, &device, &data_type);
         if (r < 0)
                 return r;
 

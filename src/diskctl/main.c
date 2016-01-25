@@ -18,7 +18,7 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 
-#include "image.h"
+#include "sign.h"
 #include "encrypt.h"
 
 int main(int argc, char **argv) {
@@ -28,11 +28,11 @@ int main(int argc, char **argv) {
         if (!verb)
                 goto fail;
 
-        if (strcmp(verb, "image") == 0) {
+        if (strcmp(verb, "sign") == 0) {
                 if (argc == 3) {
                         const char *filename = argv[2];
 
-                        if (image_print_info(filename) < 0)
+                        if (disk_sign_print_info(filename) < 0)
                                 return EXIT_FAILURE;
 
                         return EXIT_SUCCESS;
@@ -44,19 +44,19 @@ int main(int argc, char **argv) {
                         const char *filename_in = argv[4];
                         const char *filename_out = argv[5];
 
-                        r = image_write(filename_in, filename_out, name, type);
+                        r = disk_sign_write(filename_in, filename_out, name, type);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename_out, strerror(-r));
                                 return EXIT_FAILURE;
                         }
 
-                        if (image_print_info(filename_out) < 0)
+                        if (disk_sign_print_info(filename_out) < 0)
                                 return EXIT_FAILURE;
 
                         return EXIT_SUCCESS;
                 }
 
-                fprintf(stderr, "Usage: %s image <name> <type> <data file> <image file>\n", program_invocation_short_name);
+                fprintf(stderr, "Usage: %s sign <name> <type> <data file> <image file>\n", program_invocation_short_name);
                 return EXIT_FAILURE;
 
         } else if (strcmp(verb, "encrypt") == 0) {
@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
         }
 
 fail:
-        fprintf(stderr, "Usage: %s image|encrypt [OPTIONS]\n", program_invocation_short_name);
+        fprintf(stderr, "Usage: %s sign|encrypt [OPTIONS]\n", program_invocation_short_name);
+
         return EXIT_FAILURE;
 }

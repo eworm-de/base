@@ -22,13 +22,13 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
-#include "bus1/b1-disk-image-header.h"
-#include "disk-image-util.h"
+#include "bus1/b1-disk-sign-header.h"
+#include "disk-sign-util.h"
 #include "file-util.h"
 #include "string-util.h"
 #include "kmsg-util.h"
 
-static int image_attach_loop(FILE *f, uint64_t offset, char **devicep) {
+static int disk_sign_attach_loop(FILE *f, uint64_t offset, char **devicep) {
         _c_cleanup_(c_closep) int fd_loopctl = -1;
         _c_cleanup_(c_closep) int fd_loop = -1;
         _c_cleanup_(c_freep) char *device = NULL;
@@ -84,16 +84,16 @@ static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, s
         return 0;
 };
 
-static int image_setup_device(const char *device,
-                              const char *name,
-                              uint64_t data_size,
-                              uint64_t hash_offset,
-                              unsigned int data_block_size,
-                              unsigned int hash_block_size,
-                              const char *hash_name,
-                              const char *salt,
-                              const char *root_hash,
-                              char **map_device) {
+static int disk_sign_setup_device(const char *device,
+                                  const char *name,
+                                  uint64_t data_size,
+                                  uint64_t hash_offset,
+                                  unsigned int data_block_size,
+                                  unsigned int hash_block_size,
+                                  const char *hash_name,
+                                  const char *salt,
+                                  const char *root_hash,
+                                  char **map_device) {
         _c_cleanup_(c_freep) struct dm_ioctl *io = NULL;
         _c_cleanup_(c_closep) int fd = -1;
         uint64_t dm_dev;
@@ -162,23 +162,23 @@ static int image_setup_device(const char *device,
         return 0;
 }
 
-int disk_image_get_info(FILE *f,
-                        char **image_namep,
-                        uint8_t *image_uuid,
-                        char **data_typep,
-                        uint64_t *data_offset,
-                        uint64_t *data_size,
-                        uint64_t *hash_offset,
-                        uint64_t *hash_size,
-                        char **hash_algorithmp,
-                        uint64_t *hash_digest_size,
-                        uint64_t *hash_block_size,
-                        uint64_t *data_block_size,
-                        char **saltp,
-                        char **root_hashp) {
-        Bus1DiskImageHeader info;
+int disk_sign_get_info(FILE *f,
+                       char **image_namep,
+                       uint8_t *image_uuid,
+                       char **data_typep,
+                       uint64_t *data_offset,
+                       uint64_t *data_size,
+                       uint64_t *hash_offset,
+                       uint64_t *hash_size,
+                       char **hash_algorithmp,
+                       uint64_t *hash_digest_size,
+                       uint64_t *hash_block_size,
+                       uint64_t *data_block_size,
+                       char **saltp,
+                       char **root_hashp) {
+        Bus1DiskSignHeader info;
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
-        static const char info_uuid[] = BUS1_DISK_IMAGE_HEADER_UUID;
+        static const char info_uuid[] = BUS1_DISK_SIGN_HEADER_UUID;
         _c_cleanup_(c_freep) char *name = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *algorithm = NULL;
@@ -276,7 +276,7 @@ int disk_image_get_info(FILE *f,
         return 0;
 }
 
-int disk_image_setup(const char *image, char **devicep, char **image_typep) {
+int disk_sign_setup(const char *image, char **devicep, char **image_typep) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
         _c_cleanup_(c_freep) char *image_type = NULL;
@@ -297,7 +297,7 @@ int disk_image_setup(const char *image, char **devicep, char **image_typep) {
         if (!f)
                 return -errno;
 
-        r = disk_image_get_info(f,
+        r = disk_sign_get_info(f,
                                 &image_name,
                                 NULL,
                                 &image_type,
@@ -323,20 +323,20 @@ int disk_image_setup(const char *image, char **devicep, char **image_typep) {
             data_offset > hash_offset)
                 return -EINVAL;
 
-        r = image_attach_loop(f, data_offset, &loopdev);
+        r = disk_sign_attach_loop(f, data_offset, &loopdev);
         if (r < 0)
                 return r;
 
-        r = image_setup_device(loopdev,
-                               image_name,
-                               data_size,
-                               hash_offset - data_offset,
-                               hash_block_size,
-                               data_block_size,
-                               hash_algorithm,
-                               salt,
-                               root_hash,
-                               &device);
+        r = disk_sign_setup_device(loopdev,
+                                   image_name,
+                                   data_size,
+                                   hash_offset - data_offset,
+                                   hash_block_size,
+                                   data_block_size,
+                                   hash_algorithm,
+                                   salt,
+                                   root_hash,
+                                   &device);
         if (r < 0)
                 return r;
 

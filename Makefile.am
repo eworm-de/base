@@ -40,8 +40,8 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
-	src/shared/disk-image-util.h \
-	src/shared/disk-image-util.c \
+	src/shared/disk-sign-util.h \
+	src/shared/disk-sign-util.c \
 	src/shared/file-util.h \
 	src/shared/file-util.c \
 	src/shared/kernel-cmdline-util.h \
@@ -171,13 +171,13 @@ noinst_PROGRAMS += \
 org_bus1_diskctl_SOURCES = \
 	src/bus1/b1-meta-header.h \
 	src/bus1/b1-disk-encrypt-header.h \
-	src/bus1/b1-disk-image-header.h \
+	src/bus1/b1-disk-sign-header.h \
 	src/diskctl/encrypt.h \
 	src/diskctl/encrypt.c \
 	src/diskctl/hash-tree.h \
 	src/diskctl/hash-tree.c \
-	src/diskctl/image.h \
-	src/diskctl/image.c \
+	src/diskctl/sign.h \
+	src/diskctl/sign.c \
 	src/diskctl/main.c
 
 org_bus1_diskctl_CFLAGS = \
