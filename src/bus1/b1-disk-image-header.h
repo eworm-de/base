@@ -19,17 +19,17 @@
 /*
 
   ------------------------------------------------------
+  | Image header                                       |
+  ------------------------------------------------------
+  | Signature (authenticity of image header)           |
+  ------------------------------------------------------
   | Data                                               |
   |                                                    |
   |                                                    |
   |                                                    |
   ------------------------------------------------------
-  | Hash Tree (Integrity of Data)                      |
+  | Hash tree (integrity of data)                      |
   |                                                    |
-  ------------------------------------------------------
-  | Signature (Authenticity of ImageInfo)              |
-  ------------------------------------------------------
-  | ImageInfo                                          |
   ------------------------------------------------------
 
  */
@@ -42,14 +42,15 @@ typedef struct {
         Bus1MetaHeader meta;
 
         struct {
-                uint64_t offset;                /* Absolute offset of filesystem image in bytes, usually 0 */
+                uint64_t offset;                /* Absolute offset of filesystem image in bytes */
                 uint64_t size;                  /* Size of filesystem image in bytes */
+                char type[64];                  /* Data type / filesystem format */
         } data;
 
         struct {
                 uint64_t offset;                /* Absolute offset of hash tree blocks in bytes */
                 uint64_t size;                  /* Size of hash tree blocks in bytes */
-                char algorithm[32];             /* Hash algorithm used to create hash blocks */
+                char algorithm[64];             /* Hash algorithm used to create hash blocks */
                 uint64_t digest_size;           /* Size of hash digest in bits */
                 uint64_t hash_block_size;       /* Hash block size in bits */
                 uint64_t data_block_size;       /* Input block size in bits */
@@ -63,6 +64,6 @@ typedef struct {
         struct {
                 uint64_t offset;                /* Absolute offset of signature */
                 uint64_t size;                  /* Size of signature in bytes */
-                char signature_type[32];        /* Type of signature */
+                char signature_type[64];        /* Type of signature */
         } signature;
 } Bus1DiskImageHeader;

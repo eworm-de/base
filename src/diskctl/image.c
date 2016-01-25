@@ -33,6 +33,7 @@ int image_print_info(const char *filename) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
         uint8_t image_uuid[16];
+        _c_cleanup_(c_freep) char *data_type = NULL;
         uint64_t data_offset;
         uint64_t data_size;
         uint64_t hash_offset;
@@ -52,8 +53,10 @@ int image_print_info(const char *filename) {
 
         setvbuf(f, NULL, _IONBF, 0);
 
-        r = disk_image_get_info(f, &image_name,
+        r = disk_image_get_info(f,
+                                &image_name,
                                 image_uuid,
+                                &data_type,
                                 &data_offset,
                                 &data_size,
                                 &hash_offset,
@@ -75,6 +78,7 @@ int image_print_info(const char *filename) {
         printf("Info for:         %s\n", filename);
         printf("Image Name:       %s\n", image_name);
         printf("Image UUID:       %s\n", uuid);
+        printf("Data type:        %s\n", data_type);
         printf("Data offset:      %" PRIu64 " bytes\n", data_offset);
         printf("Data size:        %" PRIu64 " bytes\n", data_size);
         printf("Hash tree offset: %" PRIu64 " bytes\n", hash_offset);
@@ -92,7 +96,8 @@ int image_print_info(const char *filename) {
 
 #define IMAGE_HEADER_SPACE 4096
 
-int image_write(const char *filename_data, const char *filename_image, const char *name) {
+int image_write(const char *filename_data, const char *filename_image,
+                const char *image_name, const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
         _c_cleanup_(c_fclosep) FILE *f_image = NULL;
         uint64_t digest_size = 256;
@@ -116,7 +121,8 @@ int image_write(const char *filename_data, const char *filename_image, const cha
 
         assert(filename_data);
         assert(filename_image);
-        assert(name);
+        assert(image_name);
+        assert(data_type);
         assert(sizeof(Bus1DiskImageHeader) < IMAGE_HEADER_SPACE);
 
         f_data = fopen(filename_data, "re");
@@ -143,7 +149,8 @@ int image_write(const char *filename_data, const char *filename_image, const cha
         if (r < 0)
                 return r;
 
-        strncpy(info.meta.object_label, name, sizeof(info.meta.object_label) - 1);
+        strncpy(info.meta.object_label, image_name, sizeof(info.meta.object_label) - 1);
+        strncpy(info.data.type, data_type, sizeof(info.data.type) - 1);
 
         r = uuid_set_random(info.meta.object_uuid);
         if (r < 0)

@@ -16,6 +16,17 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+/*
+
+  ------------------------------------------------------
+  | Image header                                       |
+  ------------------------------------------------------
+  | Encrypted Data                                     |
+  |                                                    |
+  ------------------------------------------------------
+
+ */
+
 #include <bus1/b1-meta-header.h>
 
 #define BUS1_DISK_ENCRYPT_HEADER_UUID { 0x59, 0x33, 0x18, 0x42, 0x97, 0x21, 0x42, 0x37, 0xa7, 0xca, 0xff, 0x9b, 0x94, 0x5b, 0x92, 0x8b }
@@ -24,8 +35,9 @@ typedef struct {
         Bus1MetaHeader meta;
 
         struct {
-                uint64_t offset;
-                uint64_t size;
+                uint64_t offset;                /* Absolute offset of filesystem image in bytes */
+                uint64_t size;                  /* Size of filesystem image in bytes */
+                char type[64];                  /* Data type / filesystem format */
         } data;
 
         struct {

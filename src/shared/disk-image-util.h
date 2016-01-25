@@ -17,17 +17,20 @@
 ***/
 
 int disk_image_get_info(FILE *f,
-                        char **image_name,
+                        char **image_namep,
                         uint8_t *image_uuid,
+                        char **data_typep,
                         uint64_t *data_offset,
                         uint64_t *data_size,
                         uint64_t *hash_offset,
                         uint64_t *hash_size,
-                        char **hash_algorithm,
+                        char **hash_algorithmp,
                         uint64_t *hash_digest_size,
                         uint64_t *hash_block_size,
                         uint64_t *data_block_size,
-                        char **salt,
-                        char **root_hash);
+                        char **saltp,
+                        char **root_hashp);
 
-int disk_image_setup(const char *image, const char *name, char **device);
+int disk_image_setup(const char *image,
+                     char **devicep,
+                     char **data_typep);

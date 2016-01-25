@@ -316,33 +316,6 @@ static int disk_find_partitions(const char *disk, Manager *m) {
         return 0;
 }
 
-static int filesystem_probe(const char *volume, char **fstypep) {
-        _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
-        const char *s;
-        char *fstype;
-        int r;
-
-        b = blkid_new_probe_from_filename(volume);
-        if (!b)
-                return -EIO;
-
-        r = blkid_do_safeprobe(b);
-        if (r < 0)
-                return r;
-
-        r = blkid_probe_lookup_value(b, "TYPE", &s, NULL);
-        if (r < 0)
-                return r;
-
-        fstype = strdup(s);
-        if (!fstype)
-                return -ENOMEM;
-
-        *fstypep = fstype;
-
-        return 0;
-}
-
 static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
                     int devfd, const char *devname, const char *modalias,
                     void *userdata) {
@@ -448,23 +421,17 @@ static int manager_run(Manager *m) {
 
 static int mount_var(const char *device, const char *dir, const char *key) {
         _c_cleanup_(c_freep) char *device_crypt = NULL;
-        _c_cleanup_(c_freep) char *fstype = NULL;
+        _c_cleanup_(c_freep) char *data_type = NULL;
         int r;
 
-        r = disk_encrypt_setup(device, "org.bus1.data", key, &device_crypt);
+        r = disk_encrypt_setup(device, key, &device_crypt, &data_type);
         if (r < 0) {
                 kmsg(LOG_ERR, "Unable to unlock data volume %s: %s", device, strerror(-r));
                 return r;
         }
 
-        r = filesystem_probe(device_crypt, &fstype);
-        if (r < 0) {
-                kmsg(LOG_ERR, "No device or no filesystem found at %s: %s", device_crypt, strerror(-r));
-                return r;
-        }
-
-        kmsg(LOG_INFO, "Mounting data device %s (%s) at /var.", device_crypt, fstype);
-        if (mount(device_crypt, dir, fstype, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
+        kmsg(LOG_INFO, "Mounting data device %s (%s) at /var.", device_crypt, data_type);
+        if (mount(device_crypt, dir, data_type, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;
@@ -472,19 +439,15 @@ static int mount_var(const char *device, const char *dir, const char *key) {
 
 static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_freep) char *device = NULL;
-        _c_cleanup_(c_freep) char *fstype = NULL;
+        _c_cleanup_(c_freep) char *data_type = NULL;
         int r;
 
-        r = disk_image_setup(image, "org.bus1.system", &device);
+        r = disk_image_setup(image, &device, &data_type);
         if (r < 0)
                 return r;
 
-        r = filesystem_probe(device, &fstype);
-        if (r < 0)
-                return r;
-
-        kmsg(LOG_INFO, "Mounting %s (%s) at /usr.", device, fstype);
-        if (mount(device, dir, fstype, MS_RDONLY|MS_NODEV, NULL) < 0)
+        kmsg(LOG_INFO, "Mounting %s (%s) at /usr.", device, data_type);
+        if (mount(device, dir, data_type, MS_RDONLY|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;

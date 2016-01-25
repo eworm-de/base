@@ -69,6 +69,7 @@ int encrypt_print_info(const char *data) {
         printf("Info for:    %s\n", data);
         printf("Volume Name: %s\n", info.meta.object_label);
         printf("Volume UUID: %s\n", uuid);
+        printf("Data type:   %s\n", info.data.type);
         printf("Data offset: %" PRIu64 " bytes\n", le64toh(info.data.offset));
         printf("Data size:   %" PRIu64 " bytes\n", le64toh(info.data.size));
         printf("Encryption:  %s-%s-%s\n", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode);
@@ -96,7 +97,10 @@ static int block_discard_range(FILE *f, uint64_t start, uint64_t len) {
         return 0;
 }
 
-int encrypt_setup_volume(const char *data_file, const char *name) {
+#define ENCRYPT_HEADER_SPACE 4096
+
+int encrypt_setup_volume(const char *data_file,
+                         const char *image_name, const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset, size = 0;
         Bus1DiskEncryptHeader info = {
@@ -110,9 +114,12 @@ int encrypt_setup_volume(const char *data_file, const char *name) {
         int r;
 
         assert(data_file);
-        assert(name);
+        assert(image_name);
+        assert(data_type);
+        assert(sizeof(Bus1DiskEncryptHeader) < ENCRYPT_HEADER_SPACE);
 
-        strncpy(info.meta.object_label, name, sizeof(info.meta.object_label) - 1);
+        strncpy(info.meta.object_label, image_name, sizeof(info.meta.object_label) - 1);
+        strncpy(info.data.type, data_type, sizeof(info.data.type) - 1);
 
         r = uuid_set_random(info.meta.object_uuid);
         if (r < 0)
@@ -129,7 +136,7 @@ int encrypt_setup_volume(const char *data_file, const char *name) {
         block_discard_range(f, 0, size);
 
         size -= size  % 4096;
-        offset = 4096;
+        offset = ENCRYPT_HEADER_SPACE;
 
         info.data.offset = htole64(offset);
         info.data.size = htole64(size - offset);

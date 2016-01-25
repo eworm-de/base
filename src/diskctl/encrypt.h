@@ -16,5 +16,6 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int encrypt_setup_volume(const char *data_file, const char *name);
+int encrypt_setup_volume(const char *data_file,
+                         const char *image_name, const char *data_type);
 int encrypt_print_info(const char *data);

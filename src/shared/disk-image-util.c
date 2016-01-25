@@ -163,22 +163,24 @@ static int image_setup_device(const char *device,
 }
 
 int disk_image_get_info(FILE *f,
-                        char **image_name,
+                        char **image_namep,
                         uint8_t *image_uuid,
+                        char **data_typep,
                         uint64_t *data_offset,
                         uint64_t *data_size,
                         uint64_t *hash_offset,
                         uint64_t *hash_size,
-                        char **hash_algorithm,
+                        char **hash_algorithmp,
                         uint64_t *hash_digest_size,
                         uint64_t *hash_block_size,
                         uint64_t *data_block_size,
-                        char **salt,
-                        char **root_hash) {
+                        char **saltp,
+                        char **root_hashp) {
         Bus1DiskImageHeader info;
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
         static const char info_uuid[] = BUS1_DISK_IMAGE_HEADER_UUID;
         _c_cleanup_(c_freep) char *name = NULL;
+        _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *algorithm = NULL;
         _c_cleanup_(c_freep) char *salt_str = NULL;
         _c_cleanup_(c_freep) char *hash_str = NULL;
@@ -196,6 +198,10 @@ int disk_image_get_info(FILE *f,
 
         name = strdup(info.meta.object_label);
         if (!name)
+                return -ENOMEM;
+
+        data_type = strdup(info.data.type);
+        if (!data_type)
                 return -ENOMEM;
 
         algorithm = strdup(info.hash.algorithm);
@@ -218,13 +224,18 @@ int disk_image_get_info(FILE *f,
         if (r < 0)
                 return r;
 
-        if (image_name) {
-                *image_name = name;
+        if (image_namep) {
+                *image_namep = name;
                 name = NULL;
         }
 
         if (image_uuid)
                 memcpy(image_uuid, info.meta.object_uuid, 16);
+
+        if (data_typep) {
+                *data_typep = data_type;
+                data_type = NULL;
+        }
 
         if (data_offset)
                 *data_offset = le64toh(info.data.offset);
@@ -238,8 +249,8 @@ int disk_image_get_info(FILE *f,
         if (hash_size)
                 *hash_size = le64toh(info.hash.size);
 
-        if (hash_algorithm) {
-                *hash_algorithm = algorithm;
+        if (hash_algorithmp) {
+                *hash_algorithmp = algorithm;
                 algorithm = NULL;
         }
 
@@ -252,21 +263,23 @@ int disk_image_get_info(FILE *f,
         if (data_block_size)
                 *data_block_size = le64toh(info.hash.data_block_size);
 
-        if (salt) {
-                *salt = salt_str;
+        if (saltp) {
+                *saltp = salt_str;
                 salt_str = NULL;
         }
 
-        if (root_hash) {
-                *root_hash = hash_str;
+        if (root_hashp) {
+                *root_hashp = hash_str;
                 hash_str = NULL;
         }
 
         return 0;
 }
 
-int disk_image_setup(const char *image, const char *name, char **device) {
+int disk_image_setup(const char *image, char **devicep, char **image_typep) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
+        _c_cleanup_(c_freep) char *image_name = NULL;
+        _c_cleanup_(c_freep) char *image_type = NULL;
         uint64_t data_offset;
         uint64_t data_size;
         uint64_t hash_offset;
@@ -277,15 +290,17 @@ int disk_image_setup(const char *image, const char *name, char **device) {
         _c_cleanup_(c_freep) char *salt = NULL;
         _c_cleanup_(c_freep) char *root_hash = NULL;
         _c_cleanup_(c_freep) char *loopdev = NULL;
-        _c_cleanup_(c_freep) char *dev = NULL;
+        _c_cleanup_(c_freep) char *device = NULL;
         int r;
 
         f = fopen(image, "re");
         if (!f)
                 return -errno;
 
-        r = disk_image_get_info(f, NULL,
+        r = disk_image_get_info(f,
+                                &image_name,
                                 NULL,
+                                &image_type,
                                 &data_offset,
                                 &data_size,
                                 &hash_offset,
@@ -313,7 +328,7 @@ int disk_image_setup(const char *image, const char *name, char **device) {
                 return r;
 
         r = image_setup_device(loopdev,
-                               name,
+                               image_name,
                                data_size,
                                hash_offset - data_offset,
                                hash_block_size,
@@ -321,12 +336,19 @@ int disk_image_setup(const char *image, const char *name, char **device) {
                                hash_algorithm,
                                salt,
                                root_hash,
-                               &dev);
+                               &device);
         if (r < 0)
                 return r;
 
-        *device = dev;
-        dev = NULL;
+        if (devicep) {
+                *devicep = device;
+                device = NULL;
+        }
+
+        if (image_typep) {
+                *image_typep = image_type;
+                image_type = NULL;
+        }
 
         return 0;
 }

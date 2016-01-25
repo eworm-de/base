@@ -38,12 +38,13 @@ int main(int argc, char **argv) {
                         return EXIT_SUCCESS;
                 }
 
-                if (argc == 5) {
+                if (argc == 6) {
                         const char *name = argv[2];
-                        const char *filename_in = argv[3];
-                        const char *filename_out = argv[4];
+                        const char *type = argv[3];
+                        const char *filename_in = argv[4];
+                        const char *filename_out = argv[5];
 
-                        r = image_write(filename_in, filename_out, name);
+                        r = image_write(filename_in, filename_out, name, type);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename_out, strerror(-r));
                                 return EXIT_FAILURE;
@@ -55,7 +56,7 @@ int main(int argc, char **argv) {
                         return EXIT_SUCCESS;
                 }
 
-                fprintf(stderr, "Usage: %s image <name> <data file> <image file>\n", program_invocation_short_name);
+                fprintf(stderr, "Usage: %s image <name> <type> <data file> <image file>\n", program_invocation_short_name);
                 return EXIT_FAILURE;
 
         } else if (strcmp(verb, "encrypt") == 0) {
@@ -68,14 +69,15 @@ int main(int argc, char **argv) {
                         return EXIT_SUCCESS;
                 }
 
-                if (argc == 4) {
+                if (argc == 5) {
                         const char *name = argv[2];
-                        const char *filename = argv[3];
+                        const char *type = argv[3];
+                        const char *filename = argv[4];
 
                         if (encrypt_print_info(filename) >= 0)
                                 return EXIT_SUCCESS;
 
-                        r = encrypt_setup_volume(filename, name);
+                        r = encrypt_setup_volume(filename, name, type);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename, strerror(-r));
                                 return EXIT_FAILURE;
@@ -87,7 +89,7 @@ int main(int argc, char **argv) {
                         return EXIT_SUCCESS;
                 }
 
-                fprintf(stderr, "Usage: %s encrypt <name> <device>\n", program_invocation_short_name);
+                fprintf(stderr, "Usage: %s encrypt <name> <type> <device>\n", program_invocation_short_name);
                 return EXIT_FAILURE;
         }
 
