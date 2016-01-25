@@ -767,12 +767,12 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
-        if (asprintf(&key_file, "/sysroot/boot%s/bus1-key.txt", m->loader_dir ?: "") < 0) {
+        if (asprintf(&key_file, "/sysroot/boot%s/vendor-key.txt", m->loader_dir ?: "") < 0) {
                 r = -ENOMEM;
                 goto fail;
         }
 
-        kmsg(LOG_INFO, "Reading data volume decryption key bus1-key.txt from boot volume.");
+        kmsg(LOG_INFO, "Reading data volume decryption key vendor-key.txt from boot volume.");
         r = file_read_line(key_file, &key);
         if (r < 0)
                 goto fail;
