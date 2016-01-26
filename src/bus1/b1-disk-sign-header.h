@@ -50,7 +50,7 @@ typedef struct {
         struct {
                 uint64_t offset;                /* Absolute offset of hash tree blocks in bytes */
                 uint64_t size;                  /* Size of hash tree blocks in bytes */
-                char algorithm[64];             /* Hash algorithm used to create hash blocks */
+                char algorithm[32];             /* Hash algorithm used to create hash blocks */
                 uint64_t digest_size;           /* Size of hash digest in bits */
                 uint64_t hash_block_size;       /* Hash block size in bits */
                 uint64_t data_block_size;       /* Input block size in bits */
