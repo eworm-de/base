@@ -167,7 +167,7 @@ org_bus1_coredump_LDADD = \
 	$(ELFUTILS_LIBS)
 
 # ------------------------------------------------------------------------------
-noinst_PROGRAMS += \
+bin_PROGRAMS += \
 	org.bus1.diskctl
 
 org_bus1_diskctl_SOURCES = \
