@@ -119,10 +119,6 @@ PKG_CHECK_MODULES(KMOD, [ libkmod >= 15 ],
         [AC_DEFINE(HAVE_KMOD, 1, [Define if kmod is available])],
         AC_MSG_ERROR([*** libkmod not found]))
 
-PKG_CHECK_MODULES(BLKID, [ blkid >= 2.24 ],
-        [AC_DEFINE(HAVE_BLKID, 1, [Define if blkid is available])],
-        AC_MSG_ERROR([*** libblkid not found]))
-
 AC_CHECK_LIB([dw], [dwfl_core_file_attach],
         [AC_DEFINE(HAVE_ELFUTILS, 1, [Define if elfutils is available])],
         AC_MSG_ERROR([*** elfutils >= 158 not found]))

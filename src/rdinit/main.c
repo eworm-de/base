@@ -15,7 +15,6 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <blkid/blkid.h>
 #include <bus1/b1-platform.h>
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
@@ -44,6 +43,7 @@
 #include "uuid-util.h"
 
 #include "disk-encrypt.h"
+#include "disk-gpt.h"
 #include "sysctl.h"
 
 typedef struct Manager Manager;
@@ -53,7 +53,7 @@ struct Manager {
         int fd_ep;
         struct epoll_event ep_signal;
 
-        char *disk_uuid;         /* Boot disk GPT UUID. */
+        uint8_t disk_uuid[16];   /* Boot disk GPT UUID. */
         char *device_data;       /* Data device mounted at /var. */
         char *device_boot;       /* Boot device mounted at /boot. */
         char *loader_dir;        /* Boot loader directory in /boot. */
@@ -63,7 +63,6 @@ struct Manager {
 };
 
 static Manager *manager_free(Manager *m) {
-        free(m->disk_uuid);
         free(m->device_data);
         free(m->device_boot);
         free(m->loader_dir);
@@ -230,92 +229,6 @@ finish:
         return r;
 }
 
-C_DEFINE_CLEANUP(blkid_probe, blkid_free_probe);
-
-static int disk_find_partitions(const char *disk, Manager *m) {
-        const char *s;
-        _c_cleanup_(blkid_free_probep) blkid_probe b = NULL;
-        blkid_partlist pl;
-        int i;
-        int r;
-
-        assert(m->disk_uuid);
-        assert(!m->device_boot);
-        assert(!m->device_data);
-
-        b = blkid_new_probe_from_filename(disk);
-        if (!b)
-                return -EIO;
-
-        blkid_probe_enable_partitions(b, 1);
-        blkid_probe_set_partitions_flags(b, BLKID_PARTS_ENTRY_DETAILS);
-        r = blkid_do_safeprobe(b);
-        if (r < 0)
-                return r;
-
-        r = blkid_probe_lookup_value(b, "PTTYPE", &s, NULL);
-        if (r < 0)
-                return r;
-
-        if (strcmp(s, "gpt") != 0)
-                return -ENODEV;
-
-        r = blkid_probe_lookup_value(b, "PTUUID", &s, NULL);
-        if (r < 0)
-                return r;
-
-        if (strcmp(s, m->disk_uuid) != 0)
-                return -ENODEV;
-
-        kmsg(LOG_INFO, "Found disk %s (%s).", disk, m->disk_uuid);
-
-        pl = blkid_probe_get_partitions(b);
-        if(!pl)
-                return -EIO;
-
-        for (i = 0; i < blkid_partlist_numof_partitions(pl); i++) {
-                blkid_partition p;
-                struct {
-                        const char *type;
-                        const uint8_t uuid[16];
-                        char **device;
-                } partitions[] = {
-                        { "boot", BUS1_GPT_TYPE_BOOT_UUID, &m->device_boot },
-                        { "data", BUS1_GPT_TYPE_DATA_UUID, &m->device_data },
-                };
-                uint8_t uuid[16];
-                unsigned int n;
-
-                p = blkid_partlist_get_partition(pl, i);
-                s = blkid_partition_get_type_string(p);
-                if (!s)
-                        continue;
-
-                if (uuid_from_string(s, uuid) < 0)
-                        continue;
-
-                for (n = 0; n < C_ARRAY_SIZE(partitions); n++) {
-                        if (memcmp(uuid, partitions[n].uuid, sizeof(uuid)) != 0)
-                                continue;
-
-                        if (isdigit(disk[strlen(disk) - 1])) {
-                                if (asprintf(partitions[n].device, "%sp%d", disk, blkid_partition_get_partno(p)) < 0)
-                                        return -ENOMEM;
-                        } else {
-                                if (asprintf(partitions[n].device, "%s%d", disk, blkid_partition_get_partno(p)) < 0)
-                                        return -ENOMEM;
-                        }
-
-                        kmsg(LOG_INFO, "Found %s partition at %s.", partitions[n].type, *partitions[n].device);
-                }
-        }
-
-        if (!m->device_boot || !m->device_data)
-                return -ENODEV;
-
-        return 0;
-}
-
 static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
                     int devfd, const char *devname, const char *modalias,
                     void *userdata) {
@@ -326,7 +239,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         if (asprintf(&device, "/dev/%s", devname) < 0)
                 return -ENOMEM;
 
-        r = disk_find_partitions(device, m);
+        r = disk_gpt_find_partitions(device, m->disk_uuid, &m->device_boot, &m->device_data);
         if (r < 0)
                 return 0;
 
@@ -409,8 +322,6 @@ static int manager_run(Manager *m) {
                         break;
         }
 
-        if (m->disk_uuid)
-                kmsg(LOG_ERR, "Disk %s not found.", m->disk_uuid);
         if (m->device_boot)
                 kmsg(LOG_ERR, "Boot device %s not found.", m->device_boot);
         if (m->device_data)
@@ -603,6 +514,7 @@ static int rdshell(const char *release) {
 }
 
 static int manager_parse_kernel_cmdline(Manager *m) {
+        _c_cleanup_(c_freep) char *disk = NULL;
         int r;
 
         r = kernel_cmdline_option("loader", &m->loader_dir);
@@ -622,7 +534,11 @@ static int manager_parse_kernel_cmdline(Manager *m) {
                 *s = '\0';
         }
 
-        r = kernel_cmdline_option("disk", &m->disk_uuid);
+        r = kernel_cmdline_option("disk", &disk);
+        if (r < 0)
+                return r;
+
+        r = uuid_from_string(disk, m->disk_uuid);
         if (r < 0)
                 return r;
 
@@ -634,7 +550,7 @@ static int manager_parse_kernel_cmdline(Manager *m) {
         if (r < 0)
                 return r;
 
-        if ((!!m->device_data != !!m->device_boot) || (m->disk_uuid && m->device_data))
+        if ((!!m->device_data != !!m->device_boot) || (disk && m->device_data))
                 return -EINVAL;
 
         return 0;

@@ -87,6 +87,8 @@ org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.c \
 	src/rdinit/disk-encrypt.h \
 	src/rdinit/disk-encrypt.c \
+	src/rdinit/disk-gpt.h \
+	src/rdinit/disk-gpt.c \
 	src/rdinit/sysctl.h \
 	src/rdinit/sysctl.c \
 	src/rdinit/main.c

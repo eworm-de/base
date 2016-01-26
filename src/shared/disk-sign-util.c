@@ -187,6 +187,9 @@ int disk_sign_get_info(FILE *f,
         size_t l;
         int r;
 
+        if (fseeko(f, 0, SEEK_SET) < 0)
+                return -errno;
+
         if (fread(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
