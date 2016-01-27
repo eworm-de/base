@@ -49,15 +49,19 @@ int service_new(const char *name, Service **servicep) {
 }
 
 Service *service_free(Service *s) {
-        char *p;
+        unsigned int i;
 
-        for (p = s->argv[0]; p; p++)
-                free(p);
+        for (i = 0; s->argv[i]; i++)
+                free(s->argv[i]);
+
         free(s->argv);
 
-        for (p = s->envp[0]; p; p++)
-                free(p);
-        free(s->envp);
+        if (s->envp) {
+                for (i = 0; s->envp[i]; i++)
+                        free(s->envp[i]);
+
+                free(s->envp);
+        }
 
         free(s->name);
         free(s);
@@ -68,6 +72,7 @@ Service *service_free(Service *s) {
 int service_terminate(Service *s) {
         assert(s->pid >= 0);
 
+        kmsg(LOG_INFO, "Terminating service %s.", s->name);
         if (kill(s->pid, SIGTERM) < 0)
                 return -errno;
 

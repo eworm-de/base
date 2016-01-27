@@ -31,7 +31,7 @@ struct Service {
         bool terminated;
 };
 
-int service_new(const char *name, Service **s);
+int service_new(const char *name, Service **servicep);
 Service *service_free(Service *s);
 C_DEFINE_CLEANUP(Service *, service_free);
 
