@@ -29,7 +29,7 @@
 #include "kmsg-util.h"
 #include "tmpfs-root-util.h"
 
-int service_new(const char *name, Service **service) {
+int service_new(const char *name, Service **servicep) {
         _c_cleanup_(service_freep) Service *s = NULL;
 
         s = calloc(1, sizeof(Service));
@@ -42,7 +42,7 @@ int service_new(const char *name, Service **service) {
 
         s->pid = -1;
 
-        *service = s;
+        *servicep = s;
         s = NULL;
 
        return 0;
@@ -92,8 +92,6 @@ int service_activate(Service *s) {
         assert(!s->terminated);
 
         if (!s->argv) {
-                _c_cleanup_(c_freep) char *exe = NULL;
-
                 s->argv = calloc(2, sizeof(char *));
                 if (!s->argv)
                         return -ENOMEM;
