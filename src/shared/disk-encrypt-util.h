@@ -22,4 +22,4 @@ int encrypt_get_info(FILE *f,
                      char **crypt_typep, char **data_typep,
                      char **keyp);
 
-int disk_encrypt_setup_device(const char *device, char **devicep, char **data_typep);
+int disk_encrypt_setup_device(const char *device, char **devicep, char **image_namep, char **data_typep);

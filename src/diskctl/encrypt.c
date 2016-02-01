@@ -124,8 +124,7 @@ static int block_discard_range(FILE *f, uint64_t start, uint64_t len) {
         return 0;
 }
 
-int disk_encrypt_format_volume(const char *data_file,
-                          const char *image_name, const char *data_type) {
+int disk_encrypt_format_volume(const char *data_file, const char *image_name, const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset, size = 0;
         uint64_t key_size = 256;

@@ -132,7 +132,7 @@ static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, s
         return 0;
 };
 
-static int encrypt_setup_device(const char *device, const char *name,
+static int dm_setup_device(const char *device, const char *name,
                                 uint64_t offset, uint64_t size,
                                 const char *crypt_type, const char *key,
                                 char **devicep) {
@@ -202,7 +202,7 @@ static int encrypt_setup_device(const char *device, const char *name,
         return 0;
 }
 
-int disk_encrypt_setup_device(const char *device, char **devicep, char **data_typep) {
+int disk_encrypt_setup_device(const char *device, char **devicep, char **image_namep, char **data_typep) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset;
         uint64_t size;
@@ -221,10 +221,10 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **data_ty
         if (r < 0)
                 return r;
 
-        r = encrypt_setup_device(device, image_name,
-                                 offset, size,
-                                 crypt_type, key,
-                                 &dev);
+        r = dm_setup_device(device, image_name,
+                            offset, size,
+                            crypt_type, key,
+                            &dev);
         if (r < 0)
                 return r;
 
@@ -236,6 +236,11 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **data_ty
         if (data_typep) {
                 *data_typep = data_type;
                 data_type = NULL;
+        }
+
+        if (image_namep) {
+                *image_namep = image_name;
+                image_name = NULL;
         }
 
         return 0;

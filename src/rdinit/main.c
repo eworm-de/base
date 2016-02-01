@@ -332,16 +332,17 @@ static int manager_run(Manager *m) {
 
 static int mount_var(const char *device, const char *dir) {
         _c_cleanup_(c_freep) char *device_crypt = NULL;
+        _c_cleanup_(c_freep) char *image_name = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         int r;
 
-        r = disk_encrypt_setup_device(device, &device_crypt, &data_type);
+        r = disk_encrypt_setup_device(device, &device_crypt, &image_name, &data_type);
         if (r < 0) {
                 kmsg(LOG_ERR, "Unable to unlock data volume %s: %s", device, strerror(-r));
                 return r;
         }
 
-        kmsg(LOG_INFO, "Mounting data device %s (%s) at /var.", device_crypt, data_type);
+        kmsg(LOG_INFO, "Mounting %s device %s (%s) at /var.", image_name, device_crypt, data_type);
         if (mount(device_crypt, dir, data_type, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
                 return -errno;
 
