@@ -16,6 +16,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int disk_sign_format(const char *filename_in, const char *filename_out,
-                     const char *image_name, const char *data_type);
+int disk_sign_format(const char *filename_in,
+                     const char *filename_out,
+                     const char *image_name,
+                     const char *data_type);
+
 int disk_sign_print_info(const char *filename);

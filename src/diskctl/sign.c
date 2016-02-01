@@ -105,15 +105,21 @@ int disk_sign_format(const char *filename_data, const char *filename_image,
         uint64_t hash_block_size = 4096;
         uint64_t data_block_size = 4096;
         uint64_t salt_size = 256;
+        uint8_t signature[4096] = {};
         Bus1DiskSignHeader info = {
                 .meta.meta_uuid = BUS1_META_HEADER_UUID,
                 .meta.type_uuid = BUS1_DISK_SIGN_HEADER_UUID,
                 .meta.type_tag = "org.bus1.sign",
+
+                .data.offset = htole64(sizeof(info) + sizeof(signature)),
+
                 .hash.algorithm = "sha256",
                 .hash.digest_size = htole64(digest_size),
                 .hash.hash_block_size = htole64(hash_block_size),
                 .hash.data_block_size = htole64(data_block_size),
                 .hash.salt_size = htole64(salt_size),
+
+                .signature.offset = htole64(sizeof(info)),
         };
         uint64_t hashes_per_block;
         int r;
@@ -140,7 +146,8 @@ int disk_sign_format(const char *filename_data, const char *filename_image,
         if (!f_image)
                 return -errno;
 
-        if (fseeko(f_image, sizeof(Bus1DiskSignHeader), SEEK_SET) < 0)
+        /* Copy the data. */
+        if (fseeko(f_image, sizeof(info) + sizeof(signature), SEEK_SET) < 0)
                 return -errno;
 
         r = file_copy(f_data, f_image, NULL);
@@ -154,9 +161,10 @@ int disk_sign_format(const char *filename_data, const char *filename_image,
         if (r < 0)
                 return r;
 
-        info.data.offset = htole64(sizeof(Bus1DiskSignHeader));
         info.data.size = htole64(data_size);
-        info.hash.offset = htole64(sizeof(Bus1DiskSignHeader) + data_size);
+
+        /* Write the hash tree. */
+        info.hash.offset = htole64(sizeof(info) + sizeof(signature) + data_size);
 
         if (getrandom(info.hash.salt, info.hash.salt_size / 8, GRND_NONBLOCK) < 0)
                 return -errno;
@@ -165,10 +173,10 @@ int disk_sign_format(const char *filename_data, const char *filename_image,
                              info.hash.algorithm,
                              digest_size / 8,
                              data_block_size,
-                             sizeof(Bus1DiskSignHeader) / data_block_size,
+                             (sizeof(info) + sizeof(signature)) / data_block_size,
                              data_size / data_block_size,
                              hash_block_size,
-                             (sizeof(Bus1DiskSignHeader) + data_size) / hash_block_size,
+                             (sizeof(info) + sizeof(signature) + data_size) / hash_block_size,
                              info.hash.salt,
                              salt_size / 8,
                              info.hash.root_hash,
@@ -177,6 +185,13 @@ int disk_sign_format(const char *filename_data, const char *filename_image,
                 return r;
 
         info.hash.size = htole64(hash_size);
+
+        /* Write the header signature. */
+        if (fseeko(f_image, sizeof(info), SEEK_SET) < 0)
+                return -errno;
+
+        if (fwrite(&signature, sizeof(signature), 1, f_image) != 1)
+                return -EIO;
 
         if (fseeko(f_image, 0, SEEK_SET) < 0)
                 return -errno;

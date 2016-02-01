@@ -70,6 +70,7 @@ typedef union {
                 } hash;
 
                 struct {
+                        uint64_t offset;                /* Absolute offset of signature in bytes */
                         uint64_t size;                  /* Size of signature in bytes */
                         char signature_type[64];        /* Type of signature */
                 } signature;
