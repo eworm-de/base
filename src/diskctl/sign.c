@@ -52,8 +52,6 @@ int disk_sign_print_info(const char *filename) {
         if (!f)
                 return -errno;
 
-        setvbuf(f, NULL, _IONBF, 0);
-
         r = disk_sign_get_info(f,
                                 &image_type,
                                 &image_name,

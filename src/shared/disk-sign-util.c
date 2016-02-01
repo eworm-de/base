@@ -165,23 +165,23 @@ static int dm_setup_device(const char *device,
 int disk_sign_get_info(FILE *f,
                        char **image_typep,
                        char **image_namep,
-                       uint8_t *image_uuid,
+                       uint8_t *image_uuidp,
                        char **data_typep,
-                       uint64_t *data_offset,
-                       uint64_t *data_size,
-                       uint64_t *hash_offset,
-                       uint64_t *hash_size,
+                       uint64_t *data_offsetp,
+                       uint64_t *data_sizep,
+                       uint64_t *hash_offsetp,
+                       uint64_t *hash_sizep,
                        char **hash_algorithmp,
-                       uint64_t *hash_digest_size,
-                       uint64_t *hash_block_size,
-                       uint64_t *data_block_size,
+                       uint64_t *hash_digest_sizep,
+                       uint64_t *hash_block_sizep,
+                       uint64_t *data_block_sizep,
                        char **saltp,
                        char **root_hashp) {
         Bus1DiskSignHeader info;
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
         static const char info_uuid[] = BUS1_DISK_SIGN_HEADER_UUID;
-        _c_cleanup_(c_freep) char *type = NULL;
-        _c_cleanup_(c_freep) char *name = NULL;
+        _c_cleanup_(c_freep) char *image_type = NULL;
+        _c_cleanup_(c_freep) char *image_name = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *algorithm = NULL;
         _c_cleanup_(c_freep) char *salt_str = NULL;
@@ -201,12 +201,12 @@ int disk_sign_get_info(FILE *f,
         if (memcmp(info.meta.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
 
-        type = strdup(info.meta.type_tag);
-        if (!type)
+        image_type = strdup(info.meta.type_tag);
+        if (!image_type)
                 return -ENOMEM;
 
-        name = strdup(info.meta.object_label);
-        if (!name)
+        image_name = strdup(info.meta.object_label);
+        if (!image_name)
                 return -ENOMEM;
 
         data_type = strdup(info.data.type);
@@ -214,7 +214,7 @@ int disk_sign_get_info(FILE *f,
                 return -ENOMEM;
 
         algorithm = strdup(info.hash.algorithm);
-        if (!name)
+        if (!algorithm)
                 return -ENOMEM;
 
         l = le64toh(info.hash.salt_size) / 8;
@@ -234,48 +234,48 @@ int disk_sign_get_info(FILE *f,
                 return r;
 
         if (image_typep) {
-                *image_typep = type;
-                type = NULL;
+                *image_typep = image_type;
+                image_type = NULL;
         }
 
         if (image_namep) {
-                *image_namep = name;
-                name = NULL;
+                *image_namep = image_name;
+                image_name = NULL;
         }
 
-        if (image_uuid)
-                memcpy(image_uuid, info.meta.object_uuid, 16);
+        if (image_uuidp)
+                memcpy(image_uuidp, info.meta.object_uuid, 16);
 
         if (data_typep) {
                 *data_typep = data_type;
                 data_type = NULL;
         }
 
-        if (data_offset)
-                *data_offset = le64toh(info.data.offset);
+        if (data_offsetp)
+                *data_offsetp = le64toh(info.data.offset);
 
-        if (data_size)
-                *data_size = le64toh(info.data.size);
+        if (data_sizep)
+                *data_sizep = le64toh(info.data.size);
 
-        if (hash_offset)
-                *hash_offset = le64toh(info.hash.offset);
+        if (hash_offsetp)
+                *hash_offsetp = le64toh(info.hash.offset);
 
-        if (hash_size)
-                *hash_size = le64toh(info.hash.size);
+        if (hash_sizep)
+                *hash_sizep = le64toh(info.hash.size);
 
         if (hash_algorithmp) {
                 *hash_algorithmp = algorithm;
                 algorithm = NULL;
         }
 
-        if (hash_digest_size)
-                *hash_digest_size = le64toh(info.hash.digest_size);
+        if (hash_digest_sizep)
+                *hash_digest_sizep = le64toh(info.hash.digest_size);
 
-        if (hash_block_size)
-                *hash_block_size = le64toh(info.hash.hash_block_size);
+        if (hash_block_sizep)
+                *hash_block_sizep = le64toh(info.hash.hash_block_size);
 
-        if (data_block_size)
-                *data_block_size = le64toh(info.hash.data_block_size);
+        if (data_block_sizep)
+                *data_block_sizep = le64toh(info.hash.data_block_size);
 
         if (saltp) {
                 *saltp = salt_str;

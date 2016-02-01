@@ -16,10 +16,20 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int encrypt_get_info(FILE *f,
-                     char **image_namep,
-                     uint64_t *offsetp, uint64_t *sizep,
-                     char **crypt_typep, char **data_typep,
-                     char **keyp);
+int disk_encrypt_get_info(FILE *f,
+                          char **image_typep,
+                          char **image_namep,
+                          uint8_t *image_uuidp,
+                          char **data_typep,
+                          uint64_t *data_offsetp,
+                          uint64_t *data_sizep,
+                          char **encryptionp,
+                          uint64_t *key_sizep,
+                          uint64_t *n_key_slotsp,
+                          uint8_t *key_type_uuidp,
+                          char **keyp);
 
-int disk_encrypt_setup_device(const char *device, char **devicep, char **image_namep, char **data_typep);
+int disk_encrypt_setup_device(const char *device,
+                              char **devicep,
+                              char **image_namep,
+                              char **data_typep);

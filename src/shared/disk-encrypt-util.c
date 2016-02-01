@@ -26,19 +26,27 @@
 #include "file-util.h"
 #include "string-util.h"
 
-int encrypt_get_info(FILE *f,
-                     char **image_namep,
-                     uint64_t *offsetp, uint64_t *sizep,
-                     char **crypt_typep, char **data_typep,
-                     char **keyp) {
+int disk_encrypt_get_info(FILE *f,
+                          char **image_typep,
+                          char **image_namep,
+                          uint8_t *image_uuidp,
+                          char **data_typep,
+                          uint64_t *data_offsetp,
+                          uint64_t *data_sizep,
+                          char **encryptionp,
+                          uint64_t *key_sizep,
+                          uint64_t *n_key_slotsp,
+                          uint8_t *key_type_uuidp,
+                          char **keyp) {
         Bus1DiskEncryptHeader info;
         Bus1DiskEncryptKeySlot keys[8];
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
         static const char info_uuid[] = BUS1_DISK_ENCRYPT_HEADER_UUID;
         static const char key_null_uuid[] = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID;
+        _c_cleanup_(c_freep) char *image_type = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
-        _c_cleanup_(c_freep) char *crypt_type = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
+        _c_cleanup_(c_freep) char *encryption = NULL;
         _c_cleanup_(c_freep) char *key = NULL;
         uint64_t size;
         int r;
@@ -65,11 +73,19 @@ int encrypt_get_info(FILE *f,
         if (le64toh(info.key.size) > 4096)
                 return -EINVAL;
 
+        image_type = strdup(info.meta.type_tag);
+        if (!image_type)
+                return -ENOMEM;
+
         image_name = strdup(info.meta.object_label);
         if (!image_name)
                 return -ENOMEM;
 
-        if (asprintf(&crypt_type, "%s-%s-%-s", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode) < 0)
+        data_type = strdup(info.data.type);
+        if (!data_type)
+                return -ENOMEM;
+
+        if (asprintf(&encryption, "%s-%s-%-s", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode) < 0)
                 return -ENOMEM;
 
         data_type = strdup(info.data.type);
@@ -86,23 +102,43 @@ int encrypt_get_info(FILE *f,
         if (r < 0)
                 return r;
 
+        if (image_typep) {
+                *image_typep = image_type;
+                image_type = NULL;
+        }
+
         if (image_namep) {
                 *image_namep = image_name;
                 image_name = NULL;
         }
 
-        if (crypt_typep) {
-                *crypt_typep = crypt_type;
-                crypt_type = NULL;
-        }
+        if (image_uuidp)
+                memcpy(image_uuidp, info.meta.object_uuid, 16);
 
         if (data_typep) {
                 *data_typep = data_type;
                 data_type = NULL;
         }
 
-        *offsetp = le64toh(info.data.offset);
-        *sizep = le64toh(info.data.size);
+        if (data_offsetp)
+                *data_offsetp = le64toh(info.data.offset);
+
+        if (data_sizep)
+                *data_sizep = le64toh(info.data.size);
+
+        if (encryptionp) {
+                *encryptionp = encryption;
+                encryption = NULL;
+        }
+
+        if (key_sizep)
+                *key_sizep = le64toh(info.key.size);
+
+        if (n_key_slotsp)
+                *n_key_slotsp = le64toh(info.key.n_slots);
+
+        if (key_type_uuidp)
+                memcpy(key_type_uuidp, keys[0].type_uuid, 16);
 
         if (keyp) {
                 *keyp = key;
@@ -207,7 +243,7 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         uint64_t offset;
         uint64_t size;
         _c_cleanup_(c_freep) char *image_name = NULL;
-        _c_cleanup_(c_freep) char *crypt_type = NULL;
+        _c_cleanup_(c_freep) char *encryption = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *key = NULL;
         _c_cleanup_(c_freep) char *dev = NULL;
@@ -217,13 +253,27 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         if (!f)
                 return -errno;
 
-        r = encrypt_get_info(f, &image_name, &offset, &size, &crypt_type, &data_type, &key);
+        r = disk_encrypt_get_info(f,
+                                  NULL,
+                                  &image_name,
+                                  NULL,
+                                  &data_type,
+                                  &offset,
+                                  &size,
+                                  &encryption,
+                                  NULL,
+                                  NULL,
+                                  NULL,
+                                  &key);
         if (r < 0)
                 return r;
 
-        r = dm_setup_device(device, image_name,
-                            offset, size,
-                            crypt_type, key,
+        r = dm_setup_device(device,
+                            image_name,
+                            offset,
+                            size,
+                            encryption,
+                            key,
                             &dev);
         if (r < 0)
                 return r;

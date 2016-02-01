@@ -22,6 +22,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
+#include "disk-encrypt-util.h"
 #include "encrypt.h"
 #include "file-util.h"
 #include "missing.h"
@@ -32,74 +33,63 @@
 #define BLKDISCARD _IO(0x12,119)
 #endif
 
-//FIXME: extend and use disk_encrypt_get_info()
 int disk_encrypt_print_info(const char *data) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
-        uint64_t size;
-        Bus1DiskEncryptHeader info;
-        Bus1DiskEncryptKeySlot keys[8];
-        static const char meta_uuid[] = BUS1_META_HEADER_UUID;
-        static const char encrypt_uuid[] = BUS1_DISK_ENCRYPT_HEADER_UUID;
-        static const char key_null_uuid[] = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID;
-        _c_cleanup_(c_freep) char *uuid = NULL;
-        unsigned int i;
+        _c_cleanup_(c_freep) char *image_type = NULL;
+        _c_cleanup_(c_freep) char *image_name = NULL;
+        uint8_t image_uuid[16];
+        _c_cleanup_(c_freep) char *image_uuid_str = NULL;
+        _c_cleanup_(c_freep) char *data_type = NULL;
+        uint64_t data_offset;
+        uint64_t data_size;
+        _c_cleanup_(c_freep) char *encryption = NULL;
+        uint64_t key_size;
+        uint64_t n_key_slots;
+        uint8_t key_type_uuid[16];
+        _c_cleanup_(c_freep) char *key_type_uuid_str = NULL;
+        _c_cleanup_(c_freep) char *key = NULL;
         int r;
 
         f = fopen(data, "re");
         if (!f)
                 return -errno;
 
-        setvbuf(f, NULL, _IONBF, 0);
-
-        r = file_get_size(f, &size);
+        r = disk_encrypt_get_info(f,
+                                  &image_type,
+                                  &image_name,
+                                  image_uuid,
+                                  &data_type,
+                                  &data_offset,
+                                  &data_size,
+                                  &encryption,
+                                  &key_size,
+                                  &n_key_slots,
+                                  key_type_uuid,
+                                  &key);
         if (r < 0)
                 return r;
 
-        if (size <= sizeof(info) + sizeof(keys))
-                return -EINVAL;
+        r = uuid_to_string(image_uuid, &image_uuid_str);
+        if (r < 0)
+                return r;
 
-        if (fread(&info, sizeof(info), 1, f) != 1)
-                return -EIO;
-
-        if (fread(&keys, sizeof(keys), 1, f) != 1)
-                return -EIO;
-
-        if (memcmp(info.meta.meta_uuid, meta_uuid, sizeof(meta_uuid)) != 0)
-                return -EINVAL;
-
-        if (memcmp(info.meta.type_uuid, encrypt_uuid, sizeof(encrypt_uuid)) != 0)
-                return -EINVAL;
-
-        r = uuid_to_string(info.meta.object_uuid, &uuid);
+        r = uuid_to_string(key_type_uuid, &key_type_uuid_str);
         if (r < 0)
                 return r;
 
         printf("====================================================================================\n");
         printf("Info for:           %s\n", data);
-        printf("Image type:         %s\n", info.meta.type_tag);
-        printf("Image name:         %s\n", info.meta.object_label);
-        printf("Image UUID:         %s\n", uuid);
-        printf("Data type:          %s\n", info.data.type);
-        printf("Data offset:        %" PRIu64 " bytes\n", le64toh(info.data.offset));
-        printf("Data size:          %" PRIu64 " bytes\n", le64toh(info.data.size));
-        printf("Encryption:         %s-%s-%s\n", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode);
-        printf("Key size:           %" PRIu64 " bits\n", le64toh(info.key.size));
-        printf("Key slots:          %" PRIu64 "\n", le64toh(info.key.n_slots));
-
-        for (i = 0; i < le64toh(info.key.n_slots); i++) {
-                if (memcmp(keys[i].type_uuid, key_null_uuid, 16) == 0) {
-                        _c_cleanup_(c_freep) char *key_str = NULL;
-
-                        r = bytes_to_hexstr(keys[i].key, le64toh(info.key.size) / 8, &key_str);
-                        if (r < 0)
-                                return r;
-
-                        printf("Key[%02d] type:       clear\n", i);
-                        printf("Key[%02d] key:        %s\n", i, key_str);
-                        printf("Key[%02d] encryption: %s\n", i, keys[i].clear.encryption);
-                }
-        }
-
+        printf("Image type:         %s\n", image_type);
+        printf("Image name:         %s\n", image_name);
+        printf("Image UUID:         %s\n", image_uuid_str);
+        printf("Data type:          %s\n", data_type);
+        printf("Data offset:        %" PRIu64 " bytes\n", data_offset);
+        printf("Data size:          %" PRIu64 " bytes\n", data_size);
+        printf("Encryption:         %s\n", encryption);
+        printf("Key size:           %" PRIu64 " bits\n", key_size);
+        printf("Key slots:          %" PRIu64 "\n", n_key_slots);
+        printf("Key[00] type:       %s\n", key_type_uuid_str);
+        printf("Key[00] key:        %s\n", key);
         printf("====================================================================================\n");
 
         return 0;
