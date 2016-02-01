@@ -633,12 +633,7 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        if (mkdir("/sysroot", 0755) < 0) {
-                r = -errno;
-                goto fail;
-        }
-
-        r = tmpfs_root("/sysroot");
+        r = tmpfs_root("/tmp");
         if (r < 0)
                 goto fail;
 
@@ -657,33 +652,33 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        if (mkdir("/sysroot/boot", 0755) < 0 && errno != EEXIST)
+        if (mkdir("/tmp/boot", 0755) < 0)
                 goto fail;
 
         kmsg(LOG_INFO, "Mounting boot device %s at /boot.", m->device_boot);
-        r = mount_boot(m->device_boot, "/sysroot/boot", 0);
+        r = mount_boot(m->device_boot, "/tmp/boot", 0);
         if (r < 0)
                 return r;
 
-        if (asprintf(&image, "/sysroot/boot%s/%s.img", m->loader_dir ?: "", release) < 0) {
+        if (asprintf(&image, "/tmp/boot%s/%s.img", m->loader_dir ?: "", release) < 0) {
                 r = -ENOMEM;
                 goto fail;
         }
 
         kmsg(LOG_INFO, "Setting up cryptographic integrity validation of system image %s.img.", release);
-        r = mount_usr(image, "/sysroot/usr");
+        r = mount_usr(image, "/tmp/usr");
         if (r < 0) {
                 kmsg(LOG_EMERG, "Unable to mount system image %s: %s.", image, strerror(-r));
                 goto fail;
         }
 
-        if (mount("/sysroot/usr/etc", "/sysroot/etc", NULL, MS_BIND, NULL) < 0) {
+        if (mount("/tmp/usr/etc", "/tmp/etc", NULL, MS_BIND, NULL) < 0) {
                 r = -errno;
                 goto fail;
         }
 
         kmsg(LOG_INFO, "Setting up decryption of data volume %s.", m->device_data);
-        r = mount_var(m->device_data, "/sysroot/var");
+        r = mount_var(m->device_data, "/tmp/var");
         if (r < 0)
                 goto fail;
 
@@ -701,7 +696,7 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = switch_root("/sysroot");
+        r = switch_root("/tmp");
         if (r < 0)
                 goto fail;
 

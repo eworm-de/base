@@ -109,7 +109,13 @@ int service_activate(Service *s) {
                 if (asprintf(&datadir, "/var/bus1/%s", s->name) < 0)
                         return -ENOMEM;
 
-                if (mkdir(datadir, 0755) < 0 && errno != EEXIST)
+                if (mkdir(datadir, 0770) < 0 && errno != EEXIST)
+                        return -errno;
+
+                if (chown(datadir, s->uid, s->gid) < 0)
+                        return -errno;
+
+                if (chmod(datadir, 0770) < 0)
                         return -errno;
         }
 
