@@ -18,8 +18,10 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 
-#include "sign.h"
+#include "disk-encrypt-util.h"
+#include "disk-sign-util.h"
 #include "encrypt.h"
+#include "sign.h"
 
 int main(int argc, char **argv) {
         const char *verb = argv[1];
@@ -44,7 +46,7 @@ int main(int argc, char **argv) {
                         const char *filename_in = argv[4];
                         const char *filename_out = argv[5];
 
-                        r = disk_sign_write(filename_in, filename_out, name, type);
+                        r = disk_sign_format(filename_in, filename_out, name, type);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename_out, strerror(-r));
                                 return EXIT_FAILURE;
@@ -63,7 +65,7 @@ int main(int argc, char **argv) {
                 if (argc == 3) {
                         const char *filename = argv[2];
 
-                        if (encrypt_print_info(filename) < 0)
+                        if (disk_encrypt_print_info(filename) < 0)
                                 return EXIT_FAILURE;
 
                         return EXIT_SUCCESS;
@@ -74,27 +76,48 @@ int main(int argc, char **argv) {
                         const char *type = argv[3];
                         const char *filename = argv[4];
 
-                        if (encrypt_print_info(filename) >= 0)
+                        if (disk_encrypt_print_info(filename) >= 0)
                                 return EXIT_SUCCESS;
 
-                        r = encrypt_setup_volume(filename, name, type);
+                        r = disk_encrypt_format_volume(filename, name, type);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename, strerror(-r));
                                 return EXIT_FAILURE;
                         }
 
-                        if (encrypt_print_info(filename) < 0)
+                        if (disk_encrypt_print_info(filename) < 0)
                                 return EXIT_FAILURE;
 
                         return EXIT_SUCCESS;
                 }
+        } else if (strcmp(verb, "setup") == 0) {
+                if (argc == 3) {
+                        const char *filename = argv[2];
+                        _c_cleanup_(c_freep) char *device = NULL;
+                        _c_cleanup_(c_freep) char *data_type = NULL;
 
-                fprintf(stderr, "Usage: %s encrypt <name> <type> <device>\n", program_invocation_short_name);
+                        r = disk_sign_setup_device(filename, &device, &data_type);
+                        if (r >= 0) {
+                                printf("Attached signed image %s to device %s.", data_type, device);
+                                return EXIT_SUCCESS;
+                        }
+
+                        r = disk_encrypt_setup_device(filename, &device, &data_type);
+                        if (r >= 0) {
+                                printf("Attached encrypted image %s to device %s.", data_type, device);
+                                return EXIT_SUCCESS;
+                        }
+
+                        fprintf(stderr, "Unable to set up image %s\n", filename);
+                        return EXIT_FAILURE;
+                }
+
+                fprintf(stderr, "Usage: %s setup <image>\n", program_invocation_short_name);
                 return EXIT_FAILURE;
         }
 
 fail:
-        fprintf(stderr, "Usage: %s sign|encrypt [OPTIONS]\n", program_invocation_short_name);
+        fprintf(stderr, "Usage: %s sign|encrypt|setup [OPTIONS]\n", program_invocation_short_name);
 
         return EXIT_FAILURE;
 }

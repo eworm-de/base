@@ -84,16 +84,16 @@ static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, s
         return 0;
 };
 
-static int disk_sign_setup_device(const char *device,
-                                  const char *name,
-                                  uint64_t data_size,
-                                  uint64_t hash_offset,
-                                  unsigned int data_block_size,
-                                  unsigned int hash_block_size,
-                                  const char *hash_name,
-                                  const char *salt,
-                                  const char *root_hash,
-                                  char **map_device) {
+static int dm_setup_device(const char *device,
+                           const char *name,
+                           uint64_t data_size,
+                           uint64_t hash_offset,
+                           unsigned int data_block_size,
+                           unsigned int hash_block_size,
+                           const char *hash_name,
+                           const char *salt,
+                           const char *root_hash,
+                           char **map_device) {
         _c_cleanup_(c_freep) struct dm_ioctl *io = NULL;
         _c_cleanup_(c_closep) int fd = -1;
         uint64_t dm_dev;
@@ -163,6 +163,7 @@ static int disk_sign_setup_device(const char *device,
 }
 
 int disk_sign_get_info(FILE *f,
+                       char **image_typep,
                        char **image_namep,
                        uint8_t *image_uuid,
                        char **data_typep,
@@ -179,6 +180,7 @@ int disk_sign_get_info(FILE *f,
         Bus1DiskSignHeader info;
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
         static const char info_uuid[] = BUS1_DISK_SIGN_HEADER_UUID;
+        _c_cleanup_(c_freep) char *type = NULL;
         _c_cleanup_(c_freep) char *name = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *algorithm = NULL;
@@ -198,6 +200,10 @@ int disk_sign_get_info(FILE *f,
 
         if (memcmp(info.meta.type_uuid, info_uuid, sizeof(info_uuid)) != 0)
                 return -EINVAL;
+
+        type = strdup(info.meta.type_tag);
+        if (!type)
+                return -ENOMEM;
 
         name = strdup(info.meta.object_label);
         if (!name)
@@ -226,6 +232,11 @@ int disk_sign_get_info(FILE *f,
         r = bytes_to_hexstr(info.hash.root_hash, l, &hash_str);
         if (r < 0)
                 return r;
+
+        if (image_typep) {
+                *image_typep = type;
+                type = NULL;
+        }
 
         if (image_namep) {
                 *image_namep = name;
@@ -279,7 +290,7 @@ int disk_sign_get_info(FILE *f,
         return 0;
 }
 
-int disk_sign_setup(const char *image, char **devicep, char **image_typep) {
+int disk_sign_setup_device(const char *image, char **devicep, char **image_typep) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
         _c_cleanup_(c_freep) char *image_type = NULL;
@@ -301,19 +312,20 @@ int disk_sign_setup(const char *image, char **devicep, char **image_typep) {
                 return -errno;
 
         r = disk_sign_get_info(f,
-                                &image_name,
-                                NULL,
-                                &image_type,
-                                &data_offset,
-                                &data_size,
-                                &hash_offset,
-                                NULL,
-                                &hash_algorithm,
-                                &hash_digest_size,
-                                &hash_block_size,
-                                &data_block_size,
-                                &salt,
-                                &root_hash);
+                               NULL,
+                               &image_name,
+                               NULL,
+                               &image_type,
+                               &data_offset,
+                               &data_size,
+                               &hash_offset,
+                               NULL,
+                               &hash_algorithm,
+                               &hash_digest_size,
+                               &hash_block_size,
+                               &data_block_size,
+                               &salt,
+                               &root_hash);
         if (r < 0)
                 return r;
 
@@ -330,16 +342,16 @@ int disk_sign_setup(const char *image, char **devicep, char **image_typep) {
         if (r < 0)
                 return r;
 
-        r = disk_sign_setup_device(loopdev,
-                                   image_name,
-                                   data_size,
-                                   hash_offset - data_offset,
-                                   hash_block_size,
-                                   data_block_size,
-                                   hash_algorithm,
-                                   salt,
-                                   root_hash,
-                                   &device);
+        r = dm_setup_device(loopdev,
+                            image_name,
+                            data_size,
+                            hash_offset - data_offset,
+                            hash_block_size,
+                            data_block_size,
+                            hash_algorithm,
+                            salt,
+                            root_hash,
+                            &device);
         if (r < 0)
                 return r;
 

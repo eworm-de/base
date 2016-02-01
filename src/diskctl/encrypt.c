@@ -24,19 +24,25 @@
 
 #include "encrypt.h"
 #include "file-util.h"
+#include "missing.h"
+#include "string-util.h"
 #include "uuid-util.h"
 
 #ifndef BLKDISCARD
 #define BLKDISCARD _IO(0x12,119)
 #endif
 
-int encrypt_print_info(const char *data) {
+//FIXME: extend and use disk_encrypt_get_info()
+int disk_encrypt_print_info(const char *data) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t size;
         Bus1DiskEncryptHeader info;
+        Bus1DiskEncryptKeySlot keys[8];
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
         static const char encrypt_uuid[] = BUS1_DISK_ENCRYPT_HEADER_UUID;
+        static const char key_null_uuid[] = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID;
         _c_cleanup_(c_freep) char *uuid = NULL;
+        unsigned int i;
         int r;
 
         f = fopen(data, "re");
@@ -49,10 +55,13 @@ int encrypt_print_info(const char *data) {
         if (r < 0)
                 return r;
 
-        if (size <= (off_t)sizeof(Bus1DiskEncryptHeader))
+        if (size <= sizeof(info) + sizeof(keys))
                 return -EINVAL;
 
         if (fread(&info, sizeof(info), 1, f) != 1)
+                return -EIO;
+
+        if (fread(&keys, sizeof(keys), 1, f) != 1)
                 return -EIO;
 
         if (memcmp(info.meta.meta_uuid, meta_uuid, sizeof(meta_uuid)) != 0)
@@ -65,15 +74,33 @@ int encrypt_print_info(const char *data) {
         if (r < 0)
                 return r;
 
-        printf("=================================================\n");
-        printf("Info for:    %s\n", data);
-        printf("Image Name:  %s\n", info.meta.object_label);
-        printf("Image UUID:  %s\n", uuid);
-        printf("Data type:   %s\n", info.data.type);
-        printf("Data offset: %" PRIu64 " bytes\n", le64toh(info.data.offset));
-        printf("Data size:   %" PRIu64 " bytes\n", le64toh(info.data.size));
-        printf("Encryption:  %s-%s-%s\n", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode);
-        printf("=================================================\n");
+        printf("====================================================================================\n");
+        printf("Info for:           %s\n", data);
+        printf("Image type:         %s\n", info.meta.type_tag);
+        printf("Image name:         %s\n", info.meta.object_label);
+        printf("Image UUID:         %s\n", uuid);
+        printf("Data type:          %s\n", info.data.type);
+        printf("Data offset:        %" PRIu64 " bytes\n", le64toh(info.data.offset));
+        printf("Data size:          %" PRIu64 " bytes\n", le64toh(info.data.size));
+        printf("Encryption:         %s-%s-%s\n", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode);
+        printf("Key size:           %" PRIu64 " bits\n", le64toh(info.key.size));
+        printf("Key slots:          %" PRIu64 "\n", le64toh(info.key.n_slots));
+
+        for (i = 0; i < le64toh(info.key.n_slots); i++) {
+                if (memcmp(keys[i].type_uuid, key_null_uuid, 16) == 0) {
+                        _c_cleanup_(c_freep) char *key_str = NULL;
+
+                        r = bytes_to_hexstr(keys[i].key, le64toh(info.key.size) / 8, &key_str);
+                        if (r < 0)
+                                return r;
+
+                        printf("Key[%02d] type:       clear\n", i);
+                        printf("Key[%02d] key:        %s\n", i, key_str);
+                        printf("Key[%02d] encryption: %s\n", i, keys[i].clear.encryption);
+                }
+        }
+
+        printf("====================================================================================\n");
 
         return 0;
 }
@@ -97,12 +124,17 @@ static int block_discard_range(FILE *f, uint64_t start, uint64_t len) {
         return 0;
 }
 
-#define ENCRYPT_HEADER_SPACE 4096
-
-int encrypt_setup_volume(const char *data_file,
-                         const char *image_name, const char *data_type) {
+int disk_encrypt_format_volume(const char *data_file,
+                          const char *image_name, const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset, size = 0;
+        uint64_t key_size = 256;
+        Bus1DiskEncryptKeySlot keys[8] = {
+                {
+                        .type_uuid = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID,
+                        .clear.encryption = "fixme",
+                },
+        };
         Bus1DiskEncryptHeader info = {
                 .meta.meta_uuid = BUS1_META_HEADER_UUID,
                 .meta.type_uuid = BUS1_DISK_ENCRYPT_HEADER_UUID,
@@ -110,13 +142,14 @@ int encrypt_setup_volume(const char *data_file,
                 .encrypt.cypher = "aes",
                 .encrypt.chain_mode = "xts",
                 .encrypt.iv_mode = "plain64",
+                .key.size = htole64(key_size),
+                .key.n_slots = htole64(C_ARRAY_SIZE(keys)),
         };
         int r;
 
         assert(data_file);
         assert(image_name);
         assert(data_type);
-        assert(sizeof(Bus1DiskEncryptHeader) < ENCRYPT_HEADER_SPACE);
 
         strncpy(info.meta.object_label, image_name, sizeof(info.meta.object_label) - 1);
         strncpy(info.data.type, data_type, sizeof(info.data.type) - 1);
@@ -136,12 +169,19 @@ int encrypt_setup_volume(const char *data_file,
         block_discard_range(f, 0, size);
 
         size -= size  % 4096;
-        offset = ENCRYPT_HEADER_SPACE;
+        offset = sizeof(info) + sizeof(keys);
 
         info.data.offset = htole64(offset);
         info.data.size = htole64(size - offset);
 
+        /* FIXME: use Authenticated Encryption method also for NULL key */
+        if (getrandom(keys[0].key, key_size / 8, GRND_NONBLOCK) < 0)
+                return -errno;
+
         if (fwrite(&info, sizeof(info), 1, f) != 1)
+                return -EIO;
+
+        if (fwrite(&keys, sizeof(keys), 1, f) != 1)
                 return -EIO;
 
         if (fflush(f) < 0)

@@ -33,6 +33,7 @@
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
+#include "disk-encrypt-util.h"
 #include "disk-sign-util.h"
 #include "file-util.h"
 #include "kmsg-util.h"
@@ -42,7 +43,6 @@
 #include "tmpfs-root-util.h"
 #include "uuid-util.h"
 
-#include "disk-encrypt.h"
 #include "disk-gpt.h"
 #include "sysctl.h"
 
@@ -330,12 +330,12 @@ static int manager_run(Manager *m) {
         return -ENODEV;
 }
 
-static int mount_var(const char *device, const char *dir, const char *key) {
+static int mount_var(const char *device, const char *dir) {
         _c_cleanup_(c_freep) char *device_crypt = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         int r;
 
-        r = disk_encrypt_setup(device, key, &device_crypt, &data_type);
+        r = disk_encrypt_setup_device(device, &device_crypt, &data_type);
         if (r < 0) {
                 kmsg(LOG_ERR, "Unable to unlock data volume %s: %s", device, strerror(-r));
                 return r;
@@ -353,7 +353,7 @@ static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_freep) char *data_type = NULL;
         int r;
 
-        r = disk_sign_setup(image, &device, &data_type);
+        r = disk_sign_setup_device(image, &device, &data_type);
         if (r < 0)
                 return r;
 
@@ -563,8 +563,6 @@ int main(int argc, char **argv) {
         _c_cleanup_(c_freep) char *release = NULL;
         bool shell = false;
         _c_cleanup_(c_freep) char *image = NULL;
-        _c_cleanup_(c_freep) char *key_file = NULL;
-        _c_cleanup_(c_freep) char *key = NULL;
         _c_cleanup_(c_freep) char *init = NULL;
         struct timezone tz = {};
         const char *init_argv[] = {
@@ -683,18 +681,8 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
-        if (asprintf(&key_file, "/sysroot/boot%s/vendor-key.txt", m->loader_dir ?: "") < 0) {
-                r = -ENOMEM;
-                goto fail;
-        }
-
-        kmsg(LOG_INFO, "Reading data volume decryption key vendor-key.txt from boot volume.");
-        r = file_read_line(key_file, &key);
-        if (r < 0)
-                goto fail;
-
         kmsg(LOG_INFO, "Setting up decryption of data volume %s.", m->device_data);
-        r = mount_var(m->device_data, "/sysroot/var", key);
+        r = mount_var(m->device_data, "/sysroot/var");
         if (r < 0)
                 goto fail;
 

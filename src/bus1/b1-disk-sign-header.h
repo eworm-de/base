@@ -32,38 +32,48 @@
   |                                                    |
   ------------------------------------------------------
 
+  The image header is 4096 bytes in size.
+
+  The signature storage follows the header. The size of the
+  signature is a multipe of 4096 bytes.
+
+  The byte-order is little-endian.
+
  */
 
 #include <bus1/b1-meta-header.h>
 
 #define BUS1_DISK_SIGN_HEADER_UUID { 0xb7, 0x46, 0xc4, 0xf5, 0xc3, 0xc4, 0x47, 0x37, 0x8a, 0x4c, 0x54, 0xbe, 0xe4, 0x75, 0x69, 0x2a }
 
-typedef struct {
-        Bus1MetaHeader meta;
-
+typedef union {
         struct {
-                uint64_t offset;                /* Absolute offset of filesystem image in bytes */
-                uint64_t size;                  /* Size of filesystem image in bytes */
-                char type[64];                  /* Data type / filesystem format */
-        } data;
+                Bus1MetaHeader meta;
 
-        struct {
-                uint64_t offset;                /* Absolute offset of hash tree blocks in bytes */
-                uint64_t size;                  /* Size of hash tree blocks in bytes */
-                char algorithm[32];             /* Hash algorithm used to create hash blocks */
-                uint64_t digest_size;           /* Size of hash digest in bits */
-                uint64_t hash_block_size;       /* Hash block size in bits */
-                uint64_t data_block_size;       /* Input block size in bits */
+                struct {
+                        uint64_t offset;                /* Absolute offset of filesystem image in bytes */
+                        uint64_t size;                  /* Size of filesystem image in bytes */
+                        char type[64];                  /* Data type / filesystem format */
+                } data;
 
-                uint8_t salt[256];              /* Salt used while hashing input data */
-                uint64_t salt_size;             /* Size of salt in bits */
+                struct {
+                        uint64_t offset;                /* Absolute offset of hash tree blocks in bytes */
+                        uint64_t size;                  /* Size of hash tree blocks in bytes */
+                        char algorithm[32];             /* Hash algorithm used to create hash blocks */
+                        uint64_t digest_size;           /* Size of hash digest in bits */
+                        uint64_t hash_block_size;       /* Hash block size in bits */
+                        uint64_t data_block_size;       /* Input block size in bits */
 
-                uint8_t root_hash[256];         /* Root hash value to validate against */
-        } hash;
+                        uint8_t salt[256];              /* Salt used while hashing input data */
+                        uint64_t salt_size;             /* Size of salt in bits */
 
-        struct {
-                uint64_t offset;                /* Absolute offset of signature */
-                uint64_t size;                  /* Size of signature in bytes */
-                char signature_type[64];        /* Type of signature */
-        } signature;
+                        uint8_t root_hash[256];         /* Root hash value to validate against */
+                } hash;
+
+                struct {
+                        uint64_t size;                  /* Size of signature in bytes */
+                        char signature_type[64];        /* Type of signature */
+                } signature;
+        };
+
+        uint8_t bytes[4096];
 } Bus1DiskSignHeader;

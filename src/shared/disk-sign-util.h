@@ -17,6 +17,7 @@
 ***/
 
 int disk_sign_get_info(FILE *f,
+                       char **image_typep,
                        char **image_namep,
                        uint8_t *image_uuid,
                        char **data_typep,
@@ -31,6 +32,4 @@ int disk_sign_get_info(FILE *f,
                        char **saltp,
                        char **root_hashp);
 
-int disk_sign_setup(const char *image,
-                    char **devicep,
-                    char **data_typep);
+int disk_sign_setup_device(const char *image, char **devicep, char **data_typep);

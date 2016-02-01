@@ -32,6 +32,7 @@
 int disk_sign_print_info(const char *filename) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
+        _c_cleanup_(c_freep) char *image_type = NULL;
         uint8_t image_uuid[16];
         _c_cleanup_(c_freep) char *data_type = NULL;
         uint64_t data_offset;
@@ -54,6 +55,7 @@ int disk_sign_print_info(const char *filename) {
         setvbuf(f, NULL, _IONBF, 0);
 
         r = disk_sign_get_info(f,
+                                &image_type,
                                 &image_name,
                                 image_uuid,
                                 &data_type,
@@ -76,6 +78,7 @@ int disk_sign_print_info(const char *filename) {
 
         printf("==================================================================================\n");
         printf("Info for:         %s\n", filename);
+        printf("Image type:       %s\n", image_type);
         printf("Image Name:       %s\n", image_name);
         printf("Image UUID:       %s\n", uuid);
         printf("Data type:        %s\n", data_type);
@@ -94,10 +97,8 @@ int disk_sign_print_info(const char *filename) {
         return 0;
 }
 
-#define DISK_SIGN_HEADER_SPACE 4096
-
-int disk_sign_write(const char *filename_data, const char *filename_image,
-                const char *image_name, const char *data_type) {
+int disk_sign_format(const char *filename_data, const char *filename_image,
+                     const char *image_name, const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
         _c_cleanup_(c_fclosep) FILE *f_image = NULL;
         uint64_t digest_size = 256;
@@ -109,7 +110,7 @@ int disk_sign_write(const char *filename_data, const char *filename_image,
         Bus1DiskSignHeader info = {
                 .meta.meta_uuid = BUS1_META_HEADER_UUID,
                 .meta.type_uuid = BUS1_DISK_SIGN_HEADER_UUID,
-                .meta.type_tag = "org.bus1.image",
+                .meta.type_tag = "org.bus1.sign",
                 .hash.algorithm = "sha256",
                 .hash.digest_size = htole64(digest_size),
                 .hash.hash_block_size = htole64(hash_block_size),
@@ -123,7 +124,6 @@ int disk_sign_write(const char *filename_data, const char *filename_image,
         assert(filename_image);
         assert(image_name);
         assert(data_type);
-        assert(sizeof(Bus1DiskSignHeader) < DISK_SIGN_HEADER_SPACE);
 
         f_data = fopen(filename_data, "re");
         if (!f_data)
@@ -142,7 +142,7 @@ int disk_sign_write(const char *filename_data, const char *filename_image,
         if (!f_image)
                 return -errno;
 
-        if (fseeko(f_image, DISK_SIGN_HEADER_SPACE, SEEK_SET) < 0)
+        if (fseeko(f_image, sizeof(Bus1DiskSignHeader), SEEK_SET) < 0)
                 return -errno;
 
         r = file_copy(f_data, f_image, NULL);
@@ -156,9 +156,9 @@ int disk_sign_write(const char *filename_data, const char *filename_image,
         if (r < 0)
                 return r;
 
-        info.data.offset = htole64(DISK_SIGN_HEADER_SPACE);
+        info.data.offset = htole64(sizeof(Bus1DiskSignHeader));
         info.data.size = htole64(data_size);
-        info.hash.offset = htole64(DISK_SIGN_HEADER_SPACE + data_size);
+        info.hash.offset = htole64(sizeof(Bus1DiskSignHeader) + data_size);
 
         if (getrandom(info.hash.salt, info.hash.salt_size / 8, GRND_NONBLOCK) < 0)
                 return -errno;
@@ -167,10 +167,10 @@ int disk_sign_write(const char *filename_data, const char *filename_image,
                              info.hash.algorithm,
                              digest_size / 8,
                              data_block_size,
-                             DISK_SIGN_HEADER_SPACE / data_block_size,
+                             sizeof(Bus1DiskSignHeader) / data_block_size,
                              data_size / data_block_size,
                              hash_block_size,
-                             (DISK_SIGN_HEADER_SPACE + data_size) / hash_block_size,
+                             (sizeof(Bus1DiskSignHeader) + data_size) / hash_block_size,
                              info.hash.salt,
                              salt_size / 8,
                              info.hash.root_hash,

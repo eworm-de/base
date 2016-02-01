@@ -40,6 +40,8 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
+	src/shared/disk-encrypt-util.h \
+	src/shared/disk-encrypt-util.c \
 	src/shared/disk-sign-util.h \
 	src/shared/disk-sign-util.c \
 	src/shared/file-util.h \
@@ -85,8 +87,6 @@ bin_PROGRAMS += \
 org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.h \
 	src/devices/sysfs.c \
-	src/rdinit/disk-encrypt.h \
-	src/rdinit/disk-encrypt.c \
 	src/rdinit/disk-gpt.h \
 	src/rdinit/disk-gpt.c \
 	src/rdinit/sysctl.h \
