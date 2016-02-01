@@ -165,18 +165,17 @@ static int kernel_filesystem_mount(bool early) {
 
                         if (mount(mount_early[i].what, mount_early[i].where,
                                   mount_early[i].type, mount_early[i].flags,
-                                  mount_early[i].options) < 0 && errno != EBUSY)
+                                  mount_early[i].options) < 0)
                                 return -errno;
                 }
         } else {
                 unsigned int i;
 
-                for (i = 0; i < C_ARRAY_SIZE(mount_late); i++) {
+                for (i = 0; i < C_ARRAY_SIZE(mount_late); i++)
                         if (mount(mount_late[i].what, mount_late[i].where,
                                   mount_late[i].type, mount_late[i].flags,
-                                  mount_late[i].options) < 0 && errno != EBUSY)
+                                  mount_late[i].options) < 0)
                                 return -errno;
-                }
         }
 
         return 0;
