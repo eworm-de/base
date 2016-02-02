@@ -58,9 +58,6 @@ int main(int argc, char **argv) {
                         const char *type = argv[3];
                         const char *filename = argv[4];
 
-                        if (disk_encrypt_print_info(filename) >= 0)
-                                return EXIT_SUCCESS;
-
                         r = disk_encrypt_format_volume(filename, name, type);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename, strerror(-r));
@@ -92,7 +89,7 @@ int main(int argc, char **argv) {
                                 return EXIT_SUCCESS;
                         }
 
-                        fprintf(stderr, "Unable to set up image %s\n", filename);
+                        fprintf(stderr, "Unable to set up image %s: %s\n", filename, strerror(-r));
                         return EXIT_FAILURE;
                 }
 

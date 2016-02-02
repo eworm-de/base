@@ -16,6 +16,14 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int hexstr_from_bytes(const uint8_t *bytes, size_t len, char **str);
-int hexstr_to_bytes(const char *str, uint8_t *bytes);
-char *escape_hex(const char *in);
+int aeswrap_encrypt_data(const uint8_t *key,
+                         uint64_t key_size,
+                         const uint8_t *data,
+                         uint8_t *data_encrypted,
+                         uint64_t *data_encrypted_sizep);
+
+int aeswrap_decrypt_data(const uint8_t *key,
+                         uint64_t key_size,
+                         const uint8_t *data,
+                         uint64_t data_size,
+                         uint8_t *data_decrypted);

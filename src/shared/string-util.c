@@ -43,7 +43,7 @@ int hexstr_to_bytes(const char *str, uint8_t *bytes) {
         return 0;
 }
 
-int bytes_to_hexstr(const uint8_t *bytes, size_t len, char **str) {
+int hexstr_from_bytes(const uint8_t *bytes, size_t len, char **str) {
         char *s;
         unsigned int i;
 

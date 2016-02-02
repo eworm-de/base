@@ -18,10 +18,12 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 #include <bus1/b1-disk-encrypt-header.h>
+#include <gcrypt.h>
 #include <linux/random.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
+#include "aeswrap-util.h"
 #include "disk-encrypt-util.h"
 #include "encrypt.h"
 #include "file-util.h"
@@ -43,11 +45,16 @@ int disk_encrypt_print_info(const char *data) {
         uint64_t data_offset;
         uint64_t data_size;
         _c_cleanup_(c_freep) char *encryption = NULL;
-        uint64_t key_size;
+        uint8_t master_key_encrypted[256];
+        _c_cleanup_(c_freep) char *master_key_str = NULL;
+        uint64_t master_key_encrypted_size;
         uint64_t n_key_slots;
-        uint8_t key_type_uuid[16];
-        _c_cleanup_(c_freep) char *key_type_uuid_str = NULL;
-        _c_cleanup_(c_freep) char *key = NULL;
+        uint8_t key0_type_uuid[16];
+        _c_cleanup_(c_freep) char *key0_type_uuid_str = NULL;
+        _c_cleanup_(c_freep) char *key0_encryption = NULL;
+        uint8_t key0[256];
+        size_t key0_size;
+        _c_cleanup_(c_freep) char *key0_str = NULL;
         int r;
 
         f = fopen(data, "re");
@@ -62,10 +69,13 @@ int disk_encrypt_print_info(const char *data) {
                                   &data_offset,
                                   &data_size,
                                   &encryption,
-                                  &key_size,
+                                  master_key_encrypted,
+                                  &master_key_encrypted_size,
                                   &n_key_slots,
-                                  key_type_uuid,
-                                  &key);
+                                  key0_type_uuid,
+                                  &key0_encryption,
+                                  key0,
+                                  &key0_size);
         if (r < 0)
                 return r;
 
@@ -73,24 +83,35 @@ int disk_encrypt_print_info(const char *data) {
         if (r < 0)
                 return r;
 
-        r = uuid_to_string(key_type_uuid, &key_type_uuid_str);
+        r = hexstr_from_bytes(master_key_encrypted, master_key_encrypted_size / 8, &master_key_str);
         if (r < 0)
                 return r;
 
-        printf("====================================================================================\n");
-        printf("Info for:           %s\n", data);
-        printf("Image type:         %s\n", image_type);
-        printf("Image name:         %s\n", image_name);
-        printf("Image UUID:         %s\n", image_uuid_str);
-        printf("Data type:          %s\n", data_type);
-        printf("Data offset:        %" PRIu64 " bytes\n", data_offset);
-        printf("Data size:          %" PRIu64 " bytes\n", data_size);
-        printf("Encryption:         %s\n", encryption);
-        printf("Key size:           %" PRIu64 " bits\n", key_size);
-        printf("Key slots:          %" PRIu64 "\n", n_key_slots);
-        printf("Key[00] type:       %s\n", key_type_uuid_str);
-        printf("Key[00] key:        %s\n", key);
-        printf("====================================================================================\n");
+        r = uuid_to_string(key0_type_uuid, &key0_type_uuid_str);
+        if (r < 0)
+                return r;
+
+        r = hexstr_from_bytes(key0, master_key_encrypted_size / 8, &key0_str);
+        if (r < 0)
+                return r;
+
+        printf("=======================================================================================================\n");
+        printf("Info for:              %s\n", data);
+        printf("Image type:            %s\n", image_type);
+        printf("Image name:            %s\n", image_name);
+        printf("Image UUID:            %s\n", image_uuid_str);
+        printf("Data type:             %s\n", data_type);
+        printf("Data offset:           %" PRIu64 " bytes\n", data_offset);
+        printf("Data size:             %" PRIu64 " bytes\n", data_size);
+        printf("Encryption:            %s\n", encryption);
+        printf("Master key size:       %" PRIu64 " bits\n", master_key_encrypted_size);
+        printf("Encrypted master key:  %s\n", master_key_str);
+        printf("Key slots:             %" PRIu64 "\n", n_key_slots);
+        printf("Key[00] type:          %s\n", key0_type_uuid_str);
+        printf("Key[00] encryption:    %s\n", key0_encryption);
+        printf("Key[00] encrypted key: %s\n", key0_str);
+        printf("Key[00] key size:      %" PRIu64 " bits\n", key0_size);
+        printf("=======================================================================================================\n");
 
         return 0;
 }
@@ -117,22 +138,27 @@ static int block_discard_range(FILE *f, uint64_t start, uint64_t len) {
 int disk_encrypt_format_volume(const char *data_file, const char *image_name, const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset, size = 0;
-        uint64_t key_size = 256;
-        Bus1DiskEncryptKeySlot keys[8] = {
+        uint8_t master_key[32];
+        uint64_t master_key_size = 256;
+        uint8_t master_key_unlock[32];
+        static const uint8_t null_key[32] = {};
+        Bus1DiskEncryptKeySlot keys[1] = {
                 {
                         .type_uuid = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID,
-                        .clear.encryption = "fixme",
+                        .encryption = "aes-wrap",
                 },
         };
         Bus1DiskEncryptHeader info = {
                 .meta.meta_uuid = BUS1_META_HEADER_UUID,
                 .meta.type_uuid = BUS1_DISK_ENCRYPT_HEADER_UUID,
                 .meta.type_tag = "org.bus1.encrypt",
+
                 .encrypt.cypher = "aes",
                 .encrypt.chain_mode = "xts",
                 .encrypt.iv_mode = "plain64",
-                .key.size = htole64(key_size),
-                .key.n_slots = htole64(C_ARRAY_SIZE(keys)),
+
+                .master_key.key_size = htole64(master_key_size),
+                .n_key_slots = htole64(C_ARRAY_SIZE(keys)),
         };
         int r;
 
@@ -163,9 +189,29 @@ int disk_encrypt_format_volume(const char *data_file, const char *image_name, co
         info.data.offset = htole64(offset);
         info.data.size = htole64(size - offset);
 
-        /* FIXME: use Authenticated Encryption method also for NULL key */
-        if (getrandom(keys[0].key, key_size / 8, GRND_NONBLOCK) < 0)
+        if (getrandom(master_key, master_key_size / 8, GRND_NONBLOCK) < 0)
                 return -errno;
+
+        if (getrandom(master_key_unlock, master_key_size / 8, GRND_NONBLOCK) < 0)
+                return -errno;
+
+        /* Encrypt the master volume key. */
+        r = aeswrap_encrypt_data(master_key_unlock,
+                                 master_key_size,
+                                 master_key,
+                                 info.master_key.key,
+                                 &info.master_key.key_size);
+        if (r < 0)
+                return r;
+
+        /* Encrypt the clear key. */
+        r = aeswrap_encrypt_data(null_key,
+                                 master_key_size,
+                                 master_key_unlock,
+                                 keys[0].key,
+                                 &keys[0].key_size);
+        if (r < 0)
+                return r;
 
         if (fwrite(&info, sizeof(info), 1, f) != 1)
                 return -EIO;

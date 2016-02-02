@@ -27,7 +27,7 @@ static int hash_write(FILE *f_data, FILE *f_hash,
                       uint64_t data_block, uint64_t data_block_size,
                       uint64_t hash_block, uint64_t hash_block_size,
                       uint64_t n_data_blocks,
-                      gcry_md_hd_t crypt_ctx, int crypt_hash_type, unsigned int crypt_hash_size,
+                      gcry_md_hd_t crypt_hd, int crypt_hash_type, unsigned int crypt_hash_size,
                       const uint8_t *salt, size_t salt_size,
                       uint8_t *result) {
         _c_cleanup_(c_freep) uint8_t *null_block = NULL;
@@ -67,17 +67,17 @@ static int hash_write(FILE *f_data, FILE *f_hash,
                         if (fread(data_buffer, data_block_size, 1, f_data) != 1)
                                 return -EIO;
 
-                        gcry_md_reset(crypt_ctx);
-                        gcry_md_write(crypt_ctx, salt, salt_size);
-                        gcry_md_write(crypt_ctx, data_buffer, data_block_size);
+                        gcry_md_reset(crypt_hd);
+                        gcry_md_write(crypt_hd, salt, salt_size);
+                        gcry_md_write(crypt_hd, data_buffer, data_block_size);
 
                         if (result)
-                                memcpy(result, gcry_md_read(crypt_ctx, crypt_hash_type), crypt_hash_size);
+                                memcpy(result, gcry_md_read(crypt_hd, crypt_hash_type), crypt_hash_size);
 
                         if (!f_hash)
                                 break;
 
-                        if (fwrite(gcry_md_read(crypt_ctx, crypt_hash_type), crypt_hash_size, 1, f_hash) != 1)
+                        if (fwrite(gcry_md_read(crypt_hd, crypt_hash_type), crypt_hash_size, 1, f_hash) != 1)
                                 return -EIO;
 
                         n_bytes -= crypt_hash_size;
@@ -108,7 +108,7 @@ int hash_tree_write(const char *filename,
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
         _c_cleanup_(c_fclosep) FILE *f_hash = NULL;
         uint64_t data_size;
-        _c_cleanup_(gcry_md_closep) gcry_md_hd_t crypt_ctx = NULL;
+        _c_cleanup_(gcry_md_closep) gcry_md_hd_t crypt_hd = NULL;
         int crypt_hash_type;
         int n_level;
         uint64_t hash_size = 0;
@@ -158,7 +158,7 @@ int hash_tree_write(const char *filename,
         if (digest_size != gcry_md_get_algo_dlen(crypt_hash_type))
                 return -EINVAL;
 
-        if (gcry_md_open(&crypt_ctx, crypt_hash_type, 0) != 0)
+        if (gcry_md_open(&crypt_hd, crypt_hash_type, 0) != 0)
                 return -EINVAL;
 
         /* Calculate the number of levels. */
@@ -187,7 +187,7 @@ int hash_tree_write(const char *filename,
                        data_block_nr, data_block_size,
                        levels[0].block, hash_block_size,
                        n_data_blocks,
-                       crypt_ctx, crypt_hash_type, digest_size,
+                       crypt_hd, crypt_hash_type, digest_size,
                        salt, salt_size,
                        NULL);
         if (r < 0)
@@ -200,7 +200,7 @@ int hash_tree_write(const char *filename,
                                levels[i - 1].block, hash_block_size,
                                levels[i].block, hash_block_size,
                                levels[i - 1].n_blocks,
-                               crypt_ctx, crypt_hash_type, digest_size,
+                               crypt_hd, crypt_hash_type, digest_size,
                                salt, salt_size,
                                NULL);
                 if (r < 0)
@@ -212,7 +212,7 @@ int hash_tree_write(const char *filename,
                        levels[n_level - 1].block, hash_block_size,
                        0, hash_block_size,
                        1,
-                       crypt_ctx, crypt_hash_type, digest_size,
+                       crypt_hd, crypt_hash_type, digest_size,
                        salt, salt_size,
                        root_hash);
 

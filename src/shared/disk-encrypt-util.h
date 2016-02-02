@@ -24,10 +24,13 @@ int disk_encrypt_get_info(FILE *f,
                           uint64_t *data_offsetp,
                           uint64_t *data_sizep,
                           char **encryptionp,
-                          uint64_t *key_sizep,
+                          uint8_t *master_keyp,
+                          uint64_t *master_key_sizep,
                           uint64_t *n_key_slotsp,
-                          uint8_t *key_type_uuidp,
-                          char **keyp);
+                          uint8_t *key0_type_uuidp,
+                          char **key0_encryptionp,
+                          uint8_t *key0p,
+                          uint64_t *key0_sizep);
 
 int disk_encrypt_setup_device(const char *device,
                               char **devicep,

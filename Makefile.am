@@ -40,6 +40,8 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
+	src/shared/aeswrap-util.h \
+	src/shared/aeswrap-util.c \
 	src/shared/disk-encrypt-util.h \
 	src/shared/disk-encrypt-util.c \
 	src/shared/disk-sign-util.h \
@@ -63,7 +65,8 @@ libshared_a_SOURCES = \
 
 libshared_a_CFLAGS = \
 	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
+	$(BUS1_CFLAGS) \
+	$(GCRYPT_CFLAGS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
@@ -97,13 +100,13 @@ org_bus1_rdinit_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
 	$(KMOD_CFLAGS) \
-	$(BLKID_CFLAGS)
+	$(GCRYPT_CFLAGS)
 
 org_bus1_rdinit_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(KMOD_LIBS) \
-	$(BLKID_LIBS)
+	$(GCRYPT_LIBS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \

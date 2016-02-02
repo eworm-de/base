@@ -221,7 +221,7 @@ int disk_sign_get_info(FILE *f,
         if (l >= 256)
                 return -EINVAL;
 
-        r = bytes_to_hexstr(info.hash.salt, l, &salt_str);
+        r = hexstr_from_bytes(info.hash.salt, l, &salt_str);
         if (r < 0)
                 return r;
 
@@ -229,7 +229,7 @@ int disk_sign_get_info(FILE *f,
         if (l >= 256)
                 return -EINVAL;
 
-        r = bytes_to_hexstr(info.hash.root_hash, l, &hash_str);
+        r = hexstr_from_bytes(info.hash.root_hash, l, &hash_str);
         if (r < 0)
                 return r;
 
