@@ -20,6 +20,20 @@
 
 #include "string-util.h"
 
+#pragma GCC push_options
+#pragma GCC optimize("O0")
+
+void *memwipe(void *s, size_t n) {
+        volatile uint8_t *p = (volatile uint8_t *)s;
+
+        while(n--)
+                *p++ = '@';
+
+        return s;
+}
+
+#pragma GCC pop_options
+
 int hexstr_to_bytes(const char *str, uint8_t *bytes) {
         size_t len;
         unsigned int i;

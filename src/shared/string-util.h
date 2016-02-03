@@ -16,6 +16,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+char *escape_hex(const char *in);
+
 int hexstr_from_bytes(const uint8_t *bytes, size_t len, char **str);
 int hexstr_to_bytes(const char *str, uint8_t *bytes);
-char *escape_hex(const char *in);
+
+void *memwipe(void *s, size_t n);

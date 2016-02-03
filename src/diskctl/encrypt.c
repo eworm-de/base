@@ -18,7 +18,6 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 #include <bus1/b1-disk-encrypt-header.h>
-#include <gcrypt.h>
 #include <linux/random.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -221,6 +220,9 @@ int disk_encrypt_format_volume(const char *data_file, const char *image_name, co
 
         if (fflush(f) < 0)
                 return -errno;
+
+        memwipe(master_key, sizeof(master_key));
+        memwipe(master_key_unlock, sizeof(master_key_unlock));
 
         return 0;
 }

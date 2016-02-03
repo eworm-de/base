@@ -18,7 +18,6 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 #include <bus1/b1-disk-encrypt-header.h>
-#include <gcrypt.h>
 #include <linux/dm-ioctl.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -354,6 +353,10 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
                 *image_namep = image_name;
                 image_name = NULL;
         }
+
+        memwipe(hexkey, strlen(hexkey));
+        memwipe(master_key, sizeof(master_key));
+        memwipe(master_key_unlock, sizeof(master_key_unlock));
 
         return 0;
 }
