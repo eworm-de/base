@@ -28,14 +28,19 @@
 #include "string-util.h"
 #include "kmsg-util.h"
 
-static int disk_sign_attach_loop(FILE *f, uint64_t offset, char **devicep) {
+/* Return opened loop device, to prevent auto-clear before we attach it. */
+static int disk_sign_attach_loop(FILE *f, uint64_t offset, char **devicep, int *fd_devicep) {
         _c_cleanup_(c_closep) int fd_loopctl = -1;
         _c_cleanup_(c_closep) int fd_loop = -1;
         _c_cleanup_(c_freep) char *device = NULL;
         struct loop_info64 info = {
                 .lo_offset = offset,
+                .lo_flags = LO_FLAGS_AUTOCLEAR,
         };
         int n;
+
+        assert(devicep);
+        assert(fd_devicep);
 
         fd_loopctl = open("/dev/loop-control", O_RDWR|O_CLOEXEC);
         if (fd_loopctl < 0)
@@ -60,6 +65,9 @@ static int disk_sign_attach_loop(FILE *f, uint64_t offset, char **devicep) {
 
         *devicep = device;
         device = NULL;
+
+        *fd_devicep = fd_loop;
+        fd_loop = -1;
 
         return 0;
 }
@@ -304,6 +312,7 @@ int disk_sign_setup_device(const char *image, char **devicep, char **image_typep
         _c_cleanup_(c_freep) char *salt = NULL;
         _c_cleanup_(c_freep) char *root_hash = NULL;
         _c_cleanup_(c_freep) char *loopdev = NULL;
+        _c_cleanup_(c_closep) int fd_loopdev = -1;
         _c_cleanup_(c_freep) char *device = NULL;
         int r;
 
@@ -338,7 +347,7 @@ int disk_sign_setup_device(const char *image, char **devicep, char **image_typep
             data_offset > hash_offset)
                 return -EINVAL;
 
-        r = disk_sign_attach_loop(f, data_offset, &loopdev);
+        r = disk_sign_attach_loop(f, data_offset, &loopdev, &fd_loopdev);
         if (r < 0)
                 return r;
 
