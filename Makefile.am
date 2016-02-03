@@ -44,6 +44,8 @@ libshared_a_SOURCES = \
 	src/shared/aeswrap-util.c \
 	src/shared/disk-encrypt-util.h \
 	src/shared/disk-encrypt-util.c \
+	src/shared/disk-sign-hash-tree-util.h \
+	src/shared/disk-sign-hash-tree-util.c \
 	src/shared/disk-sign-util.h \
 	src/shared/disk-sign-util.c \
 	src/shared/file-util.h \
@@ -179,8 +181,6 @@ org_bus1_diskctl_SOURCES = \
 	src/bus1/b1-disk-sign-header.h \
 	src/diskctl/encrypt.h \
 	src/diskctl/encrypt.c \
-	src/diskctl/hash-tree.h \
-	src/diskctl/hash-tree.c \
 	src/diskctl/sign.h \
 	src/diskctl/sign.c \
 	src/diskctl/main.c

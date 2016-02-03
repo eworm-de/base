@@ -37,3 +37,7 @@ int disk_encrypt_setup_device(const char *device,
                               char **devicep,
                               char **image_namep,
                               char **data_typep);
+
+int disk_encrypt_format_volume(const char *data_file,
+                               const char *image_name,
+                               const char *data_type);

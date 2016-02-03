@@ -32,4 +32,11 @@ int disk_sign_get_info(FILE *f,
                        char **saltp,
                        char **root_hashp);
 
-int disk_sign_setup_device(const char *image, char **devicep, char **data_typep);
+int disk_sign_setup_device(const char *image,
+                           char **devicep,
+                           char **data_typep);
+
+int disk_sign_format_volume(const char *filename_data,
+                            const char *filename_image,
+                            const char *image_name,
+                            const char *data_type);

@@ -19,16 +19,22 @@
 #include <bus1/c-shared.h>
 #include <gcrypt.h>
 
-#include "hash-tree.h"
+#include "disk-sign-hash-tree-util.h"
 #include "file-util.h"
 
 /* Calculate and store hash blocks from n data blocks. */
-static int hash_write(FILE *f_data, FILE *f_hash,
-                      uint64_t data_block, uint64_t data_block_size,
-                      uint64_t hash_block, uint64_t hash_block_size,
+static int hash_write(FILE *f_data,
+                      FILE *f_hash,
+                      uint64_t data_block,
+                      uint64_t data_block_size,
+                      uint64_t hash_block,
+                      uint64_t hash_block_size,
                       uint64_t n_data_blocks,
-                      gcry_md_hd_t crypt_hd, int crypt_hash_type, unsigned int crypt_hash_size,
-                      const uint8_t *salt, size_t salt_size,
+                      gcry_md_hd_t crypt_hd,
+                      int crypt_hash_type,
+                      unsigned int crypt_hash_size,
+                      const uint8_t *salt,
+                      size_t salt_size,
                       uint8_t *result) {
         _c_cleanup_(c_freep) uint8_t *null_block = NULL;
         _c_cleanup_(c_freep) uint8_t *data_buffer = NULL;
@@ -93,18 +99,18 @@ static int hash_write(FILE *f_data, FILE *f_hash,
 
 C_DEFINE_CLEANUP(gcry_md_hd_t, gcry_md_close);
 
-int hash_tree_write(const char *filename,
-                    const char *hash_name,
-                    uint64_t digest_size,
-                    uint64_t data_block_size,
-                    uint64_t data_block_nr,
-                    uint64_t n_data_blocks,
-                    uint64_t hash_block_size,
-                    uint64_t hash_block_nr,
-                    const uint8_t *salt,
-                    uint64_t salt_size,
-                    uint8_t *root_hash,
-                    uint64_t *hash_tree_sizep) {
+int disk_sign_hash_tree_write(const char *filename,
+                              const char *hash_name,
+                              uint64_t digest_size,
+                              uint64_t data_block_size,
+                              uint64_t data_block_nr,
+                              uint64_t n_data_blocks,
+                              uint64_t hash_block_size,
+                              uint64_t hash_block_nr,
+                              const uint8_t *salt,
+                              uint64_t salt_size,
+                              uint8_t *root_hash,
+                              uint64_t *hash_tree_sizep) {
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
         _c_cleanup_(c_fclosep) FILE *f_hash = NULL;
         uint64_t data_size;

@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
                         const char *filename_in = argv[4];
                         const char *filename_out = argv[5];
 
-                        r = disk_sign_format(filename_in, filename_out, name, type);
+                        r = disk_sign_format_volume(filename_in, filename_out, name, type);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename_out, strerror(-r));
                                 return EXIT_FAILURE;

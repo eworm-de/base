@@ -18,15 +18,9 @@
 #include <bus1/c-macro.h>
 #include <bus1/c-shared.h>
 #include <bus1/b1-disk-encrypt-header.h>
-#include <linux/random.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
 
-#include "aeswrap-util.h"
 #include "disk-encrypt-util.h"
 #include "encrypt.h"
-#include "file-util.h"
-#include "missing.h"
 #include "string-util.h"
 #include "uuid-util.h"
 
@@ -114,120 +108,6 @@ int disk_encrypt_print_info(const char *data) {
         printf("Key[0] key (encrypted): %s\n", key0_str);
         printf("Key[0] key size:        %" PRIu64 " bits\n", key0_size);
         printf("========================================================================================================\n");
-
-        return 0;
-}
-
-static int block_discard_range(FILE *f, uint64_t start, uint64_t len) {
-        while (len > 0) {
-                uint64_t range[2];
-                uint64_t chunk;
-
-                chunk = c_min(len, 1024ULL * 1024ULL * 1024ULL);
-                range[0] = start;
-                range[1] = chunk;
-
-                if (ioctl(fileno(f), BLKDISCARD, &range) < 0)
-                        return -errno;
-
-                len -= chunk;
-                start += chunk;
-        }
-
-        return 0;
-}
-
-int disk_encrypt_format_volume(const char *data_file, const char *image_name, const char *data_type) {
-        _c_cleanup_(c_fclosep) FILE *f = NULL;
-        uint64_t offset, size = 0;
-        uint8_t master_key[32];
-        uint64_t master_key_size = 256;
-        uint8_t master_key_unlock[32];
-        static const uint8_t null_key[32] = {};
-        Bus1DiskEncryptKeySlot keys[1] = {
-                {
-                        .type_uuid = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID,
-                        .encryption = "aes-wrap",
-                },
-        };
-        Bus1DiskEncryptHeader info = {
-                .meta.meta_uuid = BUS1_META_HEADER_UUID,
-                .meta.type_uuid = BUS1_DISK_ENCRYPT_HEADER_UUID,
-                .meta.type_tag = "org.bus1.encrypt",
-
-                .encrypt.cypher = "aes",
-                .encrypt.chain_mode = "xts",
-                .encrypt.iv_mode = "plain64",
-
-                .master_key.key_size = htole64(master_key_size),
-                .master_key.encryption = "aes-wrap",
-
-                .n_key_slots = htole64(C_ARRAY_SIZE(keys)),
-        };
-        int r;
-
-        assert(data_file);
-        assert(image_name);
-        assert(data_type);
-
-        strncpy(info.meta.object_label, image_name, sizeof(info.meta.object_label) - 1);
-        strncpy(info.data.type, data_type, sizeof(info.data.type) - 1);
-
-        r = uuid_set_random(info.meta.object_uuid);
-        if (r < 0)
-                return EXIT_FAILURE;
-
-        f = fopen(data_file, "r+");
-        if (!f)
-                return -errno;
-
-        r = file_get_size(f, &size);
-        if (r < 0)
-                return r;
-
-        block_discard_range(f, 0, size);
-
-        size -= size  % 4096;
-        offset = sizeof(info) + sizeof(keys);
-
-        info.data.offset = htole64(offset);
-        info.data.size = htole64(size - offset);
-
-        if (getrandom(master_key, master_key_size / 8, GRND_NONBLOCK) < 0)
-                return -errno;
-
-        if (getrandom(master_key_unlock, master_key_size / 8, GRND_NONBLOCK) < 0)
-                return -errno;
-
-        /* Encrypt the master volume key. */
-        r = aeswrap_encrypt_data(master_key_unlock,
-                                 master_key_size,
-                                 master_key,
-                                 info.master_key.key,
-                                 &info.master_key.key_size);
-        if (r < 0)
-                return r;
-
-        /* Encrypt the clear key. */
-        r = aeswrap_encrypt_data(null_key,
-                                 master_key_size,
-                                 master_key_unlock,
-                                 keys[0].key,
-                                 &keys[0].key_size);
-        if (r < 0)
-                return r;
-
-        if (fwrite(&info, sizeof(info), 1, f) != 1)
-                return -EIO;
-
-        if (fwrite(&keys, sizeof(keys), 1, f) != 1)
-                return -EIO;
-
-        if (fflush(f) < 0)
-                return -errno;
-
-        memwipe(master_key, sizeof(master_key));
-        memwipe(master_key_unlock, sizeof(master_key_unlock));
 
         return 0;
 }
