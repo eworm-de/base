@@ -53,9 +53,9 @@ org.bus1.coredump:
 org.bus1.diskctl:
         - adds a metadata header to a filesystem image and creates a
           cryptographic hash tree to provide data integrity validation;
-          used for the system image mounted at /usr
+          used for the org.bus1.system image mounted at /usr
         - adds a metadata header for an encrypted volume; used for the
-          data volume mounted at /var
+          org.bus1.data volume mounted at /var
 
 DETAILS:
         https://github.com/bus1/base
