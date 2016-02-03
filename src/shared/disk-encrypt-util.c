@@ -35,6 +35,7 @@ int disk_encrypt_get_info(FILE *f,
                           uint64_t *data_offsetp,
                           uint64_t *data_sizep,
                           char **encryptionp,
+                          char **master_key_encryptionp,
                           uint8_t *master_keyp,
                           uint64_t *master_key_sizep,
                           uint64_t *n_key_slotsp,
@@ -50,6 +51,7 @@ int disk_encrypt_get_info(FILE *f,
         _c_cleanup_(c_freep) char *image_name = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *encryption = NULL;
+        _c_cleanup_(c_freep) char *master_key_encryption = NULL;
         _c_cleanup_(c_freep) char *key0_encryption = NULL;
         uint64_t master_key_size;
         uint64_t key0_size;
@@ -94,8 +96,8 @@ int disk_encrypt_get_info(FILE *f,
         if (asprintf(&encryption, "%s-%s-%-s", info.encrypt.cypher, info.encrypt.chain_mode, info.encrypt.iv_mode) < 0)
                 return -ENOMEM;
 
-        data_type = strdup(info.data.type);
-        if (!data_type)
+        master_key_encryption = strdup(info.master_key.encryption);
+        if (!master_key_encryption)
                 return -ENOMEM;
 
         if (fread(&keys, sizeof(keys), 1, f) != 1)
@@ -136,6 +138,11 @@ int disk_encrypt_get_info(FILE *f,
         if (encryptionp) {
                 *encryptionp = encryption;
                 encryption = NULL;
+        }
+
+        if (master_key_encryptionp) {
+                *master_key_encryptionp = master_key_encryption;
+                master_key_encryption = NULL;
         }
 
         if (master_keyp)
@@ -261,6 +268,7 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         _c_cleanup_(c_freep) char *image_name = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *encryption = NULL;
+        _c_cleanup_(c_freep) char *master_key_encryption = NULL;
         uint8_t master_key_encrypted[256];
         uint64_t master_key_encrypted_size;
         uint8_t key0_type_uuid[16];
@@ -288,6 +296,7 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
                                   &offset,
                                   &size,
                                   &encryption,
+                                  &master_key_encryption,
                                   master_key_encrypted,
                                   &master_key_encrypted_size,
                                   NULL,
@@ -297,6 +306,9 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
                                   &key0_size);
         if (r < 0)
                 return r;
+
+        if (strcmp(master_key_encryption, "aes-wrap") != 0)
+                return -EINVAL;
 
         if (memcmp(key0_type_uuid, key_clear_uuid, sizeof(key_clear_uuid)) != 0)
                 return -EINVAL;

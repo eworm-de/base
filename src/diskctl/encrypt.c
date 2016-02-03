@@ -44,6 +44,7 @@ int disk_encrypt_print_info(const char *data) {
         uint64_t data_offset;
         uint64_t data_size;
         _c_cleanup_(c_freep) char *encryption = NULL;
+        _c_cleanup_(c_freep) char *master_key_encryption = NULL;
         uint8_t master_key_encrypted[256];
         _c_cleanup_(c_freep) char *master_key_str = NULL;
         uint64_t master_key_encrypted_size;
@@ -68,6 +69,7 @@ int disk_encrypt_print_info(const char *data) {
                                   &data_offset,
                                   &data_size,
                                   &encryption,
+                                  &master_key_encryption,
                                   master_key_encrypted,
                                   &master_key_encrypted_size,
                                   &n_key_slots,
@@ -94,23 +96,24 @@ int disk_encrypt_print_info(const char *data) {
         if (r < 0)
                 return r;
 
-        printf("=======================================================================================================\n");
-        printf("Info for:              %s\n", data);
-        printf("Image type:            %s\n", image_type);
-        printf("Image name:            %s\n", image_name);
-        printf("Image UUID:            %s\n", image_uuid_str);
-        printf("Data type:             %s\n", data_type);
-        printf("Data offset:           %" PRIu64 " bytes\n", data_offset);
-        printf("Data size:             %" PRIu64 " bytes\n", data_size);
-        printf("Encryption:            %s\n", encryption);
-        printf("Master key size:       %" PRIu64 " bits\n", master_key_encrypted_size);
-        printf("Encrypted master key:  %s\n", master_key_str);
-        printf("Key slots:             %" PRIu64 "\n", n_key_slots);
-        printf("Key[00] type:          %s\n", key0_type_uuid_str);
-        printf("Key[00] encryption:    %s\n", key0_encryption);
-        printf("Key[00] encrypted key: %s\n", key0_str);
-        printf("Key[00] key size:      %" PRIu64 " bits\n", key0_size);
-        printf("=======================================================================================================\n");
+        printf("========================================================================================================\n");
+        printf("Info for:               %s\n", data);
+        printf("Image type:             %s\n", image_type);
+        printf("Image name:             %s\n", image_name);
+        printf("Image UUID:             %s\n", image_uuid_str);
+        printf("Data type:              %s\n", data_type);
+        printf("Data offset:            %" PRIu64 " bytes\n", data_offset);
+        printf("Data size:              %" PRIu64 " bytes\n", data_size);
+        printf("Data encryption:        %s\n", encryption);
+        printf("Master key encryption:  %s\n", master_key_encryption);
+        printf("Master key (encrypted): %s\n", master_key_str);
+        printf("Master key size:        %" PRIu64 " bits\n", master_key_encrypted_size);
+        printf("Key slots:              %" PRIu64 "\n", n_key_slots);
+        printf("Key[0] type UUID:       %s\n", key0_type_uuid_str);
+        printf("Key[0] encryption:      %s\n", key0_encryption);
+        printf("Key[0] key (encrypted): %s\n", key0_str);
+        printf("Key[0] key size:        %" PRIu64 " bits\n", key0_size);
+        printf("========================================================================================================\n");
 
         return 0;
 }
@@ -157,6 +160,8 @@ int disk_encrypt_format_volume(const char *data_file, const char *image_name, co
                 .encrypt.iv_mode = "plain64",
 
                 .master_key.key_size = htole64(master_key_size),
+                .master_key.encryption = "aes-wrap",
+
                 .n_key_slots = htole64(C_ARRAY_SIZE(keys)),
         };
         int r;
