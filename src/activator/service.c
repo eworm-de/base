@@ -106,7 +106,7 @@ int service_activate(Service *s) {
         }
 
         if (s->persistent_data) {
-                if (asprintf(&datadir, "/var/bus1/%s", s->name) < 0)
+                if (asprintf(&datadir, "/var/org.bus1/%s", s->name) < 0)
                         return -ENOMEM;
 
                 if (mkdir(datadir, 0770) < 0 && errno != EEXIST)
