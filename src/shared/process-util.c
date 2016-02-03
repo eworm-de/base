@@ -31,9 +31,6 @@ int process_reap_children(pid_t *p) {
                         if (errno == ECHILD)
                                 break;
 
-                        if (errno == EINTR)
-                                continue;
-
                         return -errno;
                 }
 

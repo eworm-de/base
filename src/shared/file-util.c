@@ -89,12 +89,8 @@ int file_copy(FILE *f_in, FILE *f_out, uint64_t *sizep) {
                 in = read(fileno(f_in), buf, sizeof(buf));
                 if (in == 0)
                         break;
-                if (in < 0) {
-                        if (errno == EINTR)
-                                continue;
-
+                if (in < 0)
                         return -errno;
-                }
 
                 p = buf;
                 n = in;
@@ -104,12 +100,8 @@ int file_copy(FILE *f_in, FILE *f_out, uint64_t *sizep) {
                         out = write(fileno(f_out), p, n);
                         if (out == 0)
                                 return -EIO;
-                        if (out < 0) {
-                                if (errno == EINTR)
-                                        continue;
-
+                        if (out < 0)
                                 return -errno;
-                        }
 
                         p += out;
                         n -= out;

@@ -377,12 +377,7 @@ static void dump_process(int sig) {
         }
 
         /* Wait for the dump process. */
-        for (;;) {
-                if (waitid(P_PID, pid, NULL, WEXITED) < 0 && errno == EINTR)
-                        continue;
-
-                break;
-        }
+        waitid(P_PID, pid, NULL, WEXITED);
 
         kmsg(LOG_EMERG, "Unrecoverable failure. System rebooting.");
         sleep(15);
