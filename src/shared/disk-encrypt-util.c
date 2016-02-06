@@ -377,7 +377,7 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         return 0;
 }
 
-int disk_encrypt_format_volume(const char *data_file,
+int disk_encrypt_format_volume(const char *device,
                                const char *image_name,
                                const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
@@ -408,7 +408,7 @@ int disk_encrypt_format_volume(const char *data_file,
         };
         int r;
 
-        assert(data_file);
+        assert(device);
         assert(image_name);
         assert(data_type);
 
@@ -417,9 +417,9 @@ int disk_encrypt_format_volume(const char *data_file,
 
         r = uuid_set_random(info.meta.object_uuid);
         if (r < 0)
-                return EXIT_FAILURE;
+                return r;
 
-        f = fopen(data_file, "r+");
+        f = fopen(device, "r+");
         if (!f)
                 return -errno;
 
@@ -436,10 +436,10 @@ int disk_encrypt_format_volume(const char *data_file,
         info.data.offset = htole64(offset);
         info.data.size = htole64(size - offset);
 
-        if (getrandom(master_key, master_key_size / 8, GRND_NONBLOCK) < 0)
+        if (getrandom(master_key, master_key_size / 8, 0) < 0)
                 return -errno;
 
-        if (getrandom(master_key_unlock, master_key_size / 8, GRND_NONBLOCK) < 0)
+        if (getrandom(master_key_unlock, master_key_size / 8, 0) < 0)
                 return -errno;
 
         /* Encrypt the master volume key. */

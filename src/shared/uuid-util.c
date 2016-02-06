@@ -47,7 +47,7 @@ int uuid_to_string(const uint8_t *uuid, char **str) {
 }
 
 int uuid_set_random(uint8_t *uuid) {
-        if (getrandom(uuid, 16, GRND_NONBLOCK) < 0)
+        if (getrandom(uuid, 16, 0) < 0)
                 return -errno;
 
         /* UUID version 4 */

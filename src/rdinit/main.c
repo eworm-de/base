@@ -329,6 +329,70 @@ static int manager_run(Manager *m) {
         return -ENODEV;
 }
 
+static int format_var(const char *device,
+                      char **device_cryptp,
+                      const char *image_name,
+                      const char *data_type) {
+        _c_cleanup_(c_fclosep) FILE *f = NULL;
+        uint8_t buf[4096];
+        unsigned int i;
+        _c_cleanup_(c_freep) char *device_crypt = NULL;
+        pid_t p;
+        int r;
+
+        f = fopen(device, "r+e");
+        if (!f)
+                return -errno;
+
+        if (fread(&buf, sizeof(buf), 1, f) != 1)
+                return -EIO;
+
+        for (i = 0; i < sizeof(buf); i++)
+                if (buf[i] != 0)
+                        return -EBUSY;
+
+        r = disk_encrypt_format_volume(device, image_name, data_type);
+        if (r < 0)
+                return r;
+
+        r = disk_encrypt_setup_device(device, &device_crypt, NULL, NULL);
+        if (r < 0)
+                return r;
+
+        p = fork();
+        if (p < 0)
+                return -errno;
+
+        if (p == 0) {
+                _c_cleanup_(c_freep) char *mkfs = NULL;
+                const char *argv[] = {
+                        NULL,
+                        "-L",
+                        "bus1",
+                        "-q",
+                        device_crypt,
+                        NULL
+                };
+
+                if (asprintf(&mkfs, "/usr/bin/mkfs.%s", data_type) < 0)
+                        return EXIT_FAILURE;
+
+                argv[0] = mkfs;
+                execve(argv[0], (char **)argv, NULL);
+
+                return EXIT_FAILURE;
+        }
+
+        p = waitpid(p, NULL, 0);
+        if (p < 0)
+                return -errno;
+
+        *device_cryptp = device_crypt;
+        device_crypt = NULL;
+
+        return 0;
+}
+
 static int mount_var(const char *device, const char *dir) {
         _c_cleanup_(c_freep) char *device_crypt = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
@@ -337,8 +401,22 @@ static int mount_var(const char *device, const char *dir) {
 
         r = disk_encrypt_setup_device(device, &device_crypt, &image_name, &data_type);
         if (r < 0) {
-                kmsg(LOG_ERR, "Unable to unlock data volume %s: %s", device, strerror(-r));
-                return r;
+                image_name = strdup("org.bus1.data");
+                if (!image_name)
+                        return -ENOMEM;
+
+                //FIXME: get default fstype from /usr/lib/org.bus1/data.filesystem
+                data_type = strdup("xfs");
+                if (!data_type)
+                        return -ENOMEM;
+
+                kmsg(LOG_WARNING, "Data partition %s at %s is not initialized.", image_name, device);
+
+                r = format_var(device, &device_crypt, image_name, data_type);
+                if (r < 0)
+                        goto fail;
+
+                kmsg(LOG_WARNING, "Initialized data partition %s at %s (%s).", image_name, device, data_type);
         }
 
         kmsg(LOG_INFO, "Mounting %s device %s (%s) at /var.", image_name, device_crypt, data_type);
@@ -346,6 +424,11 @@ static int mount_var(const char *device, const char *dir) {
                 return -errno;
 
         return 0;
+
+fail:
+        kmsg(LOG_ERR, "Unable to unlock data volume %s: %s", device, strerror(-r));
+
+        return r;
 }
 
 static int mount_usr(const char *image, const char *dir) {

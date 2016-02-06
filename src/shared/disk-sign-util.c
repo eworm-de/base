@@ -76,22 +76,22 @@ static int disk_sign_attach_loop(FILE *f, uint64_t offset, char **devicep, int *
         return 0;
 }
 
-static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, struct dm_ioctl **io) {
-        struct dm_ioctl *dm;
+static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, struct dm_ioctl **iop) {
+        struct dm_ioctl *io;
 
-        dm = calloc(1, sizeof(struct dm_ioctl) + data_size);
-        if (!dm)
+        io = calloc(1, sizeof(struct dm_ioctl) + data_size);
+        if (!io)
                 return -ENOMEM;
 
-        dm->version[0] = 4;
+        io->version[0] = 4;
 
-        dm->data_size = sizeof(struct dm_ioctl) + data_size;
-        dm->data_start = sizeof(struct dm_ioctl);
+        io->data_size = sizeof(struct dm_ioctl) + data_size;
+        io->data_start = sizeof(struct dm_ioctl);
 
-        dm->dev = device;
-        dm->flags = flags | DM_READONLY_FLAG;
+        io->dev = device;
+        io->flags = flags | DM_READONLY_FLAG;
 
-        *io = dm;
+        *iop = io;
 
         return 0;
 };
@@ -454,7 +454,7 @@ int disk_sign_format_volume(const char *filename_data,
         /* Write the hash tree. */
         info.hash.offset = htole64(sizeof(info) + sizeof(signature) + data_size);
 
-        if (getrandom(info.hash.salt, info.hash.salt_size / 8, GRND_NONBLOCK) < 0)
+        if (getrandom(info.hash.salt, info.hash.salt_size / 8, 0) < 0)
                 return -errno;
 
         r  = disk_sign_hash_tree_write(filename_image,
