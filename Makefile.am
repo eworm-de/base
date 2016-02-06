@@ -48,6 +48,8 @@ libshared_a_SOURCES = \
 	src/shared/disk-sign-hash-tree-util.c \
 	src/shared/disk-sign-util.h \
 	src/shared/disk-sign-util.c \
+	src/shared/disk-util.h \
+	src/shared/disk-util.c \
 	src/shared/file-util.h \
 	src/shared/file-util.c \
 	src/shared/kernel-cmdline-util.h \

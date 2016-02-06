@@ -25,6 +25,7 @@
 
 #include "aeswrap-util.h"
 #include "disk-encrypt-util.h"
+#include "disk-util.h"
 #include "file-util.h"
 #include "missing.h"
 #include "string-util.h"
@@ -376,29 +377,6 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         return 0;
 }
 
-#ifndef BLKDISCARD
-#define BLKDISCARD _IO(0x12,119)
-#endif
-
-static int block_discard_range(FILE *f, uint64_t start, uint64_t len) {
-        while (len > 0) {
-                uint64_t range[2];
-                uint64_t chunk;
-
-                chunk = c_min(len, 1024ULL * 1024ULL * 1024ULL);
-                range[0] = start;
-                range[1] = chunk;
-
-                if (ioctl(fileno(f), BLKDISCARD, &range) < 0)
-                        return -errno;
-
-                len -= chunk;
-                start += chunk;
-        }
-
-        return 0;
-}
-
 int disk_encrypt_format_volume(const char *data_file,
                                const char *image_name,
                                const char *data_type) {
@@ -449,7 +427,8 @@ int disk_encrypt_format_volume(const char *data_file,
         if (r < 0)
                 return r;
 
-        block_discard_range(f, 0, size);
+        block_discard_range(f, 0, 1024ULL * 1024ULL, true);
+        block_discard_range(f, 1024ULL * 1024ULL, size, false);
 
         size -= size  % 4096;
         offset = sizeof(info) + sizeof(keys);
