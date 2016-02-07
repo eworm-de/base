@@ -512,7 +512,7 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        r = file_read_line("/usr/lib/bus1-release", &m->release);
+        r = file_read_line("/usr/lib/org.bus1/release", &m->release);
         if (r < 0)
                 goto fail;
 

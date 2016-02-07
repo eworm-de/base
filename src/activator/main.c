@@ -189,9 +189,6 @@ int main(int argc, char **argv) {
         if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0)
                 return EXIT_FAILURE;
 
-        if (mkdir("/var/org.bus1", 0755) < 0 && errno != EEXIST)
-                return -errno;
-
         if (manager_new(&m) < 0)
                 return EXIT_FAILURE;
 

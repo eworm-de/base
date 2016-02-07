@@ -405,18 +405,18 @@ static int mount_var(const char *device, const char *dir) {
                 if (!image_name)
                         return -ENOMEM;
 
-                //FIXME: get default fstype from /usr/lib/org.bus1/data.filesystem
+                //FIXME: get default fstype from /usr/lib/org.bus1/data-filesystem
                 data_type = strdup("xfs");
                 if (!data_type)
                         return -ENOMEM;
 
-                kmsg(LOG_WARNING, "Data partition %s at %s is not initialized.", image_name, device);
+                kmsg(LOG_INFO, "Data partition %s at %s is not initialized.", image_name, device);
 
                 r = format_var(device, &device_crypt, image_name, data_type);
                 if (r < 0)
                         goto fail;
 
-                kmsg(LOG_WARNING, "Initialized data partition %s at %s (%s).", image_name, device, data_type);
+                kmsg(LOG_INFO, "Initialized data partition %s at %s (%s).", image_name, device, data_type);
         }
 
         kmsg(LOG_INFO, "Mounting %s device %s (%s) at /var.", image_name, device_crypt, data_type);
@@ -696,7 +696,7 @@ int main(int argc, char **argv) {
                 goto fail;
         shell = !!r;
 
-        r = file_read_line("/usr/lib/bus1-release", &release);
+        r = file_read_line("/usr/lib/org.bus1/release", &release);
         if (r < 0)
                 goto fail;
 

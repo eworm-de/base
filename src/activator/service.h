@@ -23,7 +23,7 @@ struct Service {
 
         uid_t uid;
         uid_t gid;
-        bool persistent_data;
+
         char **argv;
         char **envp;
 

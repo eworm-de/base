@@ -85,6 +85,7 @@ int service_activate(Service *s) {
         pid_t p;
         static const char *mounts[] = {
                 "/dev",
+                "/etc",
                 "/proc",
                 "/sys",
                 "/usr",
@@ -105,19 +106,17 @@ int service_activate(Service *s) {
                         return -ENOMEM;
         }
 
-        if (s->persistent_data) {
-                if (asprintf(&datadir, "/var/org.bus1/%s", s->name) < 0)
-                        return -ENOMEM;
+        if (asprintf(&datadir, "/var/%s", s->name) < 0)
+                return -ENOMEM;
 
-                if (mkdir(datadir, 0770) < 0 && errno != EEXIST)
-                        return -errno;
+        if (mkdir(datadir, 0770) < 0 && errno != EEXIST)
+                return -errno;
 
-                if (chown(datadir, s->uid, s->gid) < 0)
-                        return -errno;
+        if (chown(datadir, s->uid, s->gid) < 0)
+                return -errno;
 
-                if (chmod(datadir, 0770) < 0)
-                        return -errno;
-        }
+        if (chmod(datadir, 0770) < 0)
+                return -errno;
 
         p = c_sys_clone(SIGCHLD|CLONE_NEWNS|CLONE_NEWIPC, NULL);
         if (p < 0)
@@ -148,10 +147,10 @@ int service_activate(Service *s) {
                         return -errno;
         }
 
-        if (mount("/tmp/usr/etc", "/tmp/etc", NULL, MS_BIND, NULL) < 0)
+        if (mount(datadir, "/tmp/var", NULL, MS_BIND, NULL) < 0)
                 return -errno;
 
-        if (s->persistent_data && mount(datadir, "/tmp/var", NULL, MS_BIND, NULL) < 0)
+        if (mount(NULL, "/tmp/var", NULL, MS_BIND|MS_RDONLY|MS_REMOUNT, NULL) < 0)
                 return -errno;
 
         if (chdir("/tmp") < 0)
