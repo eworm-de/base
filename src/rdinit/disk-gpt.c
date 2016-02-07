@@ -15,9 +15,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <bus1/c-macro.h>
-#include <bus1/c-shared.h>
-#include <bus1/b1-platform.h>
+#include <org.bus1/c-macro.h>
+#include <org.bus1/c-shared.h>
+#include <org.bus1/b1-platform.h>
 #include <ctype.h>
 #include <byteswap.h>
 #include <sys/ioctl.h>

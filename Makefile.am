@@ -117,7 +117,7 @@ bin_PROGRAMS += \
 	org.bus1.devices
 
 org_bus1_devices_SOURCES = \
-	src/bus1/b1-identity.h \
+	src/org.bus1/b1-identity.h \
 	src/devices/uevent.h \
 	src/devices/uevent.c \
 	src/devices/sysfs.h \
@@ -144,7 +144,7 @@ bin_PROGRAMS += \
 	org.bus1.activator
 
 org_bus1_activator_SOURCES = \
-	src/bus1/b1-identity.h \
+	src/org.bus1/b1-identity.h \
 	src/activator/service.h \
 	src/activator/service.c \
 	src/activator/main.c
@@ -178,9 +178,9 @@ bin_PROGRAMS += \
 	org.bus1.diskctl
 
 org_bus1_diskctl_SOURCES = \
-	src/bus1/b1-meta-header.h \
-	src/bus1/b1-disk-encrypt-header.h \
-	src/bus1/b1-disk-sign-header.h \
+	src/org.bus1/b1-meta-header.h \
+	src/org.bus1/b1-disk-encrypt-header.h \
+	src/org.bus1/b1-disk-sign-header.h \
 	src/diskctl/encrypt.h \
 	src/diskctl/encrypt.c \
 	src/diskctl/sign.h \
