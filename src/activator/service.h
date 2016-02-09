@@ -21,8 +21,7 @@ typedef struct Service Service;
 struct Service {
         char *name;
 
-        uid_t uid;
-        uid_t gid;
+        uid_t identity;
 
         char **argv;
         char **envp;

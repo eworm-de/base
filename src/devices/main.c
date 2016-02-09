@@ -16,12 +16,16 @@
 ***/
 
 #include <org.bus1/c-macro.h>
+#include <org.bus1/b1-identity.h>
 #include <signal.h>
 #include <string.h>
+#include <sys/capability.h>
 #include <sys/epoll.h>
+#include <sys/prctl.h>
 #include <sys/signalfd.h>
 
 #include "kmsg-util.h"
+#include "module.h"
 #include "module.h"
 #include "permissions.h"
 #include "sysfs.h"
@@ -47,6 +51,40 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         return 0;
 }
 
+C_DEFINE_CLEANUP(cap_t, cap_free);
+
+static int privileges_drop(uid_t uid, const cap_value_t *caps, unsigned int n_caps) {
+        _c_cleanup_(cap_freep) cap_t cap = NULL;
+
+        assert(uid > 0);
+
+        if (setresgid(uid, uid, uid) < 0)
+                return -errno;
+
+        /* Retain caps across setresuid(). */
+        if (prctl(PR_SET_KEEPCAPS, 1) < 0)
+                return -errno;
+
+        if (setresuid(uid, uid, uid) < 0)
+                return -errno;
+
+        if (prctl(PR_SET_KEEPCAPS, 0) < 0)
+                return -errno;
+
+        cap = cap_init();
+        if (!cap)
+                return -errno;
+
+        if (cap_set_flag(cap, CAP_EFFECTIVE, n_caps, caps, CAP_SET) < 0 ||
+            cap_set_flag(cap, CAP_PERMITTED, n_caps, caps, CAP_SET) < 0)
+                return -errno;
+
+        if (cap_set_proc(cap) < 0)
+                return -errno;
+
+        return 0;
+}
+
 int main(int argc, char **argv) {
         _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(c_closep) int fd_uevent = -1;
@@ -57,6 +95,12 @@ int main(int argc, char **argv) {
         struct epoll_event ep_signal = { .events = EPOLLIN };
         _c_cleanup_(c_closep) int sysfd = -1;
         _c_cleanup_(c_closep) int devfd = -1;
+        cap_value_t caps[] = {
+                CAP_CHOWN,
+                CAP_FOWNER,
+                CAP_DAC_OVERRIDE,
+                CAP_SYS_MODULE,
+        };
         int r;
 
         log = kmsg(0, NULL);
@@ -71,14 +115,18 @@ int main(int argc, char **argv) {
         if (sysfd < 0)
                 return EXIT_FAILURE;
 
-        fd_ep = epoll_create1(EPOLL_CLOEXEC);
-        if (fd_ep < 0)
-                return EXIT_FAILURE;
-
         fd_uevent = uevent_connect();
         if (fd_uevent < 0)
                 return EXIT_FAILURE;
         ep_monitor.data.fd = fd_uevent;
+
+        r = privileges_drop(BUS1_IDENTITY_DEVICES, caps, C_ARRAY_SIZE(caps));
+        if (r < 0)
+                return EXIT_FAILURE;
+
+        fd_ep = epoll_create1(EPOLL_CLOEXEC);
+        if (fd_ep < 0)
+                return EXIT_FAILURE;
 
         sigemptyset(&mask);
         sigaddset(&mask, SIGTERM);
@@ -107,6 +155,7 @@ int main(int argc, char **argv) {
                 if (n < 0) {
                         if (errno == EINTR)
                                 continue;
+
                         return EXIT_FAILURE;
                 }
 
@@ -133,6 +182,7 @@ int main(int argc, char **argv) {
                                         if (r < 0)
                                                 return EXIT_FAILURE;
                                 }
+
                         }
 
                         continue;

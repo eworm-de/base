@@ -131,12 +131,14 @@ org_bus1_devices_SOURCES = \
 org_bus1_devices_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
+	$(CAP_LIBS) \
 	$(KMOD_CFLAGS) \
 	-pthread
 
 org_bus1_devices_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
+	$(CAP_CFLAGS) \
 	$(KMOD_LIBS)
 
 # ------------------------------------------------------------------------------
@@ -150,8 +152,8 @@ org_bus1_activator_SOURCES = \
 	src/activator/main.c
 
 org_bus1_activator_CFLAGS = \
-	$(BUS1_CFLAGS) \
-	$(AM_CFLAGS)
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
 
 org_bus1_activator_LDADD = \
 	libshared.a \

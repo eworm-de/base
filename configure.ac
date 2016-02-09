@@ -115,17 +115,21 @@ AC_SUBST([OUR_LDFLAGS], "$with_ldflags")
 # ------------------------------------------------------------------------------
 # dependencies
 
-PKG_CHECK_MODULES(KMOD, [ libkmod >= 15 ],
+PKG_CHECK_MODULES(CAP, [ libcap ],
+        [AC_DEFINE(HAVE_LIBCAP, 1, [Define if libcap is available])],
+        AC_MSG_ERROR([*** libcap not found]))
+
+PKG_CHECK_MODULES(KMOD, [ libkmod ],
         [AC_DEFINE(HAVE_KMOD, 1, [Define if kmod is available])],
         AC_MSG_ERROR([*** libkmod not found]))
 
 AC_CHECK_LIB([dw], [dwfl_core_file_attach],
         [AC_DEFINE(HAVE_ELFUTILS, 1, [Define if elfutils is available])],
-        AC_MSG_ERROR([*** elfutils >= 158 not found]))
+        AC_MSG_ERROR([*** elfutils library not found]))
 ELFUTILS_LIBS="-lelf -ldw"
 AC_SUBST(ELFUTILS_LIBS)
 
-AM_PATH_LIBGCRYPT(1.6.1,,[AC_MSG_ERROR([*** gcrypt not found])])
+AM_PATH_LIBGCRYPT(1.6.1,,[AC_MSG_ERROR([*** libgcrypt not found])])
 GCRYPT_LIBS="$LIBGCRYPT_LIBS"
 GCRYPT_CFLAGS="$LIBGCRYPT_CFLAGS"
 AC_SUBST(GCRYPT_LIBS)

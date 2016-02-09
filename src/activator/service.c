@@ -112,7 +112,7 @@ int service_activate(Service *s) {
         if (mkdir(datadir, 0770) < 0 && errno != EEXIST)
                 return -errno;
 
-        if (chown(datadir, s->uid, s->gid) < 0)
+        if (chown(datadir, s->identity, s->identity) < 0)
                 return -errno;
 
         if (chmod(datadir, 0770) < 0)
@@ -165,10 +165,10 @@ int service_activate(Service *s) {
         if (chdir("/") < 0)
                 return -errno;
 
-        if (s->gid > 0 && setresgid(s->gid, s->gid, s->gid) < 0)
+        if (s->identity > 0 && setresgid(s->identity, s->identity, s->identity) < 0)
                 return -errno;
 
-        if (s->uid > 0 && setresuid(s->uid, s->uid, s->uid) < 0)
+        if (s->identity > 0 && setresuid(s->identity, s->identity, s->identity) < 0)
                 return -errno;
 
         kmsg(LOG_INFO, "Activating service %s.", s->name);
