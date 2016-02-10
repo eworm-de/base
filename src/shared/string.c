@@ -18,7 +18,7 @@
 #include <org.bus1/c-macro.h>
 #include <string.h>
 
-#include "string-util.h"
+#include "string.h"
 
 #pragma GCC push_options
 #pragma GCC optimize("O0")

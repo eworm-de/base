@@ -24,13 +24,13 @@
 #include <sys/stat.h>
 
 #include "org.bus1/b1-disk-sign-header.h"
-#include "disk-sign-hash-tree-util.h"
-#include "disk-sign-util.h"
-#include "file-util.h"
+#include "disk-sign-hash-tree.h"
+#include "disk-sign.h"
+#include "file.h"
 #include "missing.h"
-#include "string-util.h"
-#include "kmsg-util.h"
-#include "uuid-util.h"
+#include "string.h"
+#include "kmsg.h"
+#include "uuid.h"
 
 /* Return opened loop device, to prevent auto-clear before we attach it. */
 static int disk_sign_attach_loop(FILE *f, uint64_t offset, char **devicep, int *fd_devicep) {

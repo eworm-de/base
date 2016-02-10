@@ -19,8 +19,8 @@
 #include <org.bus1/c-shared.h>
 #include <gcrypt.h>
 
-#include "disk-sign-hash-tree-util.h"
-#include "file-util.h"
+#include "disk-sign-hash-tree.h"
+#include "file.h"
 
 /* Calculate and store hash blocks from n data blocks. */
 static int hash_write(FILE *f_data,

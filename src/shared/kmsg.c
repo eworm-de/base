@@ -20,7 +20,7 @@
 #include <syslog.h>
 #include <sys/stat.h>
 
-#include "kmsg-util.h"
+#include "kmsg.h"
 
 static FILE *f;
 

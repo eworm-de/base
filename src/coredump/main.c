@@ -15,9 +15,6 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/b1-identity.h>
-#include <org.bus1/c-macro.h>
-#include <org.bus1/c-shared.h>
 #include <dwarf.h>
 #include <elfutils/libdwfl.h>
 #include <fcntl.h>
@@ -25,9 +22,12 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 
-#include "file-util.h"
-#include "kmsg-util.h"
-#include "string-util.h"
+#include <org.bus1/b1-identity.h>
+#include <org.bus1/c-macro.h>
+#include <org.bus1/c-shared.h>
+#include "shared/file.h"
+#include "shared/kmsg.h"
+#include "shared/string.h"
 
 struct cb_data {
         Dwfl *dwfl;

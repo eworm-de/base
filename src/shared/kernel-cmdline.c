@@ -15,12 +15,12 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/c-macro.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#include <kernel-cmdline-util.h>
+#include <org.bus1/c-macro.h>
+#include <shared/kernel-cmdline.h>
 
 int kernel_cmdline_option(const char *key, char **value) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;

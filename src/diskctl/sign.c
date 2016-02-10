@@ -15,16 +15,16 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/c-macro.h>
-#include <org.bus1/c-shared.h>
-#include <org.bus1/b1-disk-sign-header.h>
 #include <linux/random.h>
 #include <sys/stat.h>
 
-#include "disk-sign-util.h"
-#include "file-util.h"
-#include "uuid-util.h"
-#include "missing.h"
+#include <org.bus1/c-macro.h>
+#include <org.bus1/c-shared.h>
+#include <org.bus1/b1-disk-sign-header.h>
+#include "shared/disk-sign.h"
+#include "shared/file.h"
+#include "shared/uuid.h"
+#include "shared/missing.h"
 
 #include "sign.h"
 

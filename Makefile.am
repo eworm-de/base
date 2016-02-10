@@ -25,7 +25,6 @@ noinst_LIBRARIES =
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-I $(top_srcdir)/src \
-	-I $(top_srcdir)/src/shared \
 	$(OUR_CPPFLAGS)
 
 AM_CFLAGS = $(OUR_CFLAGS)
@@ -40,32 +39,32 @@ noinst_LIBRARIES += \
 	libshared.a
 
 libshared_a_SOURCES = \
-	src/shared/aeswrap-util.h \
-	src/shared/aeswrap-util.c \
-	src/shared/disk-encrypt-util.h \
-	src/shared/disk-encrypt-util.c \
-	src/shared/disk-sign-hash-tree-util.h \
-	src/shared/disk-sign-hash-tree-util.c \
-	src/shared/disk-sign-util.h \
-	src/shared/disk-sign-util.c \
-	src/shared/disk-util.h \
-	src/shared/disk-util.c \
-	src/shared/file-util.h \
-	src/shared/file-util.c \
-	src/shared/kernel-cmdline-util.h \
-	src/shared/kernel-cmdline-util.c \
-	src/shared/kmsg-util.h \
-	src/shared/kmsg-util.c \
-	src/shared/mount-util.h \
-	src/shared/mount-util.c \
-	src/shared/process-util.h \
-	src/shared/process-util.c \
-	src/shared/string-util.h \
-	src/shared/string-util.c \
-	src/shared/tmpfs-root-util.h \
-	src/shared/tmpfs-root-util.c \
-	src/shared/uuid-util.h \
-	src/shared/uuid-util.c
+	src/shared/aeswrap.h \
+	src/shared/aeswrap.c \
+	src/shared/disk-encrypt.h \
+	src/shared/disk-encrypt.c \
+	src/shared/disk-sign-hash-tree.h \
+	src/shared/disk-sign-hash-tree.c \
+	src/shared/disk-sign.h \
+	src/shared/disk-sign.c \
+	src/shared/disk.h \
+	src/shared/disk.c \
+	src/shared/file.h \
+	src/shared/file.c \
+	src/shared/kernel-cmdline.h \
+	src/shared/kernel-cmdline.c \
+	src/shared/kmsg.h \
+	src/shared/kmsg.c \
+	src/shared/mount.h \
+	src/shared/mount.c \
+	src/shared/process.h \
+	src/shared/process.c \
+	src/shared/string.h \
+	src/shared/string.c \
+	src/shared/tmpfs-root.h \
+	src/shared/tmpfs-root.c \
+	src/shared/uuid.h \
+	src/shared/uuid.c
 
 libshared_a_CFLAGS = \
 	$(AM_CFLAGS) \

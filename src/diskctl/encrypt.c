@@ -18,11 +18,11 @@
 #include <org.bus1/c-macro.h>
 #include <org.bus1/c-shared.h>
 #include <org.bus1/b1-disk-encrypt-header.h>
+#include "shared/disk-encrypt.h"
+#include "shared/string.h"
+#include "shared/uuid.h"
 
-#include "disk-encrypt-util.h"
 #include "encrypt.h"
-#include "string-util.h"
-#include "uuid-util.h"
 
 #ifndef BLKDISCARD
 #define BLKDISCARD _IO(0x12,119)

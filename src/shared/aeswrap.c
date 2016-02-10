@@ -15,10 +15,10 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/c-macro.h>
 #include <gcrypt.h>
 
-#include <aeswrap-util.h>
+#include <org.bus1/c-macro.h>
+#include <shared/aeswrap.h>
 
 C_DEFINE_CLEANUP(gcry_cipher_hd_t, gcry_cipher_close);
 

@@ -20,7 +20,7 @@
 #include <linux/random.h>
 #include <sys/ioctl.h>
 
-#include "disk-util.h"
+#include "disk.h"
 
 #ifndef BLKDISCARD
 #define BLKDISCARD _IO(0x12,119)

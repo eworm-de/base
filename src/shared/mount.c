@@ -19,7 +19,7 @@
 #include <org.bus1/c-shared.h>
 #include <sys/mount.h>
 
-#include "mount-util.h"
+#include "mount.h"
 
 int mount_boot(const char *device, const char *directory, unsigned long flags) {
         if (mount(device, directory ?: "/boot", "vfat", flags|MS_NOSUID|MS_NOEXEC|MS_NODEV, "umask=0027") < 0)

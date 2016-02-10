@@ -17,9 +17,9 @@
 
 #include <org.bus1/c-macro.h>
 #include <org.bus1/c-shared.h>
+#include "shared/disk-encrypt.h"
+#include "shared/disk-sign.h"
 
-#include "disk-encrypt-util.h"
-#include "disk-sign-util.h"
 #include "encrypt.h"
 #include "sign.h"
 

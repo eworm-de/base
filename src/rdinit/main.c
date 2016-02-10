@@ -33,15 +33,16 @@
 
 //FIXME: use bus
 #include "../devices/sysfs.h"
-#include "disk-encrypt-util.h"
-#include "disk-sign-util.h"
-#include "file-util.h"
-#include "kmsg-util.h"
-#include "mount-util.h"
-#include "kernel-cmdline-util.h"
-#include "process-util.h"
-#include "tmpfs-root-util.h"
-#include "uuid-util.h"
+
+#include "shared/disk-encrypt.h"
+#include "shared/disk-sign.h"
+#include "shared/file.h"
+#include "shared/kmsg.h"
+#include "shared/mount.h"
+#include "shared/kernel-cmdline.h"
+#include "shared/process.h"
+#include "shared/tmpfs-root.h"
+#include "shared/uuid.h"
 
 #include "disk-gpt.h"
 #include "sysctl.h"

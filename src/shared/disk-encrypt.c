@@ -23,13 +23,13 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
-#include "aeswrap-util.h"
-#include "disk-encrypt-util.h"
-#include "disk-util.h"
-#include "file-util.h"
+#include "aeswrap.h"
+#include "disk-encrypt.h"
+#include "disk.h"
+#include "file.h"
 #include "missing.h"
-#include "string-util.h"
-#include "uuid-util.h"
+#include "string.h"
+#include "uuid.h"
 
 int disk_encrypt_get_info(FILE *f,
                           char **image_typep,

@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#include "process-util.h"
+#include "process.h"
 
 int process_reap_children(pid_t *p) {
         pid_t pid = -1;
