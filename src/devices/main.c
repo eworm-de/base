@@ -56,6 +56,8 @@ C_DEFINE_CLEANUP(cap_t, cap_free);
 
 static int privileges_drop(uid_t uid, const cap_value_t *caps, unsigned int n_caps) {
         _c_cleanup_(cap_freep) cap_t cap = NULL;
+        static const cap_value_t setpcap = CAP_SETPCAP;
+        cap_value_t c;
 
         assert(uid > 0);
 
@@ -72,8 +74,22 @@ static int privileges_drop(uid_t uid, const cap_value_t *caps, unsigned int n_ca
         if (prctl(PR_SET_KEEPCAPS, 0) < 0)
                 return -errno;
 
-        cap = cap_init();
+        cap = cap_get_proc();
         if (!cap)
+                return -errno;
+
+        /* Gain CAP_SETPCAP to be able to drop the capability bounding set. */
+        if (cap_set_flag(cap, CAP_EFFECTIVE, 1, &setpcap, CAP_SET) < 0)
+                return -errno;
+
+        if (cap_set_proc(cap) < 0)
+                return -errno;
+
+        for (c = 0;; c++)
+                if (cap_drop_bound(c) < 0)
+                        break;
+
+        if (cap_clear(cap) < 0)
                 return -errno;
 
         if (cap_set_flag(cap, CAP_EFFECTIVE, n_caps, caps, CAP_SET) < 0 ||
