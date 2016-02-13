@@ -24,7 +24,7 @@
 
 #include "file.h"
 
-int file_get_size(FILE *f, size_t *size) {
+int file_get_size(FILE *f, uint64_t *size) {
         struct stat sb;
 
         if (fstat(fileno(f), &sb) < 0)
@@ -52,7 +52,7 @@ int file_read_line(const char *filename, char **linep) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         char buf[4096];
         char *line;
-        size_t len;
+        uint64_t len;
 
         f = fopen(filename, "re");
         if (!f)
@@ -82,8 +82,8 @@ int file_copy(FILE *f_in, FILE *f_out, uint64_t *sizep) {
 
         for (;;) {
                 char buf[128 * 1024];
-                ssize_t in;
-                ssize_t n;
+                int64_t in;
+                int64_t n;
                 char *p;
 
                 in = read(fileno(f_in), buf, sizeof(buf));
@@ -95,7 +95,7 @@ int file_copy(FILE *f_in, FILE *f_out, uint64_t *sizep) {
                 p = buf;
                 n = in;
                 while (n > 0) {
-                        ssize_t out;
+                        int64_t out;
 
                         out = write(fileno(f_out), p, n);
                         if (out == 0)

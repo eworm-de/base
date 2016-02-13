@@ -76,7 +76,7 @@ static int disk_sign_attach_loop(FILE *f, uint64_t offset, char **devicep, int *
         return 0;
 }
 
-static int dm_ioctl_new(uint64_t device, unsigned int flags, size_t data_size, struct dm_ioctl **iop) {
+static int dm_ioctl_new(uint64_t device, unsigned int flags, uint64_t data_size, struct dm_ioctl **iop) {
         struct dm_ioctl *io;
 
         io = calloc(1, sizeof(struct dm_ioctl) + data_size);

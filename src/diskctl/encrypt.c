@@ -47,7 +47,7 @@ int disk_encrypt_print_info(const char *data) {
         _c_cleanup_(c_freep) char *key0_type_uuid_str = NULL;
         _c_cleanup_(c_freep) char *key0_encryption = NULL;
         uint8_t key0[256];
-        size_t key0_size;
+        uint64_t key0_size;
         _c_cleanup_(c_freep) char *key0_str = NULL;
         int r;
 

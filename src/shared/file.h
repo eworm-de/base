@@ -16,7 +16,7 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int file_get_size(FILE *f, size_t *size);
+int file_get_size(FILE *f, uint64_t *size);
 int file_read_line(const char *file, char **line);
 int file_copy(FILE *f_in, FILE *f_out, uint64_t *sizep);
 

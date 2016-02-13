@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
                 if (linkat(AT_FDCWD, proc_file, dfd, core_file, AT_SYMLINK_FOLLOW) < 0)
                         return EXIT_FAILURE;
 
-                kmsg(LOG_INFO, "%s[%d] wrote coredump to /var/coredump/%s (%zd kB).", comm, pid, core_file, core_size / 1024);
+                kmsg(LOG_INFO, "%s[%d] wrote coredump to /var/coredump/%s (%" PRIu64 " kB).", comm, pid, core_file, core_size / 1024);
         }
 
         /* Drop privileges. */

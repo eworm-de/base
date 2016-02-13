@@ -38,13 +38,13 @@ static int hash_write(FILE *f_data,
                       uint8_t *result) {
         _c_cleanup_(c_freep) uint8_t *null_block = NULL;
         _c_cleanup_(c_freep) uint8_t *data_buffer = NULL;
-        size_t hashes_per_block;
+        size_t n_hashes_per_block;
         uint64_t n_blocks;
         size_t n_bytes;
         unsigned i;
 
-        hashes_per_block = hash_block_size / crypt_hash_size;
-        n_blocks = (n_data_blocks + hashes_per_block - 1) / hashes_per_block;
+        n_hashes_per_block = hash_block_size / crypt_hash_size;
+        n_blocks = (n_data_blocks + n_hashes_per_block - 1) / n_hashes_per_block;
 
         null_block = calloc(1, hash_block_size);
         data_buffer = calloc(1, data_block_size);
@@ -66,7 +66,7 @@ static int hash_write(FILE *f_data,
         while (n_blocks--) {
                 n_bytes = hash_block_size;
 
-                for (i = 0; i < hashes_per_block; i++) {
+                for (i = 0; i < n_hashes_per_block; i++) {
                         if (n_data_blocks-- == 0)
                                 break;
 
