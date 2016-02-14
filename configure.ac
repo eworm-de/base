@@ -6,7 +6,7 @@ AC_PREREQ([2.64])
 AC_INIT([base],
         [1],
         [http://www.github.com/bus1/base],
-        [libbus1],
+        [base],
         [http://www.github.com/bus1/base])
 
 AC_CONFIG_SRCDIR([src/org.bus1/b1-identity.h])
