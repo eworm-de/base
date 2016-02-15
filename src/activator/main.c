@@ -34,15 +34,13 @@
 
 #include "service.h"
 
-typedef struct Manager Manager;
-
-struct Manager {
+typedef struct {
         Service *devices;
 
         int fd_signal;
         int fd_ep;
         struct epoll_event ep_signal;
-};
+} Manager;
 
 static Manager *manager_free(Manager *m) {
         c_close(m->fd_ep);

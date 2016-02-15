@@ -16,9 +16,7 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-typedef struct Service Service;
-
-struct Service {
+typedef struct {
         char *name;
 
         uid_t identity;
@@ -28,7 +26,7 @@ struct Service {
 
         pid_t pid;
         bool terminated;
-};
+} Service;
 
 int service_new(const char *name, Service **servicep);
 Service *service_free(Service *s);

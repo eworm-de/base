@@ -47,9 +47,7 @@
 #include "disk-gpt.h"
 #include "sysctl.h"
 
-typedef struct Manager Manager;
-
-struct Manager {
+typedef struct {
         int fd_signal;
         int fd_ep;
         struct epoll_event ep_signal;
@@ -61,7 +59,7 @@ struct Manager {
 
         /* org.bus1.activator */
         pid_t activator_pid;
-};
+} Manager;
 
 static Manager *manager_free(Manager *m) {
         free(m->device_data);

@@ -153,9 +153,7 @@ static pid_t getty_start(const char *device) {
         return p;
 }
 
-typedef struct Manager Manager;
-
-struct Manager {
+typedef struct {
         int fd_signal;
         int fd_ep;
         struct epoll_event ep_signal;
@@ -172,7 +170,7 @@ struct Manager {
         pid_t activator_pid;    /* org.bus1.activator */
         pid_t login_pid;        /* console login */
         pid_t serial_pid;       /* serial console login */
-};
+} Manager;
 
 static Manager *manager_free(Manager *m) {
         free(m->release);
