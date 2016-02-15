@@ -77,14 +77,12 @@ C_DEFINE_CLEANUP(Manager *, manager_free);
 static int manager_new(Manager **manager) {
         _c_cleanup_(manager_freep) Manager *m = NULL;
         sigset_t mask;
+        _c_cleanup_(c_closep) int fd_signal = -1;
+        _c_cleanup_(c_closep) int fd_ep = -1;
 
         m = calloc(1, sizeof(Manager));
         if (!m)
                 return -ENOMEM;
-
-        m->ep_signal.events = EPOLLIN;
-        m->fd_signal = -1;
-        m->fd_ep = -1;
 
         m->activator_pid = -1;
 
@@ -94,22 +92,30 @@ static int manager_new(Manager **manager) {
         sigaddset(&mask, SIGCHLD);
         sigprocmask(SIG_BLOCK, &mask, NULL);
 
-        m->fd_ep = epoll_create1(EPOLL_CLOEXEC);
-        if (m->fd_ep < 0)
+        fd_signal = signalfd(-1, &mask, SFD_NONBLOCK|SFD_CLOEXEC);
+        if (fd_signal < 0)
                 return -errno;
 
-        m->fd_signal = signalfd(-1, &mask, SFD_NONBLOCK|SFD_CLOEXEC);
-        if (m->fd_signal < 0)
+        m->ep_signal.events = EPOLLIN;
+        m->ep_signal.data.fd = fd_signal;
+
+        fd_ep = epoll_create1(EPOLL_CLOEXEC);
+        if (fd_ep < 0)
                 return -errno;
-        m->ep_signal.data.fd = m->fd_signal;
 
-        if (epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_signal, &m->ep_signal) < 0)
+        if (epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_signal, &m->ep_signal) < 0)
                 return -errno;
 
-       *manager = m;
-       m = NULL;
+        m->fd_signal = fd_signal;
+        fd_signal = -1;
 
-       return 0;
+        m->fd_ep = fd_ep;
+        fd_ep = -1;
+
+        *manager = m;
+        m = NULL;
+
+        return 0;
 }
 
 static int manager_start_services(Manager *m, pid_t died_pid) {
@@ -271,39 +277,41 @@ static int manager_run(Manager *m) {
                         return -errno;
                 }
 
-                if (ev.data.fd == m->fd_signal && ev.events & EPOLLIN) {
-                        struct signalfd_siginfo fdsi;
-                        ssize_t size;
+                if (n > 0) {
+                        if (ev.data.fd == m->fd_signal && ev.events & EPOLLIN) {
+                                struct signalfd_siginfo fdsi;
+                                ssize_t size;
 
-                        size = read(m->fd_signal, &fdsi, sizeof(struct signalfd_siginfo));
-                        if (size != sizeof(struct signalfd_siginfo))
-                                continue;
+                                size = read(m->fd_signal, &fdsi, sizeof(struct signalfd_siginfo));
+                                if (size != sizeof(struct signalfd_siginfo))
+                                        continue;
 
-                        switch (fdsi.ssi_signo) {
-                        case SIGTERM:
-                        case SIGINT:
-                                exit = true;
-                                break;
-
-                        case SIGCHLD: {
-                                pid_t pid;
-
-                                r = process_reap_children(&pid);
-                                if (r < 0)
-                                        return r;
-
-                                if (pid < 0)
+                                switch (fdsi.ssi_signo) {
+                                case SIGTERM:
+                                case SIGINT:
+                                        exit = true;
                                         break;
 
-                                r = manager_start_services(m, pid);
-                                if (r < 0)
-                                        return r;
+                                case SIGCHLD: {
+                                        pid_t pid;
 
-                                break;
-                        }
+                                        r = process_reap_children(&pid);
+                                        if (r < 0)
+                                                return r;
 
-                        default:
-                                return -EINVAL;
+                                        if (pid < 0)
+                                                break;
+
+                                        r = manager_start_services(m, pid);
+                                        if (r < 0)
+                                                return r;
+
+                                        break;
+                                }
+
+                                default:
+                                        return -EINVAL;
+                                }
                         }
                 }
 
