@@ -1,5 +1,8 @@
 # ------------------------------------------------------------------------------
-ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
+# autotools
+
+SHELL=bash
+ACLOCAL_AMFLAGS = -I build/m4 ${ACLOCAL_FLAGS}
 AM_MAKEFLAGS = --no-print-directory
 AUTOMAKE_OPTIONS = color-tests parallel-tests
 
@@ -14,7 +17,7 @@ SUBDIRS = .
 # keep intermediate files
 .SECONDARY:
 
-# Keep the test-suite.log and Makefile around at all times
+# keep the test-suite.log and Makefile around at all times
 .PRECIOUS: $(TEST_SUITE_LOG) Makefile
 
 CLEANFILES = $(BUILT_SOURCES)
@@ -23,16 +26,17 @@ noinst_PROGRAMS =
 noinst_LIBRARIES =
 
 AM_CPPFLAGS = \
-	-include $(top_builddir)/config.h \
+	-include $(top_builddir)/build/config.h \
 	-I $(top_srcdir)/src \
+	-I $(top_builddir)/src \
 	$(OUR_CPPFLAGS)
 
 AM_CFLAGS = $(OUR_CFLAGS)
 AM_LDFLAGS = $(OUR_LDFLAGS)
 
 # ------------------------------------------------------------------------------
-BUS1_CFLAGS = -I $(top_srcdir)/../libbus1/src
-BUS1_LIBS = -L $(top_srcdir)/../libbus1/.libs -lbus1
+BUS1_CFLAGS = -I$(top_srcdir)/../libbus1/src
+BUS1_LIBS = -L$(top_srcdir)/../libbus1/.libs -lbus1
 
 # ------------------------------------------------------------------------------
 noinst_LIBRARIES += \
@@ -199,8 +203,8 @@ org_bus1_diskctl_LDADD = \
 	$(GCRYPT_LIBS)
 
 # ------------------------------------------------------------------------------
-.PHONY: install-tree
 install-tree: all
 	rm -rf $(abs_srcdir)/install-tree
 	$(MAKE) install DESTDIR=$(abs_srcdir)/install-tree
 	tree $(abs_srcdir)/install-tree
+.PHONY: install-tree
