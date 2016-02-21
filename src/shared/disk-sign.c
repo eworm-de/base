@@ -21,6 +21,7 @@
 #include <linux/loop.h>
 #include <linux/random.h>
 #include <sys/ioctl.h>
+#include <sys/sendfile.h>
 #include <sys/stat.h>
 
 #include "org.bus1/b1-disk-sign-header.h"
@@ -438,9 +439,14 @@ int disk_sign_format_volume(const char *filename_data,
         if (fseeko(f_image, sizeof(info) + sizeof(signature), SEEK_SET) < 0)
                 return -errno;
 
-        r = file_copy(f_data, f_image, NULL);
-        if (r < 0)
-                return r;
+        for (;;) {
+                r = sendfile(fileno(f_image), fileno(f_data), NULL, 1024 * 1024 * 1024);
+                if (r < 0)
+                        return -errno;
+
+                if (r == 0)
+                        break;
+        }
 
         strncpy(info.meta.object_label, image_name, sizeof(info.meta.object_label) - 1);
         strncpy(info.data.type, data_type, sizeof(info.data.type) - 1);

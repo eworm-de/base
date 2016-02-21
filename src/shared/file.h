@@ -18,5 +18,3 @@
 
 int file_get_size(FILE *f, uint64_t *size);
 int file_read_line(const char *file, char **line);
-int file_copy(FILE *f_in, FILE *f_out, uint64_t *sizep);
-

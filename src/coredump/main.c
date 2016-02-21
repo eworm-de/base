@@ -25,7 +25,6 @@
 #include <org.bus1/b1-identity.h>
 #include <org.bus1/c-macro.h>
 #include <org.bus1/c-shared.h>
-#include "shared/file.h"
 #include "shared/kmsg.h"
 #include "shared/string.h"
 
@@ -111,7 +110,7 @@ static int thread_cb(Dwfl_Thread *thread, void *userdata) {
         return DWARF_CB_OK;
 }
 
-static int stacktrace_log(FILE *f, char **error) {
+static int stacktrace_log(int fd, char **error) {
         static const Dwfl_Callbacks cbs = {
                 .find_elf = dwfl_build_id_find_elf,
                 .find_debuginfo = dwfl_standard_find_debuginfo,
@@ -119,11 +118,11 @@ static int stacktrace_log(FILE *f, char **error) {
         struct cb_data c = {};
         int r = -EINVAL;
 
-        if (fseeko(f, 0, SEEK_SET) < 0)
+        if (lseek(fd, 0, SEEK_SET) < 0)
                 return -errno;
 
         elf_version(EV_CURRENT);
-        c.elf = elf_begin(fileno(f), ELF_C_READ_MMAP, NULL);
+        c.elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
         if (!c.elf)
                 goto finish;
 
@@ -175,12 +174,10 @@ int main(int argc, char **argv) {
         gid_t gid;
         int sig;
         const char *comm;
-        int fd;
-        _c_cleanup_(c_fclosep) FILE *f_core = NULL;
-        uint64_t core_size;
+        _c_cleanup_(c_closep) int fd = -1;
+        int64_t core_size = 0;
         _c_cleanup_(c_closep) int dfd = -1;
         _c_cleanup_(c_freep) char *error = NULL;
-        int r;
 
         prctl(PR_SET_DUMPABLE, 0);
 
@@ -200,17 +197,22 @@ int main(int argc, char **argv) {
         if (fd < 0)
                 return EXIT_FAILURE;
 
-        f_core = fdopen(fd, "r+e");
-        if (!f_core)
-                return EXIT_FAILURE;
-
-        if (fchownat(fileno(f_core), "", BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, AT_EMPTY_PATH) < 0)
+        if (fchownat(fd, "", BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, AT_EMPTY_PATH) < 0)
                 return EXIT_FAILURE;
 
         /* Stream the coredump from the kernel to the file. */
-        r = file_copy(stdin, f_core, &core_size);
-        if (r < 0)
-                return EXIT_FAILURE;
+        for (;;) {
+                ssize_t n;
+
+                n = splice(STDIN_FILENO, NULL, fd, NULL, 1024 * 1024 * 1024, 0);
+                if (n < 0)
+                        return EXIT_FAILURE;
+
+                if (n == 0)
+                        break;
+
+                core_size += n;
+        }
 
         /* Safe coredump to disk. */
         dfd = openat(AT_FDCWD, "/var/coredump", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
@@ -232,7 +234,7 @@ int main(int argc, char **argv) {
                 if (asprintf(&core_file, "%d-%s", uid, comm_escaped) < 0)
                         return EXIT_FAILURE;
 
-                if (asprintf(&proc_file, "/proc/self/fd/%d", fileno(f_core)) < 0)
+                if (asprintf(&proc_file, "/proc/self/fd/%d", fd) < 0)
                         return EXIT_FAILURE;
 
                 if (unlinkat(dfd, core_file, 0) < 0 && errno != ENOENT)
@@ -249,7 +251,7 @@ int main(int argc, char **argv) {
             setresuid(BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP, BUS1_IDENTITY_COREDUMP) < 0)
                 return EXIT_FAILURE;
 
-        if (stacktrace_log(f_core, &error) < 0)
+        if (stacktrace_log(fd, &error) < 0)
                 kmsg(LOG_INFO, "Unable to generate stack trace: %s.", error);
 
         return EXIT_SUCCESS;
