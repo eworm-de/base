@@ -160,7 +160,7 @@ static int manager_new(Manager **manager) {
                 return -errno;
 
         m->fd_uevent = fd_uevent;
-        fd_signal = -1;
+        fd_uevent = -1;
 
         m->fd_signal = fd_signal;
         fd_signal = -1;
