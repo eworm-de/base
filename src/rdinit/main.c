@@ -193,8 +193,9 @@ static int modules_load(void) {
                 const char *name;
                 const char *path;
         } modules[] = {
-                { "bus1", "/sys/module/bus1" },
-                { "loop", "/sys/module/loop" },
+                { "bus1",   "/sys/module/bus1" },
+                { "dm_mod", "/sys/module/dm_mod" },
+                { "loop",   "/sys/module/loop" },
         };
         unsigned int i;
         struct kmod_ctx *ctx = NULL;
