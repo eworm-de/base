@@ -145,42 +145,29 @@ static int manager_stop_services(Manager *m) {
         return 0;
 }
 
-static int kernel_filesystem_mount(bool early) {
+static int kernel_filesystem_mount(void) {
         static const struct mountpoint {
                 const char *what;
                 const char *where;
                 const char *type;
                 const char *options;
                 unsigned long flags;
-        } mount_early[] = {
+        } mounts[] = {
                 { "devtmpfs", "/dev",         "devtmpfs", "mode=755",  MS_NOSUID|MS_NOEXEC|MS_STRICTATIME },
                 { "devpts",   "/dev/pts",     "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
                 { "proc",     "/proc",        "proc",     "hidepid=2", MS_NOSUID|MS_NOEXEC|MS_NODEV },
                 { "sysfs",    "/sys",         "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
-        }, mount_late[] = {
-                { "bus1fs",   "/sys/fs/bus1", "bus1fs",   NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
         };
+        unsigned int i;
 
-        if (early) {
-                unsigned int i;
+        for (i = 0; i < C_ARRAY_SIZE(mounts); i++) {
+                if (mkdir(mounts[i].where, 0700) < 0 && errno != EEXIST)
+                        return -errno;
 
-                for (i = 0; i < C_ARRAY_SIZE(mount_early); i++) {
-                        if (mkdir(mount_early[i].where, 0700) < 0 && errno != EEXIST)
-                                return -errno;
-
-                        if (mount(mount_early[i].what, mount_early[i].where,
-                                  mount_early[i].type, mount_early[i].flags,
-                                  mount_early[i].options) < 0)
-                                return -errno;
-                }
-        } else {
-                unsigned int i;
-
-                for (i = 0; i < C_ARRAY_SIZE(mount_late); i++)
-                        if (mount(mount_late[i].what, mount_late[i].where,
-                                  mount_late[i].type, mount_late[i].flags,
-                                  mount_late[i].options) < 0)
-                                return -errno;
+                if (mount(mounts[i].what, mounts[i].where,
+                          mounts[i].type, mounts[i].flags,
+                          mounts[i].options) < 0)
+                        return -errno;
         }
 
         return 0;
@@ -211,25 +198,26 @@ static int modules_load(void) {
                         ctx = kmod_new(NULL, NULL);
                         if (!ctx) {
                                 r = -ENOMEM;
-                                goto finish;
+                                break;
                         }
 
                         kmod_set_log_fn(ctx, module_log, NULL);
                         r = kmod_load_resources(ctx);
                         if (r < 0)
-                                goto finish;
+                                break;
                 }
 
                 r = kmod_module_new_from_name(ctx, modules[i].name, &mod);
                 if (r < 0)
-                        continue;
+                        break;
 
-                kmod_module_probe_insert_module(mod, KMOD_PROBE_APPLY_BLACKLIST|KMOD_PROBE_IGNORE_COMMAND,
-                                                NULL, NULL, NULL, NULL);
+                r = kmod_module_probe_insert_module(mod, KMOD_PROBE_APPLY_BLACKLIST|KMOD_PROBE_IGNORE_COMMAND,
+                                                    NULL, NULL, NULL, NULL);
                 kmod_module_unref(mod);
+                if (r < 0)
+                        break;
         }
 
-finish:
         kmod_unref(ctx);
         return r;
 }
@@ -684,8 +672,7 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
-        /* early mount before module load and command line parsing */
-        r = kernel_filesystem_mount(true);
+        r = kernel_filesystem_mount();
         if (r < 0)
                 goto fail;
 
@@ -715,11 +702,6 @@ int main(int argc, char **argv) {
         }
 
         r = modules_load();
-        if (r < 0)
-                goto fail;
-
-        /* late mount after module load */
-        r = kernel_filesystem_mount(false);
         if (r < 0)
                 goto fail;
 
