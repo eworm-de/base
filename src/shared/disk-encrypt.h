@@ -28,10 +28,10 @@ int disk_encrypt_get_info(FILE *f,
                           uint8_t *master_keyp,
                           uint64_t *master_key_sizep,
                           uint64_t *n_key_slotsp,
-                          uint8_t *key0_type_uuidp,
-                          char **key0_encryptionp,
-                          uint8_t *key0p,
-                          uint64_t *key0_sizep);
+                          uint8_t *key_clear_type_uuidp,
+                          char **key_clear_encryptionp,
+                          uint8_t *key_clearp,
+                          uint64_t *key_clear_sizep);
 
 int disk_encrypt_setup_device(const char *device,
                               char **devicep,
@@ -40,4 +40,6 @@ int disk_encrypt_setup_device(const char *device,
 
 int disk_encrypt_format_volume(const char *data_file,
                                const char *image_name,
-                               const char *data_type);
+                               const char *data_type,
+                               uint8_t *recovery_keyp,
+                               uint64_t *recovery_key_sizep);

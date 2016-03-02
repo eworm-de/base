@@ -57,8 +57,14 @@ int main(int argc, char **argv) {
                         const char *name = argv[2];
                         const char *type = argv[3];
                         const char *filename = argv[4];
+                        uint8_t recovery_key[32 + 8];
+                        uint64_t recovery_key_size;
 
-                        r = disk_encrypt_format_volume(filename, name, type);
+                        r = disk_encrypt_format_volume(filename,
+                                                       name,
+                                                       type,
+                                                       recovery_key,
+                                                       &recovery_key_size);
                         if (r < 0) {
                                 fprintf(stderr, "Error writing %s: %s\n", filename, strerror(-r));
                                 return EXIT_FAILURE;
@@ -66,6 +72,8 @@ int main(int argc, char **argv) {
 
                         if (disk_encrypt_print_info(filename) < 0)
                                 return EXIT_FAILURE;
+
+                        disk_encrypt_print_recovery(recovery_key, recovery_key_size);
 
                         return EXIT_SUCCESS;
                 }

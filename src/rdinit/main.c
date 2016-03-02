@@ -347,7 +347,11 @@ static int format_var(const char *device,
                 if (buf[i] != 0)
                         return -EBUSY;
 
-        r = disk_encrypt_format_volume(device, image_name, data_type);
+        r = disk_encrypt_format_volume(device,
+                                       image_name,
+                                       data_type,
+                                       NULL,
+                                       NULL);
         if (r < 0)
                 return r;
 

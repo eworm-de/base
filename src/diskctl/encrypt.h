@@ -17,3 +17,5 @@
 ***/
 
 int disk_encrypt_print_info(const char *data);
+void disk_encrypt_print_recovery(uint8_t *recovery_key, uint64_t recovery_key_size);
+

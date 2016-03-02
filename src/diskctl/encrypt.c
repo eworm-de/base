@@ -43,12 +43,12 @@ int disk_encrypt_print_info(const char *data) {
         _c_cleanup_(c_freep) char *master_key_str = NULL;
         uint64_t master_key_encrypted_size;
         uint64_t n_key_slots;
-        uint8_t key0_type_uuid[16];
-        _c_cleanup_(c_freep) char *key0_type_uuid_str = NULL;
-        _c_cleanup_(c_freep) char *key0_encryption = NULL;
-        uint8_t key0[256];
-        uint64_t key0_size;
-        _c_cleanup_(c_freep) char *key0_str = NULL;
+        uint8_t key_clear_type_uuid[16];
+        _c_cleanup_(c_freep) char *key_clear_type_uuid_str = NULL;
+        _c_cleanup_(c_freep) char *key_clear_encryption = NULL;
+        uint8_t key_clear[256];
+        uint64_t key_clear_size;
+        _c_cleanup_(c_freep) char *key_clear_str = NULL;
         int r;
 
         f = fopen(data, "re");
@@ -67,10 +67,10 @@ int disk_encrypt_print_info(const char *data) {
                                   master_key_encrypted,
                                   &master_key_encrypted_size,
                                   &n_key_slots,
-                                  key0_type_uuid,
-                                  &key0_encryption,
-                                  key0,
-                                  &key0_size);
+                                  key_clear_type_uuid,
+                                  &key_clear_encryption,
+                                  key_clear,
+                                  &key_clear_size);
         if (r < 0)
                 return r;
 
@@ -82,11 +82,11 @@ int disk_encrypt_print_info(const char *data) {
         if (r < 0)
                 return r;
 
-        r = uuid_to_string(key0_type_uuid, &key0_type_uuid_str);
+        r = uuid_to_string(key_clear_type_uuid, &key_clear_type_uuid_str);
         if (r < 0)
                 return r;
 
-        r = hexstr_from_bytes(key0, master_key_encrypted_size / 8, &key0_str);
+        r = hexstr_from_bytes(key_clear, master_key_encrypted_size / 8, &key_clear_str);
         if (r < 0)
                 return r;
 
@@ -103,11 +103,28 @@ int disk_encrypt_print_info(const char *data) {
         printf("Master key (encrypted): %s\n", master_key_str);
         printf("Master key size:        %" PRIu64 " bits\n", master_key_encrypted_size);
         printf("Key slots:              %" PRIu64 "\n", n_key_slots);
-        printf("Key[0] type UUID:       %s\n", key0_type_uuid_str);
-        printf("Key[0] encryption:      %s\n", key0_encryption);
-        printf("Key[0] key (encrypted): %s\n", key0_str);
-        printf("Key[0] key size:        %" PRIu64 " bits\n", key0_size);
+        printf("Key[0] type UUID:       %s\n", key_clear_type_uuid_str);
+        printf("Key[0] encryption:      %s\n", key_clear_encryption);
+        printf("Key[0] key (encrypted): %s\n", key_clear_str);
+        printf("Key[0] key size:        %" PRIu64 " bits\n", key_clear_size);
         printf("========================================================================================================\n");
 
         return 0;
+}
+
+void disk_encrypt_print_recovery(uint8_t *recovery_key, uint64_t recovery_key_size) {
+        unsigned int i;
+
+        /* Every 6-digit number represents 16-bit key material, multiplied
+           by 11 to be able to check the validity of the input. */
+
+        printf("Recovery key size:      %" PRIu64 " bits\n", recovery_key_size);
+        for (i = 0; i < recovery_key_size / 8; i += 8) {
+                printf("  %06d-%06d-%06d-%06d\n",
+                       (recovery_key[i + 0] << 8 | recovery_key[(i + 1)]) * 11,
+                       (recovery_key[i + 2] << 8 | recovery_key[(i + 3)]) * 11,
+                       (recovery_key[i + 4] << 8 | recovery_key[(i + 5)]) * 11,
+                       (recovery_key[i + 6] << 8 | recovery_key[(i + 7)]) * 11);
+        }
+        printf("========================================================================================================\n");
 }

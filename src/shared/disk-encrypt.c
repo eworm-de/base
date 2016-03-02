@@ -43,10 +43,10 @@ int disk_encrypt_get_info(FILE *f,
                           uint8_t *master_keyp,
                           uint64_t *master_key_sizep,
                           uint64_t *n_key_slotsp,
-                          uint8_t *key0_type_uuidp,
-                          char **key0_encryptionp,
-                          uint8_t *key0p,
-                          uint64_t *key0_sizep) {
+                          uint8_t *key_clear_type_uuidp,
+                          char **key_clear_encryptionp,
+                          uint8_t *key_clearp,
+                          uint64_t *key_clear_sizep) {
         Bus1DiskEncryptHeader info;
         Bus1DiskEncryptKeySlot keys[1];
         static const char meta_uuid[] = BUS1_META_HEADER_UUID;
@@ -56,9 +56,9 @@ int disk_encrypt_get_info(FILE *f,
         _c_cleanup_(c_freep) char *data_type = NULL;
         _c_cleanup_(c_freep) char *encryption = NULL;
         _c_cleanup_(c_freep) char *master_key_encryption = NULL;
-        _c_cleanup_(c_freep) char *key0_encryption = NULL;
+        _c_cleanup_(c_freep) char *key_clear_encryption = NULL;
         uint64_t master_key_size;
-        uint64_t key0_size;
+        uint64_t key_clear_size;
         uint64_t size;
         int r;
 
@@ -107,12 +107,12 @@ int disk_encrypt_get_info(FILE *f,
         if (fread(&keys, sizeof(keys), 1, f) != 1)
                 return -EIO;
 
-        key0_size = le64toh(keys[0].key_size);
-        if (key0_size < 128 || key0_size > 2048)
+        key_clear_size = le64toh(keys[0].key_size);
+        if (key_clear_size < 128 || key_clear_size > 2048)
                 return -EINVAL;
 
-        key0_encryption = strdup(keys[0].encryption);
-        if (!key0_encryption)
+        key_clear_encryption = strdup(keys[0].encryption);
+        if (!key_clear_encryption)
                 return -ENOMEM;
 
         if (image_typep) {
@@ -158,19 +158,19 @@ int disk_encrypt_get_info(FILE *f,
         if (n_key_slotsp)
                 *n_key_slotsp = le64toh(info.n_key_slots);
 
-        if (key0_type_uuidp)
-                memcpy(key0_type_uuidp, keys[0].type_uuid, 16);
+        if (key_clear_type_uuidp)
+                memcpy(key_clear_type_uuidp, keys[0].type_uuid, 16);
 
-        if (key0_encryptionp) {
-                *key0_encryptionp = key0_encryption;
-                key0_encryption = NULL;
+        if (key_clear_encryptionp) {
+                *key_clear_encryptionp = key_clear_encryption;
+                key_clear_encryption = NULL;
         }
 
-        if (key0p)
-                memcpy(key0p, keys[0].key, key0_size / 8);
+        if (key_clearp)
+                memcpy(key_clearp, keys[0].key, key_clear_size / 8);
 
-        if (key0_sizep)
-                *key0_sizep = key0_size;
+        if (key_clear_sizep)
+                *key_clear_sizep = key_clear_size;
 
         return 0;
 }
@@ -275,10 +275,10 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         _c_cleanup_(c_freep) char *master_key_encryption = NULL;
         uint8_t master_key_encrypted[256];
         uint64_t master_key_encrypted_size;
-        uint8_t key0_type_uuid[16];
-        _c_cleanup_(c_freep) char *key0_encryption = NULL;
-        uint8_t key0_encrypted[256];
-        uint64_t key0_size;
+        uint8_t key_clear_type_uuid[16];
+        _c_cleanup_(c_freep) char *key_clear_encryption = NULL;
+        uint8_t key_clear_encrypted[256];
+        uint64_t key_clear_size;
         static const char key_clear_uuid[] = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID;
         _c_cleanup_(c_freep) char *hexkey = NULL;
         _c_cleanup_(c_freep) char *dev = NULL;
@@ -304,20 +304,20 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
                                   master_key_encrypted,
                                   &master_key_encrypted_size,
                                   NULL,
-                                  key0_type_uuid,
-                                  &key0_encryption,
-                                  key0_encrypted,
-                                  &key0_size);
+                                  key_clear_type_uuid,
+                                  &key_clear_encryption,
+                                  key_clear_encrypted,
+                                  &key_clear_size);
         if (r < 0)
                 return r;
 
         if (strcmp(master_key_encryption, "aes-wrap") != 0)
                 return -EINVAL;
 
-        if (memcmp(key0_type_uuid, key_clear_uuid, sizeof(key_clear_uuid)) != 0)
+        if (memcmp(key_clear_type_uuid, key_clear_uuid, sizeof(key_clear_uuid)) != 0)
                 return -EINVAL;
 
-        if (strcmp(key0_encryption, "aes-wrap") != 0)
+        if (strcmp(key_clear_encryption, "aes-wrap") != 0)
                 return -EINVAL;
 
         /* AES-WRAP adds 64 bits to the output. */
@@ -326,8 +326,8 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         /* Decrypt the clear key. */
         r = aeswrap_decrypt_data(null_key,
                                  master_key_size,
-                                 key0_encrypted,
-                                 key0_size,
+                                 key_clear_encrypted,
+                                 key_clear_size,
                                  master_key_unlock);
         if (r < 0)
                 return r;
@@ -379,16 +379,24 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
 
 int disk_encrypt_format_volume(const char *device,
                                const char *image_name,
-                               const char *data_type) {
+                               const char *data_type,
+                               uint8_t *recovery_keyp,
+                               uint64_t *recovery_key_sizep) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset, size = 0;
         uint8_t master_key[32];
         uint64_t master_key_size = 256;
         uint8_t master_key_unlock[32];
         static const uint8_t null_key[32] = {};
+        uint8_t recovery_key[32 + 8];
+        uint64_t key_size;
         Bus1DiskEncryptKeySlot keys[8] = {
                 {
                         .type_uuid = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID,
+                        .encryption = "aes-wrap",
+                },
+                {
+                        .type_uuid = BUS1_DISK_ENCRYPT_KEY_RECOVERY_UUID,
                         .encryption = "aes-wrap",
                 },
         };
@@ -436,20 +444,22 @@ int disk_encrypt_format_volume(const char *device,
         info.data.offset = htole64(offset);
         info.data.size = htole64(size - offset);
 
+        /* Get and encrypt the master volume key. */
         if (getrandom(master_key, master_key_size / 8, 0) < 0)
                 return -errno;
 
         if (getrandom(master_key_unlock, master_key_size / 8, 0) < 0)
                 return -errno;
 
-        /* Encrypt the master volume key. */
         r = aeswrap_encrypt_data(master_key_unlock,
                                  master_key_size,
                                  master_key,
                                  info.master_key.key,
-                                 &info.master_key.key_size);
+                                 &key_size);
         if (r < 0)
                 return r;
+
+        info.master_key.key_size = htole64(key_size);
 
         /* Encrypt the clear key. */
         r = aeswrap_encrypt_data(null_key,
@@ -460,6 +470,20 @@ int disk_encrypt_format_volume(const char *device,
         if (r < 0)
                 return r;
 
+        /* Get and encrypt the recovery key. */
+        if (getrandom(recovery_key, master_key_size / 8, 0) < 0)
+                return -errno;
+
+        r = aeswrap_encrypt_data(recovery_key,
+                                 master_key_size,
+                                 master_key_unlock,
+                                 keys[1].key,
+                                 &key_size);
+        if (r < 0)
+                return r;
+
+        keys[1].key_size = htole64(key_size);
+
         if (fwrite(&info, sizeof(info), 1, f) != 1)
                 return -EIO;
 
@@ -469,8 +493,15 @@ int disk_encrypt_format_volume(const char *device,
         if (fflush(f) < 0)
                 return -errno;
 
+        if (recovery_keyp)
+                memcpy(recovery_keyp, keys[1].key, key_size / 8);
+
+        if (recovery_key_sizep)
+                *recovery_key_sizep = key_size;
+
         memwipe(master_key, sizeof(master_key));
         memwipe(master_key_unlock, sizeof(master_key_unlock));
+        memwipe(recovery_key, sizeof(master_key_unlock));
 
         return 0;
 }
