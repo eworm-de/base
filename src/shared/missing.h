@@ -18,6 +18,16 @@
 
 #include <sys/syscall.h>
 
+#ifndef __NR_getrandom
+#  if defined(__arm__)
+#    define __NR_getrandom 384
+#  elif defined(__aarch64__)
+#    define __NR_getrandom 278
+#  else
+#    error "__NR_getrandom unknown for your architecture"
+#  endif
+#endif
+
 #ifndef HAVE_DECL_GETRANDOM
 static inline int getrandom(void *buffer, size_t count, unsigned flags) {
         return syscall(__NR_getrandom, buffer, count, flags);
