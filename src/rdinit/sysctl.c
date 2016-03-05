@@ -52,17 +52,19 @@ int sysctl_apply(void) {
 
         for (i = 0; i < C_ARRAY_SIZE(sysctls); i++) {
                 _c_cleanup_(c_closep) int fd = -1;
-                ssize_t len;
+                ssize_t len, n;
 
                 fd = openat(dfd, sysctls[i].path, O_WRONLY|O_NONBLOCK|O_CLOEXEC);
                 if (fd < 0) {
                         if (errno == ENOENT)
                                 continue;
+
                         return -errno;
                 }
 
                 len = strlen(sysctls[i].value);
-                if (write(fd, sysctls[i].value, len) != len)
+                n = write(fd, sysctls[i].value, len);
+                if (n != len && errno != ENOENT)
                         return -errno;
         }
 
