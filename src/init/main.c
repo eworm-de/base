@@ -403,6 +403,9 @@ static int cmdline_parse_loader(Manager *m) {
         if (r < 0)
                 return r;
 
+        if (!loader_dir)
+                return 0;
+
         if (loader_dir[0] != '/')
                 return -EINVAL;
 
