@@ -325,7 +325,7 @@ static int manager_run(Manager *m) {
         return -ENODEV;
 }
 
-static int format_var(const char *device,
+static int format_data(const char *device,
                       char **device_cryptp,
                       const char *image_name,
                       const char *data_type) {
@@ -393,7 +393,7 @@ static int format_var(const char *device,
         return 0;
 }
 
-static int mount_var(const char *device, const char *dir) {
+static int mount_data(const char *device, const char *dir) {
         _c_cleanup_(c_freep) char *device_crypt = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
         _c_cleanup_(c_freep) char *data_type = NULL;
@@ -412,7 +412,7 @@ static int mount_var(const char *device, const char *dir) {
 
                 kmsg(LOG_INFO, "Data partition %s at %s is not initialized.", image_name, device);
 
-                r = format_var(device, &device_crypt, image_name, data_type);
+                r = format_data(device, &device_crypt, image_name, data_type);
                 if (r < 0)
                         goto fail;
 
@@ -621,9 +621,13 @@ static int manager_parse_kernel_cmdline(Manager *m) {
         if (r < 0)
                 return r;
 
-        r = uuid_from_string(disk, m->disk_uuid);
-        if (r < 0)
-                return r;
+        if (disk) {
+                r = uuid_from_string(disk, m->disk_uuid);
+                if (r < 0)
+                        return r;
+
+                return 0;
+        }
 
         r = kernel_cmdline_option("data", &m->device_data);
         if (r < 0)
@@ -633,7 +637,7 @@ static int manager_parse_kernel_cmdline(Manager *m) {
         if (r < 0)
                 return r;
 
-        if ((!!m->device_data != !!m->device_boot) || (disk && m->device_data))
+        if (!m->device_data || !m->device_boot)
                 return -EINVAL;
 
         return 0;
@@ -715,7 +719,7 @@ int main(int argc, char **argv) {
 
         r = manager_parse_kernel_cmdline(m);
         if (r < 0) {
-                kmsg(LOG_EMERG, "Expecting disk= or var=, usr= on the kernel command line.");
+                kmsg(LOG_EMERG, "Expecting disk= or boot=, data= on the kernel command line.");
                 r = -EINVAL;
                 goto fail;
         }
@@ -754,7 +758,7 @@ int main(int argc, char **argv) {
         }
 
         kmsg(LOG_INFO, "Setting up decryption of data volume %s.", m->device_data);
-        r = mount_var(m->device_data, "/tmp/var");
+        r = mount_data(m->device_data, "/tmp/var");
         if (r < 0)
                 goto fail;
 

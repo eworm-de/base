@@ -11,7 +11,7 @@ org.bus1.rdinit: /init to use in the initrd:
                           e0243462-d2d0-4c3b-ad28-b365f2da3b4d
                 - as an alternative it locates the devices:
                         - boot=/dev/<device>
-                        - var=/dev/<device>
+                        - data=/dev/<device>
         - mounts the boot partition to /boot (r/o)
         - sets up verification of the system image named <release>.img
         - mounts the system image to /usr
