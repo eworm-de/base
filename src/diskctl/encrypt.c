@@ -110,10 +110,10 @@ int disk_encrypt_print_info(const char *data) {
                         return r;
 
                 printf("[%02d] type:              %s\n", i, type);
-                printf("[%02d] type UUID:         %s\n", i, uuid_str);
-                printf("[%02d] encryption:        %s\n", i, keys[i].encryption);
-                printf("[%02d] key (encrypted):   %s\n", i, key_str);
-                printf("[%02d] key size:          %" PRIu64 " bits\n", i, keys[i].key_size);
+                printf("     type UUID:         %s\n", uuid_str);
+                printf("     encryption:        %s\n", keys[i].encryption);
+                printf("     key (encrypted):   %s\n", key_str);
+                printf("     key size:          %" PRIu64 " bits\n", keys[i].key_size);
         }
 
         printf("========================================================================================================\n");
@@ -121,17 +121,23 @@ int disk_encrypt_print_info(const char *data) {
         return 0;
 }
 
+/* Every 6-digit number represents 16-bit key material. This value is multiplied
+   by 11, to act like a checksum which allows the validation of the typed input. */
+static char *bytes_print(const uint8_t b[8], char s[28]) {
+        sprintf(s, "%06d-%06d-%06d-%06d",
+                (b[0] << 8 | b[1]) * 11,
+                (b[2] << 8 | b[3]) * 11,
+                (b[4] << 8 | b[5]) * 11,
+                (b[6] << 8 | b[7]) * 11);
+
+        return s;
+}
+
 void disk_encrypt_print_recovery(uint8_t *recovery_key, uint64_t recovery_key_size) {
         unsigned int i;
+        char s[28];
 
-        /* Every 6-digit number represents 16-bit key material, multiplied
-           by 11 to be able to check the validity of the input. */
-
-        printf("Recovery key:\n");
-        for (i = 0; i < recovery_key_size / 8; i += 8)
-                printf("                        %06d-%06d-%06d-%06d\n",
-                       (recovery_key[i + 0] << 8 | recovery_key[(i + 1)]) * 11,
-                       (recovery_key[i + 2] << 8 | recovery_key[(i + 3)]) * 11,
-                       (recovery_key[i + 4] << 8 | recovery_key[(i + 5)]) * 11,
-                       (recovery_key[i + 6] << 8 | recovery_key[(i + 7)]) * 11);
+        printf("Recovery key:           %s\n", bytes_print(recovery_key, s));
+        for (i = 8; i < recovery_key_size / 8; i += 8)
+                printf("                        %s\n", bytes_print(recovery_key + i, s));
 }
