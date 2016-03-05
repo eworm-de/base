@@ -18,14 +18,15 @@
 
 /*
 
-  ------------------------------------------------------
-  | Image header                                       |
-  ------------------------------------------------------
-  | Key slot array                                     |
-  ------------------------------------------------------
-  | Encrypted data                                     |
-  |                                                    |
-  ------------------------------------------------------
+  ┌────────────────┐
+  │ Image header   │
+  ├────────────────┤
+  │ Key slot array │
+  ├────────────────┤
+  │ Encrypted data │
+  │                │
+  │                │
+  └────────────────┘
 
   The image header is 4096 bytes in size.
 
@@ -33,6 +34,30 @@
   in size.
 
   The byte-order is little-endian.
+
+  Example:
+    Data encryption:       aes-xts-plain64
+    Master key length:     256 bit
+    Master key encryption: aes-wrap (320 bit output stored on disk)
+    Slot key lenght:       256 bit
+    Slot key encryption:   aes-wrap (320 bit output stored on disk)
+    Secret key length:     256 bit
+
+                       ┌────────────────────────┐
+                       │ Disk                   │
+                       ├────────────────────────┤
+      Secret key ────► │ Slot#1 key (encrypted) │ ──► Master key encryption key ─┐
+                       ├────────────────────────┤                                │
+      Recovery key ──► │ Slot#2 key (encrypted) │ ──► Master key encryption key ─┤
+                       ├────────────────────────┤                                │
+      Password ──────► │ Slot#3 key (encrypted) │ ──► Master key encryption key ─┤
+                       ├────────────────────────┤                                │
+  ┌── Master key ◄──── │ Master key (encrypted) │ ◄──────────────────────────────┘
+  │                    ├────────────────────────┤
+  └──────────────────► │ Data (encrypted)       │ ──► Data
+                       │                        │
+                       │                        │
+                       └────────────────────────┘
 
  */
 
