@@ -16,6 +16,8 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <org.bus1/b1-disk-encrypt-header.h>
+
 int disk_encrypt_get_info(FILE *f,
                           char **image_typep,
                           char **image_namep,
@@ -27,11 +29,8 @@ int disk_encrypt_get_info(FILE *f,
                           char **master_key_encryptionp,
                           uint8_t *master_keyp,
                           uint64_t *master_key_sizep,
-                          uint64_t *n_key_slotsp,
-                          uint8_t *key_clear_type_uuidp,
-                          char **key_clear_encryptionp,
-                          uint8_t *key_clearp,
-                          uint64_t *key_clear_sizep);
+                          uint64_t *n_keysp,
+                          Bus1DiskEncryptKeySlot **keysp);
 
 int disk_encrypt_setup_device(const char *device,
                               char **devicep,

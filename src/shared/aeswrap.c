@@ -83,7 +83,7 @@ int aeswrap_decrypt_data(const uint8_t *key,
         buffer = alloca(key_size / 8);
         r = gcry_cipher_decrypt(crypt_hd, buffer, key_size / 8, data, data_size / 8);
         if (r != 0)
-                return -EINVAL;
+                return -EKEYREJECTED;
 
         memcpy(data_decrypted, buffer, key_size / 8);
 

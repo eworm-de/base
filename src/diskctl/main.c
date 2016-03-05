@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
                         const char *name = argv[2];
                         const char *type = argv[3];
                         const char *filename = argv[4];
-                        uint8_t recovery_key[32 + 8];
+                        uint8_t recovery_key[32];
                         uint64_t recovery_key_size;
 
                         r = disk_encrypt_format_volume(filename,
