@@ -690,6 +690,11 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
+        /* Enable org.bus1.coredump. */
+        r = sysctl_apply();
+        if (r < 0)
+                goto fail;
+
         r = stdio_connect("/dev/null");
         if (r < 0)
                 goto fail;
@@ -777,10 +782,6 @@ int main(int argc, char **argv) {
                 goto fail;
 
         r = switch_root("/tmp");
-        if (r < 0)
-                goto fail;
-
-        r = sysctl_apply();
         if (r < 0)
                 goto fail;
 
