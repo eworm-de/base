@@ -643,7 +643,45 @@ static int manager_parse_kernel_cmdline(Manager *m) {
         return 0;
 }
 
+static void dump_process(int sig) {
+        pid_t pid;
+
+        /* Fork a child process which is able to produce a core dump. */
+        pid = fork();
+        if (pid < 0) {
+                kmsg(LOG_EMERG, "Unable to start dump process: %m");
+                return;
+        }
+
+        if (pid == 0) {
+                static const struct sigaction sa = {
+                        .sa_handler = SIG_DFL,
+                };
+
+                /* Set the default handler for our signal. */
+                sigaction(sig, &sa, NULL);
+
+                /* Handle this signal in our dump process. */
+                kmsg(LOG_EMERG, "Cought signal %d (%s). Dump process %d started.", sig, strsignal(sig), getpid());
+                raise(sig);
+
+                _exit(1);
+        }
+
+        /* Wait for the dump process. */
+        waitid(P_PID, pid, NULL, WEXITED);
+
+        kmsg(LOG_EMERG, "Unrecoverable failure. System rebooting.");
+        sleep(15);
+        reboot(RB_AUTOBOOT);
+}
+
 int main(int argc, char **argv) {
+        static const struct sigaction sa = {
+                .sa_handler = dump_process,
+                .sa_flags = SA_NODEFER,
+        };
+
         static char name[] = "org.bus1.rdinit";
         _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
@@ -660,6 +698,17 @@ int main(int argc, char **argv) {
 
         program_invocation_short_name = name;
         if (prctl(PR_SET_NAME, name) < 0) {
+                r = -errno;
+                goto fail;
+        }
+
+        /* install dump process handler */
+        if (sigaction(SIGSEGV, &sa, NULL) < 0 ||
+            sigaction(SIGILL, &sa, NULL) < 0 ||
+            sigaction(SIGFPE, &sa, NULL) < 0 ||
+            sigaction(SIGBUS, &sa, NULL) < 0 ||
+            sigaction(SIGQUIT, &sa, NULL) < 0 ||
+            sigaction(SIGABRT, &sa, NULL) < 0) {
                 r = -errno;
                 goto fail;
         }
