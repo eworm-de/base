@@ -95,6 +95,8 @@ bin_PROGRAMS += \
 org_bus1_rdinit_SOURCES = \
 	src/devices/sysfs.h \
 	src/devices/sysfs.c \
+	src/rdinit/dev.h \
+	src/rdinit/dev.c \
 	src/rdinit/disk-gpt.h \
 	src/rdinit/disk-gpt.c \
 	src/rdinit/sysctl.h \

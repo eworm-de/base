@@ -44,6 +44,7 @@
 #include "shared/tmpfs-root.h"
 #include "shared/uuid.h"
 
+#include "dev.h"
 #include "disk-gpt.h"
 #include "sysctl.h"
 
@@ -738,6 +739,10 @@ int main(int argc, char **argv) {
                 r = -errno;
                 goto fail;
         }
+
+        r = dev_symlinks("/dev");
+        if (r < 0)
+                goto fail;
 
         r = stdio_connect("/dev/null");
         if (r < 0)
