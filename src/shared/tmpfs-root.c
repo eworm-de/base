@@ -34,6 +34,7 @@ int tmpfs_root(const char *rootdir) {
                 { "lib64",  0755 },
 #endif
                 { "proc",   0755 },
+                { "run",    0755 },
                 { "sys",    0755 },
                 { "tmp",   01777 },
                 { "usr",    0755 },

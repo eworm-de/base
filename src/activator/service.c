@@ -93,6 +93,7 @@ int service_activate(Service *s) {
         };
         unsigned int i;
         _c_cleanup_(c_freep) char *datadir = NULL;
+        _c_cleanup_(c_freep) char *tmplink = NULL;
         int r;
 
         assert(s->pid < 0);
@@ -111,6 +112,12 @@ int service_activate(Service *s) {
                 return -ENOMEM;
 
         if (mkdir(datadir, 0770) < 0 && errno != EEXIST)
+                return -errno;
+
+        if (asprintf(&tmplink, "/var/%s/run", s->name) < 0)
+                return -ENOMEM;
+
+        if (symlink("../run", tmplink) < 0 && errno != EEXIST)
                 return -errno;
 
         if (chown(datadir, s->identity, s->identity) < 0)

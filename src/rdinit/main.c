@@ -816,6 +816,11 @@ int main(int argc, char **argv) {
         if (r < 0)
                 goto fail;
 
+        if (symlink("../run", "/tmp/var/run") < 0 && errno != EEXIST) {
+                r = -errno;
+                goto fail;
+        }
+
         if (shell) {
                 r = rdshell(release);
                 if (r < 0)
