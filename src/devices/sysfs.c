@@ -21,10 +21,16 @@
 
 #include "sysfs.h"
 
-static int enumerate_devices(int sysfd, const char *devicesdir, const char *devtype,
+static int enumerate_devices(int sysfd,
+                             const char *devicesdir,
+                             const char *devtype,
                              int devfd,
-                             int (*cb)(int sysfd, const char *subsystem, const char *devtype,
-                                       int devfd, const char *devname, const char *modalias,
+                             int (*cb)(int sysfd,
+                                       const char *subsystem,
+                                       const char *devtype,
+                                       int devfd,
+                                       const char *devname,
+                                       const char *modalias,
                                        void *userdata),
                              void *userdata) {
         _c_cleanup_(c_closep) int dfd2 = -1;
@@ -132,10 +138,18 @@ static int enumerate_devices(int sysfd, const char *devicesdir, const char *devt
         return 0;
 }
 
-static int enumerate_subsystems(int sysfd, const char *subsystemsdir, const char *subsystem, const char *subdir, const char *devtype,
+static int enumerate_subsystems(int sysfd,
+                                const char *subsystemsdir,
+                                const char *subsystem,
+                                const char *subdir,
+                                const char *devtype,
                                 int devfd,
-                                int (*cb)(int sysfd, const char *subsystem, const char *devtype,
-                                          int devfd, const char *devname, const char *modalias,
+                                int (*cb)(int sysfd,
+                                          const char *subsystem,
+                                          const char *devtype,
+                                          int devfd,
+                                          const char *devname,
+                                          const char *modalias,
                                           void *userdata),
                                 void *userdata) {
         _c_cleanup_(c_closep) int dfd = -1;
@@ -191,10 +205,16 @@ static int enumerate_subsystems(int sysfd, const char *subsystemsdir, const char
         return 0;
 }
 
-int sysfs_enumerate(int sysfd, const char *subsystem, const char *devtype,
+int sysfs_enumerate(int sysfd,
+                    const char *subsystem,
+                    const char *devtype,
                     int devfd,
-                    int (*cb)(int sysfd, const char *subsystem, const char *devtype,
-                              int devfd, const char *devname, const char *modalias,
+                    int (*cb)(int sysfd,
+                              const char *subsystem,
+                              const char *devtype,
+                              int devfd,
+                              const char *devname,
+                              const char *modalias,
                               void *userdata),
                     void *userdata) {
         int r;
