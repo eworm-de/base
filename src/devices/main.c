@@ -38,7 +38,7 @@ static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
         int r;
 
         if (devname) {
-                r = permissions_apply(devfd, devname, subsystem, devtype);
+                r = permissions_apply(sysfd, devfd, devname, subsystem, devtype);
                 if (r < 0)
                         return r;
         }
@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
 
                                 if (action && strcmp(action, "add") == 0) {
                                         if (devname) {
-                                                r = permissions_apply(devfd, devname, subsystem, devtype);
+                                                r = permissions_apply(sysfd, devfd, devname, subsystem, devtype);
                                                 if (r < 0)
                                                         return EXIT_FAILURE;
                                         }

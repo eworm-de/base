@@ -16,15 +16,11 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-enum {
-        BUS1_IDENTITY_ROOT      =    0,
-        BUS1_IDENTITY_INPUT     = 1001,
-        BUS1_IDENTITY_AUDIO,
-        BUS1_IDENTITY_VIDEO,
-        BUS1_IDENTITY_DISK,
-        BUS1_IDENTITY_USB,
-        BUS1_IDENTITY_COREDUMP,
-        BUS1_IDENTITY_DEVICES,
-        BUS1_IDENTITY_SMARTCARD,
-
-};
+bool permissions_usb(int sysfd,
+                     int devfd,
+                     const char *devname,
+                     const char *subsystem,
+                     const char *devtype,
+                     mode_t *modep,
+                     uid_t *uidp,
+                     gid_t *gidp);

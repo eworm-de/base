@@ -16,4 +16,4 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int permissions_apply(int devfd, const char *devname, const char *subsystem, const char *devtype);
+int permissions_apply(int sysfd, int devfd, const char *devname, const char *subsystem, const char *devtype);

@@ -22,28 +22,44 @@
 #include <org.bus1/c-macro.h>
 
 #include "permissions.h"
-
-#define ELEMENTSOF(x) (sizeof(x) / sizeof((x)[0]))
+#include "permissions-usb.h"
 
 static const struct permissions {
         const char *subsystem;
         const char *devtype;
         const char *devname;
+        bool (*match)(int sysfd,
+                     int devfd,
+                     const char *devname,
+                     const char *subsystem,
+                     const char *devtype,
+                     mode_t *modep,
+                     uid_t *uidp,
+                     gid_t *gidp);
         mode_t mode;
         uid_t uid;
         gid_t gid;
 } device_permissions[] = {
-        { "input",        NULL,           NULL, 0600, BUS1_IDENTITY_INPUT,  0 },
-        { "sound",        NULL,           NULL, 0600, BUS1_IDENTITY_AUDIO,  0 },
-        { "video4linux",  NULL,           NULL, 0600, BUS1_IDENTITY_VIDEO,  0 },
-        { "block",        NULL,           NULL, 0600, BUS1_IDENTITY_DISK,   0 },
-        { "usb",          "usb_device",   NULL, 0600, BUS1_IDENTITY_USB,    0 },
+        { "input",        NULL,           NULL, NULL,            0660, BUS1_IDENTITY_INPUT, BUS1_IDENTITY_INPUT },
+        { "sound",        NULL,           NULL, NULL,            0660, BUS1_IDENTITY_AUDIO, BUS1_IDENTITY_AUDIO },
+        { "video4linux",  NULL,           NULL, NULL,            0660, BUS1_IDENTITY_VIDEO, BUS1_IDENTITY_VIDEO },
+        { "block",        NULL,           NULL, NULL,            0660, BUS1_IDENTITY_DISK,  BUS1_IDENTITY_DISK },
+        { "usb",          "usb_device",   NULL, permissions_usb, 0,    0,                   0 },
+        { "usb",          "usb_device",   NULL, NULL,            0660, BUS1_IDENTITY_USB,   BUS1_IDENTITY_USB },
 };
 
-int permissions_apply(int devfd, const char *devname, const char *subsystem, const char *devtype) {
+int permissions_apply(int sysfd,
+                      int devfd,
+                      const char *devname,
+                      const char *subsystem,
+                      const char *devtype) {
         unsigned i;
 
-        for (i = 0; i < ELEMENTSOF(device_permissions); i++) {
+        for (i = 0; i < C_ARRAY_SIZE(device_permissions); i++) {
+                uid_t uid = device_permissions[i].uid;
+                gid_t gid = device_permissions[i].gid;
+                mode_t mode = device_permissions[i].mode;
+
                 if (subsystem && device_permissions[i].subsystem)
                         if (strcmp(subsystem, device_permissions[i].subsystem) != 0)
                                 continue;
@@ -56,12 +72,22 @@ int permissions_apply(int devfd, const char *devname, const char *subsystem, con
                         if (strcmp(devname, device_permissions[i].devname) != 0)
                                 continue;
 
-                if (device_permissions[i].uid > 0 || device_permissions[i].gid > 0)
-                        if (fchownat(devfd, devname, device_permissions[i].uid, device_permissions[i].gid, AT_SYMLINK_NOFOLLOW) < 0)
+                if (device_permissions[i].match && !device_permissions[i].match(sysfd,
+                                                                                devfd,
+                                                                                devname,
+                                                                                subsystem,
+                                                                                devtype,
+                                                                                &mode,
+                                                                                &uid,
+                                                                                &gid))
+                        continue;
+
+                if (mode > 0)
+                        if (fchmodat(devfd, devname, mode & 07777, 0) < 0)
                                 return -errno;
 
-                if (device_permissions[i].mode > 0)
-                        if (fchmodat(devfd, devname, device_permissions[i].mode & 07777, 0) < 0)
+                if (uid > 0 || gid > 0)
+                        if (fchownat(devfd, devname, uid, gid, AT_SYMLINK_NOFOLLOW) < 0)
                                 return -errno;
 
                 break;
