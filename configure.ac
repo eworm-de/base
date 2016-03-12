@@ -109,7 +109,7 @@ PKG_CHECK_MODULES(KMOD, [libkmod],
         AC_MSG_ERROR([*** libkmod not found]))
 
 PKG_CHECK_MODULES(OPENSSL, [libcrypto],
-        [AC_DEFINE(HAVE_KMOD, 1, [Define if openssl is available])],
+        [AC_DEFINE(HAVE_OPENSSL, 1, [Define if openssl is available])],
         AC_MSG_ERROR([*** openssl not found]))
 
 AC_CHECK_LIB([dw], [dwfl_core_file_attach],
