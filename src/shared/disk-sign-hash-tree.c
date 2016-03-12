@@ -17,7 +17,7 @@
 
 #include <org.bus1/c-macro.h>
 #include <org.bus1/c-shared.h>
-#include <gcrypt.h>
+#include <openssl/evp.h>
 
 #include "disk-sign-hash-tree.h"
 #include "file.h"
@@ -30,8 +30,7 @@ static int hash_write(FILE *f_data,
                       uint64_t hash_block,
                       uint64_t hash_block_size,
                       uint64_t n_data_blocks,
-                      gcry_md_hd_t crypt_hd,
-                      int crypt_hash_type,
+                      const EVP_MD *md,
                       unsigned int crypt_hash_size,
                       const uint8_t *salt,
                       size_t salt_size,
@@ -67,23 +66,33 @@ static int hash_write(FILE *f_data,
                 n_bytes = hash_block_size;
 
                 for (i = 0; i < n_hashes_per_block; i++) {
+                        EVP_MD_CTX mdctx;
+                        uint8_t md_value[EVP_MAX_MD_SIZE];
+                        unsigned int md_len;
+
                         if (n_data_blocks-- == 0)
                                 break;
 
                         if (fread(data_buffer, data_block_size, 1, f_data) != 1)
                                 return -EIO;
 
-                        gcry_md_reset(crypt_hd);
-                        gcry_md_write(crypt_hd, salt, salt_size);
-                        gcry_md_write(crypt_hd, data_buffer, data_block_size);
+                        if (!EVP_DigestInit(&mdctx, md) ||
+                            !EVP_DigestUpdate(&mdctx, salt, salt_size) ||
+                            !EVP_DigestUpdate(&mdctx, data_buffer, data_block_size) ||
+                            !EVP_DigestFinal_ex(&mdctx, md_value, &md_len) ||
+                            !EVP_MD_CTX_cleanup(&mdctx))
+                                return -EINVAL;
+
+                        if (md_len != salt_size)
+                                return -EINVAL;
 
                         if (result)
-                                memcpy(result, gcry_md_read(crypt_hd, crypt_hash_type), crypt_hash_size);
+                                memcpy(result, md_value, crypt_hash_size);
 
                         if (!f_hash)
                                 break;
 
-                        if (fwrite(gcry_md_read(crypt_hd, crypt_hash_type), crypt_hash_size, 1, f_hash) != 1)
+                        if (fwrite(md_value, crypt_hash_size, 1, f_hash) != 1)
                                 return -EIO;
 
                         n_bytes -= crypt_hash_size;
@@ -96,8 +105,6 @@ static int hash_write(FILE *f_data,
 
         return 0;
 }
-
-C_DEFINE_CLEANUP(gcry_md_hd_t, gcry_md_close);
 
 int disk_sign_hash_tree_write(const char *filename,
                               const char *hash_name,
@@ -114,8 +121,7 @@ int disk_sign_hash_tree_write(const char *filename,
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
         _c_cleanup_(c_fclosep) FILE *f_hash = NULL;
         uint64_t data_size;
-        _c_cleanup_(gcry_md_closep) gcry_md_hd_t crypt_hd = NULL;
-        int crypt_hash_type;
+        const EVP_MD *md;
         int n_level;
         uint64_t hash_size = 0;
         struct hash_level {
@@ -137,6 +143,8 @@ int disk_sign_hash_tree_write(const char *filename,
         assert(salt_size);
         assert(root_hash);
 
+        OpenSSL_add_all_digests();
+
         f_data = fopen(filename, "re");
         if (!f_data)
                 return -errno;
@@ -152,19 +160,11 @@ int disk_sign_hash_tree_write(const char *filename,
         if (!f_hash)
                 return -errno;
 
-        if (gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P) == 0) {
-                gcry_control(GCRYCTL_DISABLE_SECMEM);
-                gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
-        }
-
-        crypt_hash_type = gcry_md_map_name(hash_name);
-        if (crypt_hash_type <= 0)
+        md = EVP_get_digestbyname(hash_name);
+        if(!md)
                 return -EINVAL;
 
-        if (digest_size != gcry_md_get_algo_dlen(crypt_hash_type))
-                return -EINVAL;
-
-        if (gcry_md_open(&crypt_hd, crypt_hash_type, 0) != 0)
+        if (digest_size != (uint64_t)EVP_MD_size(md))
                 return -EINVAL;
 
         /* Calculate the number of levels. */
@@ -190,11 +190,15 @@ int disk_sign_hash_tree_write(const char *filename,
 
         /* Calculate and store hashes for the data blocks. */
         r = hash_write(f_data, f_hash,
-                       data_block_nr, data_block_size,
-                       levels[0].block, hash_block_size,
+                       data_block_nr,
+                       data_block_size,
+                       levels[0].block,
+                       hash_block_size,
                        n_data_blocks,
-                       crypt_hd, crypt_hash_type, digest_size,
-                       salt, salt_size,
+                       md,
+                       digest_size,
+                       salt,
+                       salt_size,
                        NULL);
         if (r < 0)
                 return r;
@@ -202,11 +206,15 @@ int disk_sign_hash_tree_write(const char *filename,
 
         /* Calculate and store hashes for the hash blocks layers. */
         for (i = 1; i < n_level; i++) {
-                r = hash_write(f_data, f_hash,
-                               levels[i - 1].block, hash_block_size,
-                               levels[i].block, hash_block_size,
+                r = hash_write(f_data,
+                               f_hash,
+                               levels[i - 1].block,
+                               hash_block_size,
+                               levels[i].block,
+                               hash_block_size,
                                levels[i - 1].n_blocks,
-                               crypt_hd, crypt_hash_type, digest_size,
+                               md,
+                               digest_size,
                                salt, salt_size,
                                NULL);
                 if (r < 0)
@@ -214,16 +222,23 @@ int disk_sign_hash_tree_write(const char *filename,
         }
 
         /* Calculate the root hash from the single root hash block.  */
-        r = hash_write(f_hash, NULL,
-                       levels[n_level - 1].block, hash_block_size,
-                       0, hash_block_size,
+        r = hash_write(f_hash,
+                       NULL,
+                       levels[n_level - 1].block,
+                       hash_block_size,
+                       0,
+                       hash_block_size,
                        1,
-                       crypt_hd, crypt_hash_type, digest_size,
-                       salt, salt_size,
+                       md,
+                       digest_size,
+                       salt,
+                       salt_size,
                        root_hash);
 
         if (hash_tree_sizep)
                 *hash_tree_sizep = hash_size;
+
+        EVP_cleanup();
 
         return r;
 }

@@ -71,7 +71,7 @@ libshared_a_SOURCES = \
 libshared_a_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
-	$(GCRYPT_CFLAGS)
+	$(OPENSSL_CFLAGS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
@@ -107,13 +107,13 @@ org_bus1_rdinit_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
 	$(KMOD_CFLAGS) \
-	$(GCRYPT_CFLAGS)
+	$(OPENSSL_CFLAGS)
 
 org_bus1_rdinit_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(KMOD_LIBS) \
-	$(GCRYPT_LIBS)
+	$(OPENSSL_LIBS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
@@ -197,12 +197,12 @@ org_bus1_diskctl_SOURCES = \
 org_bus1_diskctl_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
-	$(GCRYPT_CFLAGS)
+	$(OPENSSL_CFLAGS)
 
 org_bus1_diskctl_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
-	$(GCRYPT_LIBS)
+	$(OPENSSL_LIBS)
 
 # ------------------------------------------------------------------------------
 install-tree: all
