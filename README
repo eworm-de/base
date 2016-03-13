@@ -1,6 +1,23 @@
 bus1 - Base System Tools
 
-org.bus1.rdinit: /init to use in the initrd:
+DETAILS:
+        https://github.com/bus1/base
+
+BUG REPORTS:
+        https://github.com/bus1/base/issues
+
+GIT:
+        git@github.com:bus1/base.git
+        https://github.com/bus1/base.git
+
+GITWEB:
+        https://github.com/bus1/base
+
+LICENSE:
+        LGPLv2.1+ (LICENSE.LGPL2.1)
+        See COPYING for details.
+ABOUT:
+        org.bus1.rdinit: /init to use in the initrd:
         - mounts /dev, /sys, /proc, /dev/pts, /sys/fs/bus1
         - starts org.bus1.acvitvator
                 - starts org.bus1.devices
@@ -23,14 +40,14 @@ org.bus1.rdinit: /init to use in the initrd:
         - mounts the data partition to /var
         - executes org.bus1.init
 
-org.bus1.init: init process PID1
+        org.bus1.init: init process PID1
         - resets the loader boot counter on successful bootup
         - starts org.bus1.activator
         - starts a tty login if /dev/tty1 exists
         - starts a serial console if console=<device> is given on the kernel
           command line
 
-org.bus1.activator: system service activator
+        org.bus1.activator: system service activator
         - sets up the service environment:
                 - a new mount namespace
                 - a separate tmpfs /
@@ -39,37 +56,20 @@ org.bus1.activator: system service activator
                 - mounts /var with the /var/bus1/<service> data directory
         - starts org.bus1.devices
 
-org.bus1.devices: hotplug device manager and kernel module loader
+        org.bus1.devices: hotplug device manager and kernel module loader
         - listens to kernel uevents
         - crawls /sys for coldplug
         - adjusts platform permissions in /dev
         - loads kernel modules for plugged devices
 
-org.bus1.coredump:
+        org.bus1.coredump:
         - called by the kernel when a process crashes
         - writes stacktrace to the kernel log buffer
         - optionally writes the core file to /var/coredump/<user id>-<escaped binary name>
 
-org.bus1.diskctl:
+        org.bus1.diskctl:
         - adds a metadata header to a filesystem image and creates a
           cryptographic hash tree to provide data integrity validation;
           used for the org.bus1.system image mounted at /usr
         - adds a metadata header for an encrypted volume; used for the
           org.bus1.data volume mounted at /var
-
-DETAILS:
-        https://github.com/bus1/base
-
-BUG REPORTS:
-        https://github.com/bus1/base/issues
-
-GIT:
-        git@github.com:bus1/base.git
-        https://github.com/bus1/base.git
-
-GITWEB:
-        https://github.com/bus1/base
-
-LICENSE:
-        LGPLv2.1+ (LICENSE.LGPL2.1)
-        See COPYING for details.
