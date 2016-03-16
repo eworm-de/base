@@ -53,9 +53,7 @@ int permissions_apply(int sysfd,
                       const char *devname,
                       const char *subsystem,
                       const char *devtype) {
-        unsigned i;
-
-        for (i = 0; i < C_ARRAY_SIZE(device_permissions); i++) {
+        for (size_t i = 0; i < C_ARRAY_SIZE(device_permissions); i++) {
                 uid_t uid = device_permissions[i].uid;
                 gid_t gid = device_permissions[i].gid;
                 mode_t mode = device_permissions[i].mode;

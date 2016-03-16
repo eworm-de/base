@@ -40,9 +40,7 @@ static bool match_usb_class(uint8_t class,
                             mode_t *modep,
                             uid_t *uidp,
                             gid_t *gidp) {
-        unsigned int i;
-
-        for (i = 0; i < C_ARRAY_SIZE(usb_classes); i++) {
+        for (size_t i = 0; i < C_ARRAY_SIZE(usb_classes); i++) {
                 if (usb_classes[i].class != class ||
                     usb_classes[i].subclass != subclass ||
                     usb_classes[i].protocol != protocol)

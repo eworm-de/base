@@ -24,14 +24,13 @@
 
 int uuid_from_string(const char *str, uint8_t *uuid) {
         int id[16];
-        unsigned int i;
 
         if (sscanf(str, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
                    &id[0], &id[1], &id[2], &id[3], &id[4], &id[5], &id[6], &id[7],
                    &id[8], &id[9], &id[10], &id[11], &id[12], &id[13], &id[14], &id[15]) != 16)
                 return -EINVAL;
 
-        for (i = 0; i < 16; i++)
+        for (size_t i = 0; i < 16; i++)
                 uuid[i] = id[i];
 
         return 0;

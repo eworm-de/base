@@ -52,13 +52,13 @@ static int frame_cb(Dwfl_Frame *frame, void *userdata) {
         pc_adjusted = pc - (is_activation ? 0 : 1);
         module = dwfl_addrmodule(c->dwfl, pc_adjusted);
         if (module) {
-                Dwarf_Die *s, *cudie;
+                Dwarf_Die *cudie;
                 int n;
 
                 cudie = dwfl_module_addrdie(module, pc_adjusted, &bias);
                 if (cudie) {
                         n = dwarf_getscopes(cudie, pc_adjusted - bias, &scopes);
-                        for (s = scopes; s < scopes + n; s++) {
+                        for (Dwarf_Die *s = scopes; s < scopes + n; s++) {
                                 Dwarf_Attribute *a, space;
 
                                 if (dwarf_tag(s) != DW_TAG_subprogram &&

@@ -50,15 +50,13 @@ int service_new(const char *name, Service **servicep) {
 }
 
 Service *service_free(Service *s) {
-        unsigned int i;
-
-        for (i = 0; s->argv[i]; i++)
+        for (size_t i = 0; s->argv[i]; i++)
                 free(s->argv[i]);
 
         free(s->argv);
 
         if (s->envp) {
-                for (i = 0; s->envp[i]; i++)
+                for (size_t i = 0; s->envp[i]; i++)
                         free(s->envp[i]);
 
                 free(s->envp);
@@ -91,7 +89,6 @@ int service_activate(Service *s) {
                 "/sys",
                 "/usr",
         };
-        unsigned int i;
         _c_cleanup_(c_freep) char *datadir = NULL;
         _c_cleanup_(c_freep) char *tmplink = NULL;
         int r;
@@ -145,7 +142,7 @@ int service_activate(Service *s) {
         if (r < 0)
                 return r;
 
-        for (i = 0; i < C_ARRAY_SIZE(mounts); i++) {
+        for (size_t i = 0; i < C_ARRAY_SIZE(mounts); i++) {
                 _c_cleanup_(c_freep) char *target = NULL;
 
                 if (asprintf(&target, "/tmp%s", mounts[i]) < 0)

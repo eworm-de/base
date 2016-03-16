@@ -51,7 +51,6 @@ int tmpfs_root(const char *rootdir) {
 #endif
                 { "sbin",                       "usr/bin" },
         };
-        unsigned int i;
 
         if (mount("tmpfs", rootdir, "tmpfs", MS_NOSUID|MS_NOEXEC|MS_NODEV|MS_STRICTATIME, "mode=0755,size=5M") < 0)
                 return -errno;
@@ -60,11 +59,11 @@ int tmpfs_root(const char *rootdir) {
         if (rootfd < 0)
                 return -errno;
 
-        for (i = 0; i < C_ARRAY_SIZE(dirs); i++)
+        for (size_t i = 0; i < C_ARRAY_SIZE(dirs); i++)
                 if (mkdirat(rootfd, dirs[i].name, dirs[i].mode) < 0)
                         return -errno;
 
-        for (i = 0; i < C_ARRAY_SIZE(links); i++)
+        for (size_t i = 0; i < C_ARRAY_SIZE(links); i++)
                 if (symlinkat(links[i].target, rootfd, links[i].file) < 0)
                         return -errno;
 

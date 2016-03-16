@@ -107,9 +107,8 @@ static int remount_filesystems(void) {
 
 static int system_reboot(int cmd) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
-        unsigned int i;
 
-        for (i = 0; i < 10; i++) {
+        for (size_t i = 0; i < 10; i++) {
                 if (mount(NULL, "/var", NULL, MS_REMOUNT|MS_RDONLY, NULL) >= 0) {
                         kmsg(LOG_INFO, "Mounted filesystem at /var as read-only.");
                         break;

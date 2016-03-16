@@ -33,23 +33,23 @@ static int enumerate_devices(int sysfd,
                                        const char *modalias,
                                        void *userdata),
                              void *userdata) {
-        _c_cleanup_(c_closep) int dfd2 = -1;
-        _c_cleanup_(c_closedirp) DIR *dir2 = NULL;
-        struct dirent *d2;
+        _c_cleanup_(c_closep) int dfd = -1;
+        _c_cleanup_(c_closedirp) DIR *dir = NULL;
         int r;
 
-        dfd2 = openat(sysfd, devicesdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
-        if (dfd2 < 0)
+        dfd = openat(sysfd, devicesdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+        if (dfd < 0)
                 return -errno;
 
-        dir2 = fdopendir(dfd2);
-        if (!dir2)
+        dir = fdopendir(dfd);
+        if (!dir)
                 return -errno;
-        dfd2 = -1;
+
+        dfd = -1;
 
         /* /sys/bus/$SUBSYSTEM/devices/$DEVICE, /sys/class/$SUBSYSTEM/$DEVICE */
-        for (d2 = readdir(dir2); d2; d2 = readdir(dir2)) {
-                _c_cleanup_(c_closep) int dfd3 = -1;
+        for (struct dirent *d = readdir(dir); d; d = readdir(dir)) {
+                _c_cleanup_(c_closep) int dfd2 = -1;
                 int fd;
                 _c_cleanup_(c_fclosep) FILE *f = NULL;
                 char line[4096];
@@ -60,14 +60,14 @@ static int enumerate_devices(int sysfd,
                 _c_cleanup_(c_freep) char *dn = NULL;
                 _c_cleanup_(c_freep) char *ma = NULL;
 
-                if (d2->d_name[0] == '.')
+                if (d->d_name[0] == '.')
                         continue;
 
-                dfd3 = openat(dirfd(dir2), d2->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
-                if (dfd3 < 0)
+                dfd2 = openat(dirfd(dir), d->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                if (dfd2 < 0)
                         continue;
 
-                len = readlinkat(dfd3, "subsystem", line, sizeof(line));
+                len = readlinkat(dfd2, "subsystem", line, sizeof(line));
                 if (len < 0)
                         continue;
                 if (len <= 0 || len == (ssize_t)sizeof(line))
@@ -81,7 +81,7 @@ static int enumerate_devices(int sysfd,
                 if (!ss)
                         return -ENOMEM;
 
-                fd = openat(dfd3, "uevent", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
+                fd = openat(dfd2, "uevent", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
                 if (fd < 0)
                         continue;
 
@@ -154,7 +154,6 @@ static int enumerate_subsystems(int sysfd,
                                 void *userdata) {
         _c_cleanup_(c_closep) int dfd = -1;
         _c_cleanup_(c_closedirp) DIR *dir = NULL;
-        struct dirent *d;
         int r;
 
         /* specific subsystem */
@@ -182,7 +181,7 @@ static int enumerate_subsystems(int sysfd,
                 return -errno;
         dfd = -1;
 
-        for (d = readdir(dir); d; d = readdir(dir)) {
+        for (struct dirent *d = readdir(dir); d; d = readdir(dir)) {
                 _c_cleanup_(c_freep) char *sd = NULL;
 
                 if (d->d_name[0] == '.')

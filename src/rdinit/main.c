@@ -159,9 +159,8 @@ static int kernel_filesystem_mount(void) {
                 { "proc",     "/proc",        "proc",     "hidepid=2", MS_NOSUID|MS_NOEXEC|MS_NODEV },
                 { "sysfs",    "/sys",         "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
         };
-        unsigned int i;
 
-        for (i = 0; i < C_ARRAY_SIZE(mounts); i++) {
+        for (size_t i = 0; i < C_ARRAY_SIZE(mounts); i++) {
                 if (mkdir(mounts[i].where, 0700) < 0 && errno != EEXIST)
                         return -errno;
 
@@ -185,11 +184,10 @@ static int modules_load(void) {
                 { "dm_mod", "/sys/module/dm_mod" },
                 { "loop",   "/sys/module/loop" },
         };
-        unsigned int i;
         struct kmod_ctx *ctx = NULL;
         int r = 0;
 
-        for (i = 0; i < C_ARRAY_SIZE(modules); i++) {
+        for (size_t i = 0; i < C_ARRAY_SIZE(modules); i++) {
                 struct kmod_module *mod;
 
                 if (modules[i].path && access(modules[i].path, F_OK) >= 0)
@@ -332,7 +330,6 @@ static int format_data(const char *device,
                       const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint8_t buf[4096];
-        unsigned int i;
         _c_cleanup_(c_freep) char *device_crypt = NULL;
         pid_t p;
         int r;
@@ -344,7 +341,7 @@ static int format_data(const char *device,
         if (fread(&buf, sizeof(buf), 1, f) != 1)
                 return -EIO;
 
-        for (i = 0; i < sizeof(buf); i++)
+        for (size_t i = 0; i < sizeof(buf); i++)
                 if (buf[i] != 0)
                         return -EBUSY;
 
@@ -451,7 +448,6 @@ static int mount_usr(const char *image, const char *dir) {
 static int directory_delete(int *dfd) {
         _c_cleanup_(c_closedirp) DIR *dir = NULL;
         struct stat st;
-        struct dirent *d;
         int r;
 
         dir = fdopendir(*dfd);
@@ -462,7 +458,7 @@ static int directory_delete(int *dfd) {
         if (fstat(dirfd(dir), &st) < 0)
                 return -errno;
 
-        for (d = readdir(dir); d; d = readdir(dir)) {
+        for (struct dirent *d = readdir(dir); d; d = readdir(dir)) {
                 if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0)
                         continue;
 
@@ -503,7 +499,6 @@ static int switch_root(const char *newroot) {
                 "/proc",
                 "/sys",
         };
-        unsigned i;
         _c_cleanup_(c_closep) int rootfd = -1;
         int r;
 
@@ -511,7 +506,7 @@ static int switch_root(const char *newroot) {
         if (rootfd < 0)
                 return -errno;
 
-        for (i = 0; i < C_ARRAY_SIZE(mounts); i++) {
+        for (size_t i = 0; i < C_ARRAY_SIZE(mounts); i++) {
                 _c_cleanup_(c_freep) char *target = NULL;
 
                 if (asprintf(&target, "%s%s", newroot, mounts[i]) < 0)

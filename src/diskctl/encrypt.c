@@ -44,7 +44,6 @@ int disk_encrypt_print_info(const char *data) {
         uint64_t master_key_encrypted_size;
         uint64_t n_keys;
         _c_cleanup_(c_freep) Bus1DiskEncryptKeySlot *keys = NULL;
-        unsigned int i;
         int r;
 
         f = fopen(data, "re");
@@ -89,7 +88,7 @@ int disk_encrypt_print_info(const char *data) {
         printf("Master key size:        %" PRIu64 " bits\n", master_key_encrypted_size);
         printf("Number of keys:         %" PRIu64 "\n", n_keys);
 
-        for (i = 0; i < n_keys; i++) {
+        for (size_t i = 0; i < n_keys; i++) {
                 static const char key_clear_uuid[] = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID;
                 static const char key_recovery_uuid[] = BUS1_DISK_ENCRYPT_KEY_RECOVERY_UUID;
                 const char *type = "unknown";
@@ -109,7 +108,7 @@ int disk_encrypt_print_info(const char *data) {
                 if (r < 0)
                         return r;
 
-                printf("[%02d] type:              %s\n", i, type);
+                printf("[%02zd] type:              %s\n", i, type);
                 printf("     type UUID:         %s\n", uuid_str);
                 printf("     encryption:        %s\n", keys[i].encryption);
                 printf("     key (encrypted):   %s\n", key_str);
@@ -134,10 +133,9 @@ static char *bytes_print(const uint8_t b[8], char s[28]) {
 }
 
 void disk_encrypt_print_recovery(uint8_t *recovery_key, uint64_t recovery_key_size) {
-        unsigned int i;
         char s[28];
 
         printf("Recovery key:           %s\n", bytes_print(recovery_key, s));
-        for (i = 8; i < recovery_key_size / 8; i += 8)
+        for (size_t i = 8; i < recovery_key_size / 8; i += 8)
                 printf("                        %s\n", bytes_print(recovery_key + i, s));
 }

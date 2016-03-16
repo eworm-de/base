@@ -36,7 +36,6 @@ void *memwipe(void *s, size_t n) {
 
 int hexstr_to_bytes(const char *str, uint8_t *bytes) {
         size_t len;
-        unsigned int i;
         char buf[3] = {};
 
         len = strlen(str);
@@ -45,7 +44,7 @@ int hexstr_to_bytes(const char *str, uint8_t *bytes) {
 
         len /= 2;
 
-        for (i = 0; i < len; i++) {
+        for (size_t i = 0; i < len; i++) {
                 char *endp;
 
                 memcpy(buf, str + (i * 2), 2);
@@ -76,14 +75,14 @@ int hexstr_from_bytes(const uint8_t *bytes, size_t len, char **str) {
 
 char *escape_hex(const char *in) {
         static const char hex[16] = "0123456789abcdef";
-        const char *i;
         char *out, *o;
 
         out = malloc(strlen(in) * 4 + 1);
         if (!out)
                 return NULL;
 
-        for (i = in, o = out; *i; i++) {
+        o = out;
+        for (const char *i = in; *i; i++) {
                 switch (*i) {
                 case 'a' ... 'z':
                 case 'A' ... 'Z':

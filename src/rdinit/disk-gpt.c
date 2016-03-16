@@ -86,7 +86,6 @@ int disk_gpt_find_partitions(const char *device,
         static const uint8_t uuid_boot[] = BUS1_GPT_TYPE_BOOT_UUID;
         _c_cleanup_(c_freep) void *entries = NULL;
         struct gpt_entry *entry;
-        unsigned int i;
         unsigned int boot_partno = 0;
         unsigned int data_partno = 0;
         _c_cleanup_(c_freep) char *device_boot = NULL;
@@ -146,7 +145,7 @@ int disk_gpt_find_partitions(const char *device,
 
         /* Search boot and data partition types. */
         entry = entries;
-        for (i = 1; i <= n_entries; i++) {
+        for (unsigned int i = 1; i <= n_entries; i++) {
                 guid_to_uuid(&entry->partition_type_guid, uuid);
 
                 if (boot_partno == 0 && memcmp(uuid, uuid_boot, sizeof(uuid)) == 0)

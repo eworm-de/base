@@ -40,7 +40,6 @@ static int hash_write(FILE *f_data,
         size_t n_hashes_per_block;
         uint64_t n_blocks;
         size_t n_bytes;
-        unsigned i;
 
         n_hashes_per_block = hash_block_size / crypt_hash_size;
         n_blocks = (n_data_blocks + n_hashes_per_block - 1) / n_hashes_per_block;
@@ -65,7 +64,7 @@ static int hash_write(FILE *f_data,
         while (n_blocks--) {
                 n_bytes = hash_block_size;
 
-                for (i = 0; i < n_hashes_per_block; i++) {
+                for (size_t i = 0; i < n_hashes_per_block; i++) {
                         EVP_MD_CTX mdctx;
                         uint8_t md_value[EVP_MAX_MD_SIZE];
                         unsigned int md_len;
@@ -130,7 +129,6 @@ int disk_sign_hash_tree_write(const char *filename,
         };
         size_t hash_per_block_bits;
         _c_cleanup_(c_freep) struct hash_level *levels = NULL;
-        int i;
         int r;
 
         assert(filename);
@@ -174,7 +172,7 @@ int disk_sign_hash_tree_write(const char *filename,
 
         /* Calculate sizes and offsets for the hash block layer. */
         levels = calloc(n_level, sizeof(struct hash_level));
-        for (i = n_level - 1; i >= 0; i--) {
+        for (int i = n_level - 1; i >= 0; i--) {
                 uint64_t n;
 
                 levels[i].block = hash_block_nr;
@@ -205,7 +203,7 @@ int disk_sign_hash_tree_write(const char *filename,
 
 
         /* Calculate and store hashes for the hash blocks layers. */
-        for (i = 1; i < n_level; i++) {
+        for (int i = 1; i < n_level; i++) {
                 r = hash_write(f_data,
                                f_hash,
                                levels[i - 1].block,

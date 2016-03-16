@@ -30,13 +30,12 @@ int dev_symlinks(const char *dev) {
                 { "stdout", "/proc/self/fd/1" },
                 { "stderr", "/proc/self/fd/2" },
         };
-        unsigned int i;
 
         fd = openat(AT_FDCWD, dev, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (fd < 0)
                 return -errno;
 
-        for (i = 0; i < C_ARRAY_SIZE(links); i++)
+        for (size_t i = 0; i < C_ARRAY_SIZE(links); i++)
                 if (symlinkat(links[i].target, fd, links[i].file) < 0)
                         return -errno;
 

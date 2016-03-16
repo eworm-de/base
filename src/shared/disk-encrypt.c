@@ -59,7 +59,6 @@ int disk_encrypt_get_info(FILE *f,
         _c_cleanup_(c_freep) char *key_clear_encryption = NULL;
         uint64_t master_key_size;
         uint64_t size;
-        unsigned int i;
         int r;
 
         r = file_get_size(f, &size);
@@ -113,7 +112,8 @@ int disk_encrypt_get_info(FILE *f,
                 return -EIO;
 
         /* Count the used key slots. */
-        for (n_keys = 0, i = 0; i < n_key_slots; i++) {
+        n_keys = 0;
+        for (uint64_t i = 0; i < n_key_slots; i++) {
                 static const char null_uuid[16] = {};
 
                 if (memcmp(key_slots[i].type_uuid, null_uuid, sizeof(null_uuid)) != 0)
@@ -124,7 +124,8 @@ int disk_encrypt_get_info(FILE *f,
         if (!keys)
                 return -ENOMEM;
 
-        for (n_keys = 0, i = 0; i < n_key_slots; i++) {
+        n_keys = 0;
+        for (uint64_t i = 0; i < n_key_slots; i++) {
                 static const char null_uuid[16] = {};
                 uint64_t key_size;
 
@@ -305,7 +306,6 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         uint64_t master_key_size;
         uint8_t master_key_unlock[32];
         uint8_t master_key[32];
-        unsigned int i;
         int r;
 
         f = fopen(device, "r+e");
@@ -332,7 +332,7 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
                 return -EINVAL;
 
         /* Find the clear key. */
-        for (i = 0; i < n_keys; i++)
+        for (uint64_t i = 0; i < n_keys; i++)
                 if (memcmp(keys[i].type_uuid, key_clear_uuid, sizeof(key_clear_uuid)) == 0) {
                         key_clear = &keys[i];
                         break;

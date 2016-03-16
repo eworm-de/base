@@ -44,13 +44,12 @@ static const struct {
 
 int sysctl_apply(void) {
         _c_cleanup_(c_closep) int dfd = -1;
-        unsigned int i;
 
         dfd = openat(AT_FDCWD, "/proc/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (dfd < 0)
                 return -errno;
 
-        for (i = 0; i < C_ARRAY_SIZE(sysctls); i++) {
+        for (size_t i = 0; i < C_ARRAY_SIZE(sysctls); i++) {
                 _c_cleanup_(c_closep) int fd = -1;
                 ssize_t len, n;
 
