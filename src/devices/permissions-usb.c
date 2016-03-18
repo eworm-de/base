@@ -56,6 +56,24 @@ static bool match_usb_class(uint8_t class,
         return false;
 }
 
+struct usb_descriptor {
+        struct usb_descriptor_header {
+                uint8_t bLength;
+                uint8_t bDescriptorType;
+        } header;
+        union {
+                struct usb_descriptor_interface {
+                        uint8_t bInterfaceNumber;
+                        uint8_t bAlternateSetting;
+                        uint8_t bNumEndpoints;
+                        uint8_t bInterfaceClass;
+                        uint8_t bInterfaceSubClass;
+                        uint8_t bInterfaceProtocol;
+                        uint8_t iInterface;
+                } interface;
+        };
+} _c_packed_;
+
 bool permissions_usb(int sysfd,
                      int devfd,
                      const char *devname,
@@ -67,21 +85,9 @@ bool permissions_usb(int sysfd,
         struct stat st;
         _c_cleanup_(c_freep) char *descriptor = NULL;
         _c_cleanup_(c_closep) int fd = -1;
-        uint8_t buf[18 + 65535];
+        uint8_t buf[0xffff];
         ssize_t n;
-        size_t o = 0;
-        struct usb_interface_descriptor {
-                uint8_t bLength;
-                uint8_t bDescriptorType;
-                uint8_t bInterfaceNumber;
-                uint8_t bAlternateSetting;
-                uint8_t bNumEndpoints;
-                uint8_t bInterfaceClass;
-                uint8_t bInterfaceSubClass;
-                uint8_t bInterfaceProtocol;
-                uint8_t iInterface;
-        } _c_packed_;
-        struct usb_interface_descriptor *desc;
+        struct usb_descriptor *desc;
 
         if (fstatat(devfd, devname, &st, 0) < 0)
                 return false;
@@ -97,22 +103,22 @@ bool permissions_usb(int sysfd,
                 return false;
 
         n = read(fd, buf, sizeof(buf));
-        if (n < 18 || n == sizeof(buf))
+        if (n < 3 || n == sizeof(buf))
                 return false;
 
-        while (o + sizeof(struct usb_interface_descriptor) < (size_t)n) {
-                desc = (struct usb_interface_descriptor *)(buf + o);
-                if (desc->bLength < 3)
+        for (ssize_t o = 0; o < n;) {
+                desc = (struct usb_descriptor *)(buf + o);
+                if (desc->header.bLength < 3)
                         return false;
 
-                o += desc->bLength;
+                o += desc->header.bLength;
 
-                if (desc->bDescriptorType != 0x04) /* USB_DT_INTERFACE */
+                if (desc->header.bDescriptorType != 0x04) /* interface */
                         continue;
 
-                if (match_usb_class(desc->bInterfaceClass,
-                                    desc->bInterfaceSubClass,
-                                    desc->bInterfaceProtocol,
+                if (match_usb_class(desc->interface.bInterfaceClass,
+                                    desc->interface.bInterfaceSubClass,
+                                    desc->interface.bInterfaceProtocol,
                                     modep,
                                     uidp,
                                     gidp))
