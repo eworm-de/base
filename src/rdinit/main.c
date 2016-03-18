@@ -154,10 +154,10 @@ static int kernel_filesystem_mount(void) {
                 const char *options;
                 unsigned long flags;
         } mounts[] = {
-                { "devtmpfs", "/dev",         "devtmpfs", "mode=755",  MS_NOSUID|MS_NOEXEC|MS_STRICTATIME },
-                { "devpts",   "/dev/pts",     "devpts",   "mode=620",  MS_NOSUID|MS_NOEXEC },
-                { "proc",     "/proc",        "proc",     "hidepid=2", MS_NOSUID|MS_NOEXEC|MS_NODEV },
-                { "sysfs",    "/sys",         "sysfs",    NULL,        MS_NOSUID|MS_NOEXEC|MS_NODEV },
+                { "devtmpfs", "/dev",         "devtmpfs", "mode=755",                            MS_NOSUID|MS_NOEXEC|MS_STRICTATIME },
+                { "devpts",   "/dev/pts",     "devpts",   "mode=620,ptmxmode=0666,newinstance",  MS_NOSUID|MS_NOEXEC },
+                { "proc",     "/proc",        "proc",     "hidepid=2",                           MS_NOSUID|MS_NOEXEC|MS_NODEV },
+                { "sysfs",    "/sys",         "sysfs",    NULL,                                  MS_NOSUID|MS_NOEXEC|MS_NODEV },
         };
 
         for (size_t i = 0; i < C_ARRAY_SIZE(mounts); i++) {
@@ -169,6 +169,11 @@ static int kernel_filesystem_mount(void) {
                           mounts[i].options) < 0)
                         return -errno;
         }
+
+        /* Replace device node with a symlink to the local node from the mounted filesystem instance. */
+        unlink("/dev/ptmx");
+        if (symlink("pts/ptmx", "/dev/ptmx") < 0)
+                return -errno;
 
         return 0;
 }
