@@ -93,8 +93,6 @@ bin_PROGRAMS += \
 	org.bus1.rdinit
 
 org_bus1_rdinit_SOURCES = \
-	src/devices/sysfs.h \
-	src/devices/sysfs.c \
 	src/rdinit/dev.h \
 	src/rdinit/dev.c \
 	src/rdinit/disk-gpt.h \
@@ -102,6 +100,11 @@ org_bus1_rdinit_SOURCES = \
 	src/rdinit/sysctl.h \
 	src/rdinit/sysctl.c \
 	src/rdinit/main.c
+
+# FIXME: use org.bus1.devices
+org_bus1_rdinit_SOURCES += \
+	src/devices/sysfs.h \
+	src/devices/sysfs.c
 
 org_bus1_rdinit_CFLAGS = \
 	$(AM_CFLAGS) \

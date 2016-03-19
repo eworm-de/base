@@ -249,7 +249,7 @@ static int manager_run(Manager *m) {
         bool exit = false;
         int r;
 
-        sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        sysfd = open("/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (sysfd < 0)
                 return -errno;
 
