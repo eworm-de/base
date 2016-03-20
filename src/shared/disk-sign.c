@@ -398,7 +398,7 @@ int disk_sign_format_volume(const char *filename_data,
         Bus1DiskSignHeader info = {
                 .meta.meta_uuid = BUS1_META_HEADER_UUID,
                 .meta.type_uuid = BUS1_DISK_SIGN_HEADER_UUID,
-                .meta.type_tag = "org.bus1.sign",
+                .meta.type_tag = "org.bus1.disk.sign",
 
                 .data.offset = htole64(sizeof(info) + sizeof(signature)),
 

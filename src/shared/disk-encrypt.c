@@ -450,7 +450,7 @@ int disk_encrypt_format_volume(const char *device,
         Bus1DiskEncryptHeader info = {
                 .meta.meta_uuid = BUS1_META_HEADER_UUID,
                 .meta.type_uuid = BUS1_DISK_ENCRYPT_HEADER_UUID,
-                .meta.type_tag = "org.bus1.encrypt",
+                .meta.type_tag = "org.bus1.disk.encrypt",
 
                 .encrypt.cypher = "aes",
                 .encrypt.chain_mode = "xts",

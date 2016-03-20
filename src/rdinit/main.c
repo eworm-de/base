@@ -404,14 +404,13 @@ static int mount_data(const char *device, const char *dir) {
 
         r = disk_encrypt_setup_device(device, &device_crypt, &image_name, &data_type);
         if (r < 0) {
-                image_name = strdup("org.bus1.data");
+                image_name = strdup("org.bus1.disk.data");
                 if (!image_name)
                         return -ENOMEM;
 
-                //FIXME: get default fstype from /usr/lib/org.bus1/data-filesystem
-                data_type = strdup("xfs");
-                if (!data_type)
-                        return -ENOMEM;
+                r = file_read_line("/usr/lib/org.bus1/disk.data.filesystem.type", &data_type);
+                if (r < 0)
+                        goto fail;
 
                 kmsg(LOG_INFO, "Data partition %s at %s is not initialized.", image_name, device);
 

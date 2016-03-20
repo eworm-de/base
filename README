@@ -70,6 +70,6 @@ ABOUT:
         org.bus1.diskctl:
         - adds a metadata header to a filesystem image and creates a
           cryptographic hash tree to provide data integrity validation;
-          used for the org.bus1.system image mounted at /usr
+          used for the org.bus1.disk.system image mounted at /usr
         - adds a metadata header for an encrypted volume; used for the
-          org.bus1.data volume mounted at /var
+          org.bus1.disk.data volume mounted at /var
