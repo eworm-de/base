@@ -330,9 +330,9 @@ static int manager_run(Manager *m) {
 }
 
 static int format_data(const char *device,
-                      char **device_cryptp,
-                      const char *image_name,
-                      const char *data_type) {
+                       char **device_cryptp,
+                       const char *image_name,
+                       const char *filesystem_type) {
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint8_t buf[4096];
         _c_cleanup_(c_freep) char *device_crypt = NULL;
@@ -352,7 +352,7 @@ static int format_data(const char *device,
 
         r = disk_encrypt_format_volume(device,
                                        image_name,
-                                       data_type,
+                                       filesystem_type,
                                        NULL,
                                        NULL);
         if (r < 0)
@@ -377,16 +377,18 @@ static int format_data(const char *device,
                         NULL
                 };
 
-                if (asprintf(&mkfs, "/usr/bin/mkfs.%s", data_type) < 0)
+                if (asprintf(&mkfs, "/usr/bin/mkfs.%s", filesystem_type) < 0)
                         return EXIT_FAILURE;
 
                 argv[0] = mkfs;
                 execve(argv[0], (char **)argv, NULL);
 
-                return EXIT_FAILURE;
+                kmsg(LOG_EMERG, "Failed to execute %s: %m", mkfs);
+                _exit(EXIT_FAILURE);
         }
 
         p = waitpid(p, NULL, 0);
+
         if (p < 0)
                 return -errno;
 
@@ -399,32 +401,33 @@ static int format_data(const char *device,
 static int mount_data(const char *device, const char *dir) {
         _c_cleanup_(c_freep) char *device_crypt = NULL;
         _c_cleanup_(c_freep) char *image_name = NULL;
-        _c_cleanup_(c_freep) char *data_type = NULL;
+        _c_cleanup_(c_freep) char *filesystem_type = NULL;
         int r;
 
-        r = disk_encrypt_setup_device(device, &device_crypt, &image_name, &data_type);
+        r = disk_encrypt_setup_device(device, &device_crypt, &image_name, &filesystem_type);
         if (r < 0) {
                 image_name = strdup("org.bus1.disk.data");
                 if (!image_name)
                         return -ENOMEM;
 
-                r = file_read_line("/usr/lib/org.bus1/disk.data.filesystem.type", &data_type);
+                r = file_read_line("/usr/lib/org.bus1/disk.data.filesystem.type", &filesystem_type);
                 if (r < 0)
                         goto fail;
 
                 kmsg(LOG_INFO, "Data partition %s at %s is not initialized.", image_name, device);
 
-                r = format_data(device, &device_crypt, image_name, data_type);
+                r = format_data(device, &device_crypt, image_name, filesystem_type);
                 if (r < 0)
                         goto fail;
 
-                kmsg(LOG_INFO, "Initialized data partition %s at %s (%s).", image_name, device, data_type);
+                kmsg(LOG_INFO, "Initialized data partition %s at %s (%s).", image_name, device, filesystem_type);
         }
 
-        kmsg(LOG_INFO, "Mounting %s device %s (%s) at /var.", image_name, device_crypt, data_type);
-        if (mount(device_crypt, dir, data_type, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
+        kmsg(LOG_INFO, "Mounting %s device %s (%s) at /var.", image_name, device_crypt, filesystem_type);
+        if (mount(device_crypt, dir, filesystem_type, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
                 return -errno;
 
+        kmsg(LOG_INFO, "Mounting %s device %s (%s) at /var.", image_name, device_crypt, filesystem_type);
         return 0;
 
 fail:
@@ -435,15 +438,15 @@ fail:
 
 static int mount_usr(const char *image, const char *dir) {
         _c_cleanup_(c_freep) char *device = NULL;
-        _c_cleanup_(c_freep) char *data_type = NULL;
+        _c_cleanup_(c_freep) char *filesystem_type = NULL;
         int r;
 
-        r = disk_sign_setup_device(image, &device, &data_type);
+        r = disk_sign_setup_device(image, &device, &filesystem_type);
         if (r < 0)
                 return r;
 
-        kmsg(LOG_INFO, "Mounting %s (%s) at /usr.", device, data_type);
-        if (mount(device, dir, data_type, MS_RDONLY|MS_NODEV, NULL) < 0)
+        kmsg(LOG_INFO, "Mounting %s (%s) at /usr.", device, filesystem_type);
+        if (mount(device, dir, filesystem_type, MS_RDONLY|MS_NODEV, NULL) < 0)
                 return -errno;
 
         return 0;
