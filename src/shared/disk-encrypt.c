@@ -137,6 +137,7 @@ int disk_encrypt_get_info(FILE *f,
                         uint64_t key_size;
 
                         memcpy(keys[n_keys].type_uuid, key_slots[i].type_uuid, 16);
+                        memcpy(keys[n_keys].object_uuid, key_slots[i].object_uuid, 16);
                         strncpy(keys[n_keys].clear.encryption, key_slots[i].clear.encryption, sizeof(keys[i].clear.encryption) - 1);
 
                         key_size = le64toh(key_slots[i].clear.key_size);
@@ -154,6 +155,7 @@ int disk_encrypt_get_info(FILE *f,
                         uint64_t key_size;
 
                         memcpy(keys[n_keys].type_uuid, key_slots[i].type_uuid, 16);
+                        memcpy(keys[n_keys].object_uuid, key_slots[i].object_uuid, 16);
                         strncpy(keys[n_keys].recovery.encryption, key_slots[i].recovery.encryption, sizeof(keys[i].recovery.encryption) - 1);
 
                         key_size = le64toh(key_slots[i].recovery.key_size);
@@ -508,6 +510,9 @@ int disk_encrypt_format_volume(const char *device,
 
         info.master_key.key_size = htole64(key_size);
 
+        if (getrandom(keys[0].object_uuid, sizeof(keys[0].object_uuid), 0) < 0)
+                return -errno;
+
         /* Encrypt the clear key. */
         r = aeswrap_encrypt_data(null_key,
                                  master_key_size,
@@ -518,6 +523,9 @@ int disk_encrypt_format_volume(const char *device,
                 return r;
 
         keys[0].clear.key_size = htole64(key_size);
+
+        if (getrandom(keys[1].object_uuid, sizeof(keys[1].object_uuid), 0) < 0)
+                return -errno;
 
         /* Get and encrypt the recovery key. */
         if (getrandom(recovery_key, master_key_size, 0) < 0)

@@ -91,11 +91,20 @@ int disk_encrypt_print_info(const char *data) {
         for (size_t i = 0; i < n_keys; i++) {
                 static const char key_clear_uuid[] = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID;
                 static const char key_recovery_uuid[] = BUS1_DISK_ENCRYPT_KEY_RECOVERY_UUID;
-                _c_cleanup_(c_freep) char *uuid_str = NULL;
+                _c_cleanup_(c_freep) char *type_uuid_str = NULL;
+                _c_cleanup_(c_freep) char *object_uuid_str = NULL;
 
-                r = uuid_to_string(keys[i].type_uuid, &uuid_str);
+                r = uuid_to_string(keys[i].type_uuid, &type_uuid_str);
                 if (r < 0)
                         return r;
+
+                r = uuid_to_string(keys[i].object_uuid, &object_uuid_str);
+                if (r < 0)
+                        return r;
+
+                printf("Slot %zd:\n", i);
+                printf("  type UUID:            %s\n", type_uuid_str);
+                printf("  UUID:                 %s\n", object_uuid_str);
 
                 if (memcmp(keys[i].type_uuid, key_clear_uuid, 16) == 0) {
                         _c_cleanup_(c_freep) char *key_str = NULL;
@@ -104,11 +113,10 @@ int disk_encrypt_print_info(const char *data) {
                         if (r < 0)
                                 return r;
 
-                        printf("[%02zd] type:              clear\n", i);
-                        printf("     type UUID:         %s\n", uuid_str);
-                        printf("     encryption:        %s\n", keys[i].clear.encryption);
-                        printf("     key (encrypted):   %s\n", key_str);
-                        printf("     key size:          %" PRIu64 " bits\n", keys[i].clear.key_size * 8);
+                        printf("  type:                 clear\n");
+                        printf("    encryption:         %s\n", keys[i].clear.encryption);
+                        printf("    key (encrypted):    %s\n", key_str);
+                        printf("    key size:           %" PRIu64 " bits\n", keys[i].clear.key_size * 8);
 
                         continue;
                 }
@@ -120,17 +128,15 @@ int disk_encrypt_print_info(const char *data) {
                         if (r < 0)
                                 return r;
 
-                        printf("[%02zd] type:              recovery\n", i);
-                        printf("     type UUID:         %s\n", uuid_str);
-                        printf("     encryption:        %s\n", keys[i].recovery.encryption);
-                        printf("     key (encrypted):   %s\n", key_str);
-                        printf("     key size:          %" PRIu64 " bits\n", keys[i].recovery.key_size * 8);
+                        printf("  type:                 recovery\n");
+                        printf("    encryption:         %s\n", keys[i].recovery.encryption);
+                        printf("    key (encrypted):    %s\n", key_str);
+                        printf("    key size:           %" PRIu64 " bits\n", keys[i].recovery.key_size * 8);
 
                         continue;
                 }
 
-                printf("[%02zd] type:              unknown\n", i);
-                printf("     type UUID:         %s\n", uuid_str);
+                printf("  type:                 unknown\n");
         }
 
         printf("========================================================================================================\n");

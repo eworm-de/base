@@ -101,6 +101,7 @@ typedef union {
 typedef union {                                         /* Key slot with encrypted master key. */
         struct {
                 uint8_t type_uuid[16];                  /* Type of key slot. */
+                uint8_t object_uuid[16];                /* Identifier for the key slot. */
 
                 union {
                         struct {                        /* BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID */
