@@ -30,16 +30,16 @@ int aeswrap_encrypt_data(const uint8_t *key,
         AES_KEY actx;
         int r;
 
-        if (AES_set_encrypt_key(key, key_size, &actx))
+        if (AES_set_encrypt_key(key, key_size * 8, &actx))
                 return -EINVAL;
 
-        r = AES_wrap_key(&actx, NULL, data_encrypted, data, key_size / 8);
+        r = AES_wrap_key(&actx, NULL, data_encrypted, data, key_size);
         memwipe(&actx, sizeof(actx));
         if (r < 0)
                 return -EINVAL;
 
         if (data_encrypted_sizep)
-                *data_encrypted_sizep = r * 8;
+                *data_encrypted_sizep = r;
 
         return 0;
 }
@@ -52,10 +52,10 @@ int aeswrap_decrypt_data(const uint8_t *key,
         AES_KEY actx;
         int r;
 
-        if (AES_set_decrypt_key(key, key_size, &actx))
+        if (AES_set_decrypt_key(key, key_size * 8, &actx))
                 return -EINVAL;
 
-        r = AES_unwrap_key(&actx, NULL, data_decrypted, data, data_size / 8);
+        r = AES_unwrap_key(&actx, NULL, data_decrypted, data, data_size);
         memwipe(&actx, sizeof(actx));
         if (r < 0)
                 return -EKEYREJECTED;

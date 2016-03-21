@@ -49,29 +49,29 @@ typedef union {
                 Bus1MetaHeader meta;
 
                 struct {
-                        uint64_t offset;                /* Absolute offset of filesystem image in bytes */
-                        uint64_t size;                  /* Size of filesystem image in bytes */
-                        char type[64];                  /* Data type / filesystem format */
+                        uint64_t offset;                /* Absolute offset of filesystem image in bytes. */
+                        uint64_t size;                  /* Size of filesystem image in bytes. */
+                        char type[64];                  /* Data type / filesystem format. */
                 } data;
 
                 struct {
-                        uint64_t offset;                /* Absolute offset of hash tree blocks in bytes */
-                        uint64_t size;                  /* Size of hash tree blocks in bytes */
-                        char algorithm[32];             /* Hash algorithm used to create hash blocks */
-                        uint64_t digest_size;           /* Size of hash digest in bits */
-                        uint64_t hash_block_size;       /* Hash block size in bits */
-                        uint64_t data_block_size;       /* Input block size in bits */
+                        uint64_t offset;                /* Absolute offset of hash tree blocks in bytes. */
+                        uint64_t size;                  /* Size of hash tree blocks in bytes. */
+                        char algorithm[32];             /* Hash algorithm used to create hash blocks. */
+                        uint64_t digest_size;           /* Size of hash digest in bytes. */
+                        uint64_t hash_block_size;       /* Hash block size in bytes. */
+                        uint64_t data_block_size;       /* Input block size in bytes. */
 
-                        uint8_t salt[256];              /* Salt used while hashing input data */
-                        uint64_t salt_size;             /* Size of salt in bits */
+                        uint8_t salt[256];              /* Salt used while hashing input data. */
+                        uint64_t salt_size;             /* Size of salt in bytes. */
 
-                        uint8_t root_hash[256];         /* Root hash value to validate against */
+                        uint8_t root_hash[256];         /* Root hash value to validate against. */
                 } hash;
 
                 struct {
-                        uint64_t offset;                /* Absolute offset of signature in bytes */
-                        uint64_t size;                  /* Size of signature in bytes */
-                        char signature_type[64];        /* Type of signature */
+                        uint64_t offset;                /* Absolute offset of signature in bytes. */
+                        uint64_t size;                  /* Size of signature in bytes. */
+                        char signature_type[64];        /* Type of signature. */
                 } signature;
         };
 

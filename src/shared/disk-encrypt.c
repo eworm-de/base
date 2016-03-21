@@ -78,7 +78,7 @@ int disk_encrypt_get_info(FILE *f,
                 return -EINVAL;
 
         master_key_size = le64toh(info.master_key.key_size);
-        if (master_key_size < 128 || master_key_size > 2048)
+        if (master_key_size < 16 || master_key_size > 256)
                 return -EINVAL;
 
         n_key_slots = le64toh(info.n_key_slots);
@@ -140,11 +140,11 @@ int disk_encrypt_get_info(FILE *f,
                         strncpy(keys[n_keys].clear.encryption, key_slots[i].clear.encryption, sizeof(keys[i].clear.encryption) - 1);
 
                         key_size = le64toh(key_slots[i].clear.key_size);
-                        if (key_size < 128 || key_size > 2048)
+                        if (key_size < 16 || key_size > 256)
                                 continue;
 
                         keys[n_keys].clear.key_size = key_size;
-                        memcpy(keys[n_keys].clear.key, key_slots[i].clear.key, key_size / 8);
+                        memcpy(keys[n_keys].clear.key, key_slots[i].clear.key, key_size);
                         n_keys++;
 
                         continue;
@@ -157,11 +157,11 @@ int disk_encrypt_get_info(FILE *f,
                         strncpy(keys[n_keys].recovery.encryption, key_slots[i].recovery.encryption, sizeof(keys[i].recovery.encryption) - 1);
 
                         key_size = le64toh(key_slots[i].recovery.key_size);
-                        if (key_size < 128 || key_size > 2048)
+                        if (key_size < 16 || key_size > 256)
                                 continue;
 
                         keys[n_keys].recovery.key_size = key_size;
-                        memcpy(keys[n_keys].recovery.key, key_slots[i].recovery.key, key_size / 8);
+                        memcpy(keys[n_keys].recovery.key, key_slots[i].recovery.key, key_size);
                         n_keys++;
 
                         continue;
@@ -203,7 +203,7 @@ int disk_encrypt_get_info(FILE *f,
         }
 
         if (master_keyp)
-                memcpy(master_keyp, info.master_key.key, master_key_size / 8);
+                memcpy(master_keyp, info.master_key.key, master_key_size);
 
         if (master_key_sizep)
                 *master_key_sizep = master_key_size;
@@ -367,8 +367,8 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         if (strcmp(key_clear->clear.encryption, "aes-wrap") != 0)
                 return -EINVAL;
 
-        /* AES-WRAP adds 64 bits to the output. */
-        master_key_size = master_key_encrypted_size - 64;
+        /* AES-WRAP adds 8 bytes to the output. */
+        master_key_size = master_key_encrypted_size - 8;
 
         /* Decrypt the clear key. */
         r = aeswrap_decrypt_data(null_key,
@@ -388,7 +388,7 @@ int disk_encrypt_setup_device(const char *device, char **devicep, char **image_n
         if (r < 0)
                 return r;
 
-        r = hexstr_from_bytes(master_key, master_key_size / 8, &hexkey);
+        r = hexstr_from_bytes(master_key, master_key_size, &hexkey);
         if (r < 0)
                 return r;
 
@@ -432,7 +432,7 @@ int disk_encrypt_format_volume(const char *device,
         _c_cleanup_(c_fclosep) FILE *f = NULL;
         uint64_t offset, size = 0;
         uint8_t master_key[32];
-        uint64_t master_key_size = 256;
+        uint64_t master_key_size = 32;
         uint8_t master_key_unlock[32];
         static const uint8_t null_key[32] = {};
         uint8_t recovery_key[32];
@@ -492,10 +492,10 @@ int disk_encrypt_format_volume(const char *device,
         info.data.size = htole64(size - offset);
 
         /* Get and encrypt the master volume key. */
-        if (getrandom(master_key, master_key_size / 8, 0) < 0)
+        if (getrandom(master_key, master_key_size, 0) < 0)
                 return -errno;
 
-        if (getrandom(master_key_unlock, master_key_size / 8, 0) < 0)
+        if (getrandom(master_key_unlock, master_key_size, 0) < 0)
                 return -errno;
 
         r = aeswrap_encrypt_data(master_key_unlock,
@@ -520,7 +520,7 @@ int disk_encrypt_format_volume(const char *device,
         keys[0].clear.key_size = htole64(key_size);
 
         /* Get and encrypt the recovery key. */
-        if (getrandom(recovery_key, master_key_size / 8, 0) < 0)
+        if (getrandom(recovery_key, master_key_size, 0) < 0)
                 return -errno;
 
         r = aeswrap_encrypt_data(recovery_key,
@@ -543,7 +543,7 @@ int disk_encrypt_format_volume(const char *device,
                 return -errno;
 
         if (recovery_keyp)
-                memcpy(recovery_keyp, recovery_key, master_key_size / 8);
+                memcpy(recovery_keyp, recovery_key, master_key_size);
 
         if (recovery_key_sizep)
                 *recovery_key_sizep = master_key_size;

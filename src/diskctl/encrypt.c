@@ -70,7 +70,7 @@ int disk_encrypt_print_info(const char *data) {
         if (r < 0)
                 return r;
 
-        r = hexstr_from_bytes(master_key_encrypted, master_key_encrypted_size / 8, &master_key_str);
+        r = hexstr_from_bytes(master_key_encrypted, master_key_encrypted_size, &master_key_str);
         if (r < 0)
                 return r;
 
@@ -85,8 +85,8 @@ int disk_encrypt_print_info(const char *data) {
         printf("Data encryption:        %s\n", encryption);
         printf("Master key encryption:  %s\n", master_key_encryption);
         printf("Master key (encrypted): %s\n", master_key_str);
-        printf("Master key size:        %" PRIu64 " bits\n", master_key_encrypted_size);
-        printf("Number of keys:         %" PRIu64 "\n", n_keys);
+        printf("Master key size:        %" PRIu64 " bits\n", master_key_encrypted_size * 8);
+        printf("Number of key slots:    %" PRIu64 "\n", n_keys);
 
         for (size_t i = 0; i < n_keys; i++) {
                 static const char key_clear_uuid[] = BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID;
@@ -100,7 +100,7 @@ int disk_encrypt_print_info(const char *data) {
                 if (memcmp(keys[i].type_uuid, key_clear_uuid, 16) == 0) {
                         _c_cleanup_(c_freep) char *key_str = NULL;
 
-                        r = hexstr_from_bytes(keys[i].clear.key, keys[i].clear.key_size / 8, &key_str);
+                        r = hexstr_from_bytes(keys[i].clear.key, keys[i].clear.key_size, &key_str);
                         if (r < 0)
                                 return r;
 
@@ -108,7 +108,7 @@ int disk_encrypt_print_info(const char *data) {
                         printf("     type UUID:         %s\n", uuid_str);
                         printf("     encryption:        %s\n", keys[i].clear.encryption);
                         printf("     key (encrypted):   %s\n", key_str);
-                        printf("     key size:          %" PRIu64 " bits\n", keys[i].clear.key_size);
+                        printf("     key size:          %" PRIu64 " bits\n", keys[i].clear.key_size * 8);
 
                         continue;
                 }
@@ -116,7 +116,7 @@ int disk_encrypt_print_info(const char *data) {
                 if (memcmp(keys[i].type_uuid, key_recovery_uuid, 16) == 0) {
                         _c_cleanup_(c_freep) char *key_str = NULL;
 
-                        r = hexstr_from_bytes(keys[i].recovery.key, keys[i].recovery.key_size / 8, &key_str);
+                        r = hexstr_from_bytes(keys[i].recovery.key, keys[i].recovery.key_size, &key_str);
                         if (r < 0)
                                 return r;
 
@@ -124,7 +124,7 @@ int disk_encrypt_print_info(const char *data) {
                         printf("     type UUID:         %s\n", uuid_str);
                         printf("     encryption:        %s\n", keys[i].recovery.encryption);
                         printf("     key (encrypted):   %s\n", key_str);
-                        printf("     key size:          %" PRIu64 " bits\n", keys[i].recovery.key_size);
+                        printf("     key size:          %" PRIu64 " bits\n", keys[i].recovery.key_size * 8);
 
                         continue;
                 }
@@ -154,6 +154,6 @@ void disk_encrypt_print_recovery(uint8_t *recovery_key, uint64_t recovery_key_si
         char s[28];
 
         printf("Recovery key:           %s\n", bytes_print(recovery_key, s));
-        for (size_t i = 8; i < recovery_key_size / 8; i += 8)
+        for (size_t i = 8; i < recovery_key_size; i += 8)
                 printf("                        %s\n", bytes_print(recovery_key + i, s));
 }

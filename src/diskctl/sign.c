@@ -84,7 +84,7 @@ int disk_sign_print_info(const char *filename) {
         printf("Hash tree offset: %" PRIu64 " bytes\n", hash_offset);
         printf("Hash tree size:   %" PRIu64 " bytes\n", hash_size);
         printf("Hash algorithm:   %s\n", hash_algorithm);
-        printf("Hash digest size: %" PRIu64 " bits\n", hash_digest_size);
+        printf("Hash digest size: %" PRIu64 " bits\n", hash_digest_size * 8);
         printf("Data block size:  %" PRIu64 " bytes (%" PRIu64 " blocks)\n", data_block_size, data_size / data_block_size);
         printf("Hash Block size:  %" PRIu64 " bytes (%" PRIu64 " blocks)\n", hash_block_size, hash_size / hash_block_size);
         printf("Salt:             %s\n", salt);

@@ -230,16 +230,16 @@ int disk_sign_get_info(FILE *f,
         if (!algorithm)
                 return -ENOMEM;
 
-        l = le64toh(info.hash.salt_size) / 8;
-        if (l >= 256)
+        l = le64toh(info.hash.salt_size);
+        if (l > 256)
                 return -EINVAL;
 
         r = hexstr_from_bytes(info.hash.salt, l, &salt_str);
         if (r < 0)
                 return r;
 
-        l = le64toh(info.hash.digest_size) / 8;
-        if (l >= 256)
+        l = le64toh(info.hash.digest_size);
+        if (l > 256)
                 return -EINVAL;
 
         r = hexstr_from_bytes(info.hash.root_hash, l, &hash_str);
@@ -346,7 +346,7 @@ int disk_sign_setup_device(const char *image, char **devicep, char **image_typep
         if (data_offset % 4096 > 0 ||
             data_size % 4096 > 0 ||
             hash_offset % 4096 > 0 ||
-            hash_digest_size % 128 > 0 || hash_digest_size > 4096 ||
+            hash_digest_size % 16 > 0 || hash_digest_size > 256 ||
             hash_block_size % 4096 > 0 ||
             data_block_size % 4096 > 0 ||
             data_offset > hash_offset)
@@ -388,12 +388,12 @@ int disk_sign_format_volume(const char *filename_data,
                             const char *data_type) {
         _c_cleanup_(c_fclosep) FILE *f_data = NULL;
         _c_cleanup_(c_fclosep) FILE *f_image = NULL;
-        uint64_t digest_size = 256;
+        uint64_t digest_size = 32;
         uint64_t data_size;
         uint64_t hash_size;
         uint64_t hash_block_size = 4096;
         uint64_t data_block_size = 4096;
-        uint64_t salt_size = 256;
+        uint64_t salt_size = 32;
         uint8_t signature[4096] = {};
         Bus1DiskSignHeader info = {
                 .meta.meta_uuid = BUS1_META_HEADER_UUID,
@@ -427,7 +427,7 @@ int disk_sign_format_volume(const char *filename_data,
                 return r;
 
         /* We expect at least one stored hash block. */
-        hashes_per_block = hash_block_size / (digest_size / 8);
+        hashes_per_block = hash_block_size / digest_size;
         if (data_size < data_block_size * hashes_per_block)
                 return -EINVAL;
 
@@ -460,19 +460,19 @@ int disk_sign_format_volume(const char *filename_data,
         /* Write the hash tree. */
         info.hash.offset = htole64(sizeof(info) + sizeof(signature) + data_size);
 
-        if (getrandom(info.hash.salt, info.hash.salt_size / 8, 0) < 0)
+        if (getrandom(info.hash.salt, info.hash.salt_size, 0) < 0)
                 return -errno;
 
         r  = disk_sign_hash_tree_write(filename_image,
                                        info.hash.algorithm,
-                                       digest_size / 8,
+                                       digest_size,
                                        data_block_size,
                                        (sizeof(info) + sizeof(signature)) / data_block_size,
                                        data_size / data_block_size,
                                        hash_block_size,
                                        (sizeof(info) + sizeof(signature) + data_size) / hash_block_size,
                                        info.hash.salt,
-                                       salt_size / 8,
+                                       salt_size,
                                        info.hash.root_hash,
                                        &hash_size);
         if (r < 0)

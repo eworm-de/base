@@ -88,7 +88,7 @@ typedef union {
 
                 struct {                                /* Encrypted master key to decrypt data. */
                         char encryption[32];            /* Encryption type used to encrypt the key. */
-                        uint64_t key_size;              /* Key size in bits. */
+                        uint64_t key_size;              /* Key size in bytes. */
                         uint8_t key[256];               /* Encrypted key. */
                 } _c_packed_ master_key;
 
@@ -105,32 +105,32 @@ typedef union {                                         /* Key slot with encrypt
                 union {
                         struct {                        /* BUS1_DISK_ENCRYPT_KEY_CLEAR_UUID */
                                 char encryption[32];    /* Encryption type used to encrypt the key. */
-                                uint64_t key_size;      /* Key size in bits. */
+                                uint64_t key_size;      /* Key size in bytes. */
                                 uint8_t key[256];       /* Encrypted key. */
                         } _c_packed_ clear;
 
                         struct {                        /* BUS1_DISK_ENCRYPT_KEY_RECOVERY_UUID */
                                 char encryption[32];    /* Encryption type used to encrypt the key. */
-                                uint64_t key_size;      /* Key size in bits. */
+                                uint64_t key_size;      /* Key size in bytes. */
                                 uint8_t key[256];       /* Encrypted key. */
                         } _c_packed_ recovery;
 
                         struct {                        /* BUS1_DISK_ENCRYPT_KEY_SMARTCARD_UUID */
                                 char encryption[32];    /* Encryption type used to encrypt the key. */
                                 char id_hash[32];       /* Hash type to generate the ID/fingerprint. */
-                                uint64_t id_size;       /* ID size in bits.*/
-                                uint8_t id[256];        /* Public key ID/fingerprint*/
-                                uint64_t key_size;      /* Key size in bits. */
+                                uint64_t id_size;       /* ID size in bytes. */
+                                uint8_t id[256];        /* Public key ID/fingerprint. */
+                                uint64_t key_size;      /* Key size in bytes. */
                                 uint8_t key[1024];      /* Encrypted key. */
                         } _c_packed_ smartcard;
 
                         struct {                        /* BUS1_DISK_ENCRYPT_KEY_PASSWORD_UUID */
                                 char encryption[32];    /* Encryption type used to encrypt the key. */
-                                uint64_t key_size;      /* Key size in bits. */
+                                uint64_t key_size;      /* Key size in bytes. */
                                 uint8_t key[256];       /* Encrypted key. */
                                 char hash[32];          /* Password hashing type. */
-                                uint8_t salt[256];      /* Salt bits. */
-                                uint64_t salt_size;     /* Salt size in bits. */
+                                uint8_t salt[256];      /* Salt bytes. */
+                                uint64_t salt_size;     /* Salt size in bytes. */
                                 uint64_t iterations;
                                 uint64_t memory;
                                 uint64_t parallelism;
