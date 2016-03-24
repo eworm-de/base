@@ -22,6 +22,7 @@
 
 /install-tree/
 /org.bus1.activator
+/org.bus1.administrator
 /org.bus1.coredump
 /org.bus1.devices
 /org.bus1.diskctl

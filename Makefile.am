@@ -75,6 +75,110 @@ libshared_a_CFLAGS = \
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
+	org.bus1.activator
+
+org_bus1_activator_SOURCES = \
+	src/org.bus1/b1-identity.h \
+	src/activator/service.h \
+	src/activator/service.c \
+	src/activator/main.c
+
+org_bus1_activator_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
+
+org_bus1_activator_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
+	org.bus1.administrator
+
+org_bus1_administrator_SOURCES = \
+	src/administrator/main.c
+
+org_bus1_administrator_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
+
+org_bus1_administrator_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
+	org.bus1.coredump
+
+org_bus1_coredump_SOURCES = \
+	src/coredump/main.c
+
+org_bus1_coredump_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
+
+org_bus1_coredump_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS) \
+	$(ELFUTILS_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
+	org.bus1.devices
+
+org_bus1_devices_SOURCES = \
+	src/org.bus1/b1-identity.h \
+	src/devices/uevent.h \
+	src/devices/uevent.c \
+	src/devices/sysfs.h \
+	src/devices/sysfs.c \
+	src/devices/permissions.h \
+	src/devices/permissions.c \
+	src/devices/permissions-usb.h \
+	src/devices/permissions-usb.c \
+	src/devices/module.h \
+	src/devices/module.c \
+	src/devices/main.c
+
+org_bus1_devices_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS) \
+	$(CAP_LIBS) \
+	$(KMOD_CFLAGS) \
+	-pthread
+
+org_bus1_devices_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS) \
+	$(CAP_CFLAGS) \
+	$(KMOD_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
+	org.bus1.diskctl
+
+org_bus1_diskctl_SOURCES = \
+	src/org.bus1/b1-meta-header.h \
+	src/org.bus1/b1-disk-encrypt-header.h \
+	src/org.bus1/b1-disk-sign-header.h \
+	src/diskctl/encrypt.h \
+	src/diskctl/encrypt.c \
+	src/diskctl/sign.h \
+	src/diskctl/sign.c \
+	src/diskctl/main.c
+
+org_bus1_diskctl_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS) \
+	$(OPENSSL_CFLAGS)
+
+org_bus1_diskctl_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS) \
+	$(OPENSSL_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
 	org.bus1.init
 
 org_bus1_init_SOURCES = \
@@ -116,95 +220,6 @@ org_bus1_rdinit_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(KMOD_LIBS) \
-	$(OPENSSL_LIBS)
-
-# ------------------------------------------------------------------------------
-bin_PROGRAMS += \
-	org.bus1.devices
-
-org_bus1_devices_SOURCES = \
-	src/org.bus1/b1-identity.h \
-	src/devices/uevent.h \
-	src/devices/uevent.c \
-	src/devices/sysfs.h \
-	src/devices/sysfs.c \
-	src/devices/permissions.h \
-	src/devices/permissions.c \
-	src/devices/permissions-usb.h \
-	src/devices/permissions-usb.c \
-	src/devices/module.h \
-	src/devices/module.c \
-	src/devices/main.c
-
-org_bus1_devices_CFLAGS = \
-	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS) \
-	$(CAP_LIBS) \
-	$(KMOD_CFLAGS) \
-	-pthread
-
-org_bus1_devices_LDADD = \
-	libshared.a \
-	$(BUS1_LIBS) \
-	$(CAP_CFLAGS) \
-	$(KMOD_LIBS)
-
-# ------------------------------------------------------------------------------
-bin_PROGRAMS += \
-	org.bus1.activator
-
-org_bus1_activator_SOURCES = \
-	src/org.bus1/b1-identity.h \
-	src/activator/service.h \
-	src/activator/service.c \
-	src/activator/main.c
-
-org_bus1_activator_CFLAGS = \
-	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
-
-org_bus1_activator_LDADD = \
-	libshared.a \
-	$(BUS1_LIBS)
-
-# ------------------------------------------------------------------------------
-bin_PROGRAMS += \
-	org.bus1.coredump
-
-org_bus1_coredump_SOURCES = \
-	src/coredump/main.c
-
-org_bus1_coredump_CFLAGS = \
-	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
-
-org_bus1_coredump_LDADD = \
-	libshared.a \
-	$(BUS1_LIBS) \
-	$(ELFUTILS_LIBS)
-
-# ------------------------------------------------------------------------------
-bin_PROGRAMS += \
-	org.bus1.diskctl
-
-org_bus1_diskctl_SOURCES = \
-	src/org.bus1/b1-meta-header.h \
-	src/org.bus1/b1-disk-encrypt-header.h \
-	src/org.bus1/b1-disk-sign-header.h \
-	src/diskctl/encrypt.h \
-	src/diskctl/encrypt.c \
-	src/diskctl/sign.h \
-	src/diskctl/sign.c \
-	src/diskctl/main.c
-
-org_bus1_diskctl_CFLAGS = \
-	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS) \
-	$(OPENSSL_CFLAGS)
-
-org_bus1_diskctl_LDADD = \
-	libshared.a \
-	$(BUS1_LIBS) \
 	$(OPENSSL_LIBS)
 
 # ------------------------------------------------------------------------------

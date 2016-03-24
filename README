@@ -17,7 +17,49 @@ LICENSE:
         LGPLv2.1+ (LICENSE.LGPL2.1)
         See COPYING for details.
 ABOUT:
-        org.bus1.rdinit: /init to use in the initrd:
+        org.bus1.activator: The system service activator. It sets up
+        bus connection for services and executes them on-demand.
+        - sets up the service environment:
+                - a new mount namespace
+                - a separate tmpfs /
+                - mounts the kernel filesystems
+                - mounts /usr with the system image
+                - mounts /var with the /var/bus1/<service> data directory
+        - starts org.bus1.devices
+
+        org.bus1.administrator: The central process managing the system. This
+        simple example just starts login login shells. On a real system this
+        should be a symlink to the actual "administrator" process.
+        - starts a tty login if /dev/tty1 exists
+        - starts a serial console if console=<device> is given on the kernel
+          command line
+
+        org.bus1.coredump: A crash handler which logs a stack trace of a failing
+        process.
+        - called by the kernel when a process crashes
+        - writes stacktrace to the kernel log buffer
+        - optionally writes the core file to /var/coredump/<user id>-<escaped binary name>
+
+        org.bus1.devices: The hotplug device manager and kernel module loading
+        service.
+        - listens to kernel uevents
+        - crawls /sys for coldplug
+        - adjusts platform permissions in /dev
+        - loads kernel modules for plugged devices
+
+        org.bus1.diskctl: A command line tool to manage signed and encrypted
+        disk volumes.
+        - adds a metadata header to a filesystem image and creates a
+          cryptographic hash tree to provide data integrity validation;
+          used for the org.bus1.disk.system image mounted at /usr
+        - adds a metadata header for an encrypted volume; used for the
+          org.bus1.disk.data volume mounted at /var
+
+        org.bus1.init: The init process PID1.
+        - resets the loader boot counter on successful bootup
+        - starts org.bus1.activator
+
+        org.bus1.rdinit: The init process PID1 in the initrd, symlinked from /init.
         - mounts /dev, /sys, /proc, /dev/pts, /sys/fs/bus1
         - starts org.bus1.acvitvator
                 - starts org.bus1.devices
@@ -39,37 +81,3 @@ ABOUT:
         - sets up decryption of the data partition
         - mounts the data partition to /var
         - executes org.bus1.init
-
-        org.bus1.init: init process PID1
-        - resets the loader boot counter on successful bootup
-        - starts org.bus1.activator
-        - starts a tty login if /dev/tty1 exists
-        - starts a serial console if console=<device> is given on the kernel
-          command line
-
-        org.bus1.activator: system service activator
-        - sets up the service environment:
-                - a new mount namespace
-                - a separate tmpfs /
-                - mounts the kernel filesystems
-                - mounts /usr with the system image
-                - mounts /var with the /var/bus1/<service> data directory
-        - starts org.bus1.devices
-
-        org.bus1.devices: hotplug device manager and kernel module loader
-        - listens to kernel uevents
-        - crawls /sys for coldplug
-        - adjusts platform permissions in /dev
-        - loads kernel modules for plugged devices
-
-        org.bus1.coredump:
-        - called by the kernel when a process crashes
-        - writes stacktrace to the kernel log buffer
-        - optionally writes the core file to /var/coredump/<user id>-<escaped binary name>
-
-        org.bus1.diskctl:
-        - adds a metadata header to a filesystem image and creates a
-          cryptographic hash tree to provide data integrity validation;
-          used for the org.bus1.disk.system image mounted at /usr
-        - adds a metadata header for an encrypted volume; used for the
-          org.bus1.disk.data volume mounted at /var
