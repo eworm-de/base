@@ -427,7 +427,6 @@ static int mount_data(const char *device, const char *dir) {
         if (mount(device_crypt, dir, filesystem_type, MS_NOSUID|MS_NOEXEC|MS_NODEV, NULL) < 0)
                 return -errno;
 
-        kmsg(LOG_INFO, "Mounting %s device %s (%s) at /var.", image_name, device_crypt, filesystem_type);
         return 0;
 
 fail:
