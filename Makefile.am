@@ -93,21 +93,6 @@ org_bus1_activator_LDADD = \
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
-	org.bus1.administrator
-
-org_bus1_administrator_SOURCES = \
-	src/administrator/main.c
-
-org_bus1_administrator_CFLAGS = \
-	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
-
-org_bus1_administrator_LDADD = \
-	libshared.a \
-	$(BUS1_LIBS)
-
-# ------------------------------------------------------------------------------
-bin_PROGRAMS += \
 	org.bus1.coredump
 
 org_bus1_coredump_SOURCES = \
@@ -176,6 +161,21 @@ org_bus1_diskctl_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(OPENSSL_LIBS)
+
+# ------------------------------------------------------------------------------
+bin_PROGRAMS += \
+	org.bus1.example
+
+org_bus1_example_SOURCES = \
+	src/example/main.c
+
+org_bus1_example_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(BUS1_CFLAGS)
+
+org_bus1_example_LDADD = \
+	libshared.a \
+	$(BUS1_LIBS)
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \

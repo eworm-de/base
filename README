@@ -27,13 +27,6 @@ ABOUT:
                 - mounts /var with the /var/bus1/<service> data directory
         - starts org.bus1.devices
 
-        org.bus1.administrator: The central process managing the system. This
-        simple example just starts login login shells. On a real system this
-        should be a symlink to the actual "administrator" process.
-        - starts a tty login if /dev/tty1 exists
-        - starts a serial console if console=<device> is given on the kernel
-          command line
-
         org.bus1.coredump: A crash handler which logs a stack trace of a failing
         process.
         - called by the kernel when a process crashes
@@ -54,6 +47,13 @@ ABOUT:
           used for the org.bus1.disk.system image mounted at /usr
         - adds a metadata header for an encrypted volume; used for the
           org.bus1.disk.data volume mounted at /var
+
+        org.bus1.example: This simple example of the org.bus1.administrator
+        just starts a tty and a serial console login shell. It is executed
+        by the symlink org.bus1.administrator.
+        - starts a tty login if /dev/tty1 exists
+        - starts a serial console if console=<device> is given on the kernel
+          command line
 
         org.bus1.init: The init process PID1.
         - resets the loader boot counter on successful bootup
