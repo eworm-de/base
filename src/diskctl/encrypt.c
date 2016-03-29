@@ -102,7 +102,7 @@ int disk_encrypt_print_info(const char *data) {
                 if (r < 0)
                         return r;
 
-                printf("Slot %zd:\n", i);
+                printf("Slot %zd:\n", i + 1);
                 printf("  type UUID:            %s\n", type_uuid_str);
                 printf("  UUID:                 %s\n", object_uuid_str);
 
