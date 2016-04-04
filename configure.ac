@@ -16,8 +16,9 @@ AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_HEADERS([build/config.h])
 AC_CONFIG_AUX_DIR([build/build-aux])
 
-# AC_PROG_CC sets default CFLAGS which conflict with our own configuration
-CFLAGS_SAVE=$CFLAGS
+# suppress conflicting defaults (as suggested by AC manual)
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
 
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
@@ -28,8 +29,6 @@ AC_CANONICAL_HOST
 AC_DEFINE_UNQUOTED([CANONICAL_HOST], "$host", [Canonical host string.])
 AC_PROG_CC_C99
 AC_PROG_RANLIB
-
-CFLAGS=$CFLAGS_SAVE
 
 m4_pattern_forbid([^_?PKG_[A-Z_]+$],[*** pkg.m4 missing, please install pkg-config])
 
@@ -103,6 +102,12 @@ AC_SUBST(OUR_LDFLAGS)
 
 # ------------------------------------------------------------------------------
 # dependencies
+
+# temporary hack until we do proper shared library linking
+BUS1_CFLAGS="-I../libbus1/src"
+BUS1_LIBS="-L../libbus1 -lbus1"
+AC_SUBST(BUS1_CFLAGS)
+AC_SUBST(BUS1_LIBS)
 
 PKG_CHECK_MODULES(CAP, [libcap],
         [AC_DEFINE(HAVE_LIBCAP, 1, [Define if libcap is available])],
