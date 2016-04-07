@@ -800,7 +800,7 @@ int main(int argc, char **argv) {
                 goto fail;
         }
 
-        kmsg(LOG_INFO, "Setting up cryptographic integrity validation of system image %s.img.", release);
+        kmsg(LOG_INFO, "Setting up integrity validation of system image %s.img.", release);
         r = mount_usr(image, "/tmp/usr");
         if (r < 0) {
                 kmsg(LOG_EMERG, "Unable to mount system image %s: %s.", image, strerror(-r));
