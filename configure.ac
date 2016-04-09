@@ -103,11 +103,20 @@ AC_SUBST(OUR_LDFLAGS)
 # ------------------------------------------------------------------------------
 # dependencies
 
-# temporary hack until we do proper shared library linking
-BUS1_CFLAGS="-I../libbus1/src"
-BUS1_LIBS="-L../libbus1 -lbus1"
-AC_SUBST(BUS1_CFLAGS)
-AC_SUBST(BUS1_LIBS)
+AC_ARG_ENABLE(static, AS_HELP_STRING([--enable-static], [enable temporary static library linking]))
+AS_IF([test "$enable_static" = "yes"],
+        [
+                # temporary hack until we do proper shared library linking
+                BUS1_CFLAGS="-I../libbus1/src"
+                BUS1_LIBS="-L../libbus1 -lbus1"
+                AC_SUBST(BUS1_CFLAGS)
+                AC_SUBST(BUS1_LIBS)
+        ], [
+                PKG_CHECK_MODULES(BUS1, [libbus1],
+                        [AC_DEFINE(HAVE_BUS1, 1, [Define if libbus1 is available])],
+                        AC_MSG_ERROR([*** libbus1 library not found]))
+        ]
+)
 
 PKG_CHECK_MODULES(CAP, [libcap],
         [AC_DEFINE(HAVE_LIBCAP, 1, [Define if libcap is available])],

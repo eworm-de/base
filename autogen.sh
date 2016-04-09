@@ -10,10 +10,10 @@ autoreconf --force --install --symlink
 cd $oldpwd
 
 if [[ "$1" == "b" ]]; then
-        $topdir/configure --prefix=/usr
+        $topdir/configure --enable-static --prefix=/usr
         make clean
 elif [[ "$1" = "c" ]]; then
-        $topdir/configure
+        $topdir/configure --enable-static
         make clean
 else
         echo
