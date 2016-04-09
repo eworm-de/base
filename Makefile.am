@@ -220,7 +220,7 @@ org_bus1_rdinit_LDADD = \
 
 # ------------------------------------------------------------------------------
 install-tree: all
-	rm -rf $(abs_srcdir)/install-tree
-	$(MAKE) install DESTDIR=$(abs_srcdir)/install-tree
-	tree $(abs_srcdir)/install-tree
+	rm -rf $(abs_builddir)/install-tree
+	$(MAKE) install DESTDIR=$(abs_builddir)/install-tree
+	tree $(abs_builddir)/install-tree
 .PHONY: install-tree
