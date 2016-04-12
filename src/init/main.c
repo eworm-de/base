@@ -137,20 +137,20 @@ typedef struct {
         char *loader_rename;            /* Boot loader file name after rename. */
         int boot_counter;               /* Boot candidate counter for an updated system. */
 
-        char *serial_device;
-
         pid_t activator_pid;            /* org.bus1.activator */
         pid_t administrator_pid;        /* org.bus1.administrator */
+
+        char *administrator;            /* org.bus1.administrator binary */
 } Manager;
 
 static Manager *manager_free(Manager *m) {
+        free(m->administrator);
         free(m->release);
         free(m->loader_dir);
         free(m->loader);
         free(m->loader_rename);
         c_close(m->fd_ep);
         c_close(m->fd_signal);
-        free(m->serial_device);
         free(m);
         return NULL;
 }
@@ -412,10 +412,15 @@ static int manager_parse_kernel_cmdline(Manager *m) {
         if (r < 0)
                 return r;
 
-        /* Serial console getty. */
-        r = kernel_cmdline_option("console", &m->serial_device);
+        r = kernel_cmdline_option("administrator", &m->administrator);
         if (r < 0)
                 return r;
+
+        if (!m->administrator) {
+                m->administrator = strdup(m->administrator);
+                if (!m->administrator)
+                        return -ENOMEM;
+        }
 
         return 0;
 }

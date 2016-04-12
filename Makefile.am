@@ -160,16 +160,16 @@ org_bus1_diskctl_LDADD = \
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
-	org.bus1.example
+	org.bus1.login
 
-org_bus1_example_SOURCES = \
-	src/example/main.c
+org_bus1_login_SOURCES = \
+	src/login/main.c
 
-org_bus1_example_CFLAGS = \
+org_bus1_login_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS)
 
-org_bus1_example_LDADD = \
+org_bus1_login_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS)
 

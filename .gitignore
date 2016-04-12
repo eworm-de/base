@@ -25,6 +25,6 @@
 /org.bus1.coredump
 /org.bus1.devices
 /org.bus1.diskctl
-/org.bus1.example
+/org.bus1.login
 /org.bus1.init
 /org.bus1.rdinit
