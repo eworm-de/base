@@ -211,7 +211,7 @@ static int manager_start_services(Manager *m, pid_t died_pid) {
                 pid_t pid;
 
                 kmsg(LOG_INFO, "Starting org.bus1.administrator.");
-                pid = process_start_program("/usr/bin/org.bus1.administrator");
+                pid = process_start_program(m->administrator);
                 if (pid < 0)
                         return pid;
 
@@ -417,7 +417,7 @@ static int manager_parse_kernel_cmdline(Manager *m) {
                 return r;
 
         if (!m->administrator) {
-                m->administrator = strdup(m->administrator);
+                m->administrator = strdup("/usr/bin/org.bus1.administrator");
                 if (!m->administrator)
                         return -ENOMEM;
         }
