@@ -20,6 +20,7 @@ export GCC_COLORS
 
 CLEANFILES = $(BUILT_SOURCES)
 bin_PROGRAMS =
+include_HEADERS =
 noinst_PROGRAMS =
 noinst_LIBRARIES =
 
@@ -68,6 +69,13 @@ libshared_a_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
 	$(OPENSSL_CFLAGS)
+
+# ------------------------------------------------------------------------------
+include_HEADERS = \
+	src/org.bus1/b1-disk-encrypt-header.h \
+	src/org.bus1/b1-disk-sign-header.h \
+	src/org.bus1/b1-identity.h \
+	src/org.bus1/b1-meta-header.h
 
 # ------------------------------------------------------------------------------
 bin_PROGRAMS += \
