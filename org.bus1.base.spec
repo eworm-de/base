@@ -1,6 +1,6 @@
 Name:           org.bus1.base
 Version:        1
-Release:        2
+Release:        3
 Summary:        Bus1 Base Services
 License:        LGPL2+
 URL:            https://github.com/bus1/base
@@ -42,6 +42,9 @@ make %{?_smp_mflags}
 %{_includedir}/org.bus1/*.h
 
 %changelog
+* Fri Apr 29 2016 <kay@redhat.com> 1-3
+- rebuild for libbus1 update
+
 * Tue Apr 26 2016 <kay@redhat.com> 1-2
 - rebuild for libbus1 update
 
