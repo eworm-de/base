@@ -226,3 +226,31 @@ int sysfs_enumerate(int sysfd,
         /* /sys/class/$SUBSYSTEM/ */
         return enumerate_subsystems(sysfd, "class", subsystem, NULL, devtype, devfd, cb, userdata);
 }
+
+int sysfs_get_seqnum(int sysfd, uint64_t *seqnump) {
+        _c_cleanup_(c_closep) int fd = -1;
+        _c_cleanup_(c_fclosep) FILE *f = NULL;
+        char line[32];
+        uint64_t seqnum;
+
+        assert(seqnump);
+
+        fd = openat(sysfd, "kernel/uevent_seqnum", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
+        if (fd < 0)
+                return -errno;
+
+        f = fdopen(fd, "re");
+        if (!f)
+                return -errno;
+
+        if (!fgets(line, sizeof(line), f))
+                return -EIO;
+
+        errno = 0;
+        seqnum = strtoull(line, NULL, 10);
+        if (errno != 0)
+                return -errno;
+
+        *seqnump = seqnum;
+        return 0;
+}

@@ -28,3 +28,5 @@ int sysfs_enumerate(int sysfd,
                               const char *modalias,
                               void *userdata),
                     void *userdata);
+
+int sysfs_get_seqnum(int sysfd, uint64_t *seqnum);
