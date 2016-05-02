@@ -15,42 +15,15 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <signal.h>
 #include <string.h>
 #include <sys/capability.h>
-#include <sys/epoll.h>
 #include <sys/prctl.h>
-#include <sys/signalfd.h>
 
 #include <org.bus1/c-macro.h>
 #include <org.bus1/b1-identity.h>
 #include "shared/kmsg.h"
 
-#include "module.h"
-#include "module.h"
-#include "permissions.h"
-#include "sysfs.h"
-#include "uevent.h"
-
-static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
-                    int devfd, const char *devname, const char *modalias,
-                    void *userdata) {
-        int r;
-
-        if (devname) {
-                r = permissions_apply(sysfd, devfd, devname, subsystem, devtype);
-                if (r < 0)
-                        return r;
-        }
-
-        if (modalias) {
-                r = module_load(modalias);
-                if (r < 0)
-                        return r;
-        }
-
-        return 0;
-}
+#include "manager.h"
 
 C_DEFINE_CLEANUP(cap_t, cap_free);
 
@@ -101,83 +74,9 @@ static int privileges_drop(uid_t uid, const cap_value_t *caps, unsigned int n_ca
         return 0;
 }
 
-typedef struct {
-        int fd_uevent;
-        int fd_signal;
-        int fd_ep;
-        struct epoll_event ep_uevent;
-        struct epoll_event ep_signal;
-} Manager;
-
-static Manager *manager_free(Manager *m) {
-        c_close(m->fd_ep);
-        c_close(m->fd_uevent);
-        c_close(m->fd_signal);
-        free(m);
-
-        return NULL;
-}
-
-C_DEFINE_CLEANUP(Manager *, manager_free);
-static int manager_new(Manager **manager) {
-        _c_cleanup_(manager_freep) Manager *m = NULL;
-        sigset_t mask;
-        _c_cleanup_(c_closep) int fd_uevent = -1;
-        _c_cleanup_(c_closep) int fd_signal = -1;
-        _c_cleanup_(c_closep) int fd_ep = -1;
-
-        m = calloc(1, sizeof(Manager));
-        if (!m)
-                return -ENOMEM;
-
-        fd_uevent = uevent_connect();
-        if (fd_uevent < 0)
-                return fd_uevent;
-
-        m->ep_uevent.events = EPOLLIN;
-        m->ep_uevent.data.fd = fd_uevent;
-
-        sigemptyset(&mask);
-        sigaddset(&mask, SIGTERM);
-        sigaddset(&mask, SIGINT);
-        sigaddset(&mask, SIGCHLD);
-        sigprocmask(SIG_BLOCK, &mask, NULL);
-
-        fd_signal = signalfd(-1, &mask, SFD_NONBLOCK|SFD_CLOEXEC);
-        if (fd_signal < 0)
-                return -errno;
-
-        m->ep_signal.events = EPOLLIN;
-        m->ep_signal.data.fd = fd_signal;
-
-        fd_ep = epoll_create1(EPOLL_CLOEXEC);
-        if (fd_ep < 0)
-                return -errno;
-
-        if (epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_uevent, &m->ep_uevent) < 0 ||
-            epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_signal, &m->ep_signal) < 0)
-                return -errno;
-
-        m->fd_uevent = fd_uevent;
-        fd_uevent = -1;
-
-        m->fd_signal = fd_signal;
-        fd_signal = -1;
-
-        m->fd_ep = fd_ep;
-        fd_ep = -1;
-
-        *manager = m;
-        m = NULL;
-
-       return 0;
-}
-
 int main(int argc, char **argv) {
         _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
-        _c_cleanup_(c_closep) int sysfd = -1;
-        _c_cleanup_(c_closep) int devfd = -1;
         cap_value_t caps[] = {
                 CAP_CHOWN,
                 CAP_FOWNER,
@@ -190,14 +89,6 @@ int main(int argc, char **argv) {
         if (!log)
                 return EXIT_FAILURE;
 
-        devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (devfd < 0)
-                return EXIT_FAILURE;
-
-        sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (sysfd < 0)
-                return EXIT_FAILURE;
-
         if (manager_new(&m) < 0)
                 return EXIT_FAILURE;
 
@@ -206,64 +97,13 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
 
         kmsg(LOG_INFO, "Coldplug, adjust /dev permissions and load kernel modules for current devices.");
-        r = sysfs_enumerate(sysfd, NULL, NULL, devfd, sysfs_cb, NULL);
+        r = manager_enumerate(m);
         if (r < 0)
                 return EXIT_FAILURE;
 
-        for (;;) {
-                int n;
-                struct epoll_event ev;
-
-                n = epoll_wait(m->fd_ep, &ev, 1, -1);
-                if (n < 0) {
-                        if (errno == EINTR)
-                                continue;
-
-                        return EXIT_FAILURE;
-                }
-
-                if (n > 0) {
-                        if (ev.data.fd == m->fd_uevent && ev.events & EPOLLIN) {
-                                _c_cleanup_(c_freep) char *action = NULL;
-                                _c_cleanup_(c_freep) char *subsystem = NULL;
-                                _c_cleanup_(c_freep) char *devtype = NULL;
-                                _c_cleanup_(c_freep) char *devname = NULL;
-                                _c_cleanup_(c_freep) char *modalias = NULL;
-
-                                r = uevent_receive(m->fd_uevent, &action, &subsystem, &devtype, &devname, &modalias);
-                                if (r < 0)
-                                        return EXIT_FAILURE;
-
-                                if (action && strcmp(action, "add") == 0) {
-                                        if (devname) {
-                                                r = permissions_apply(sysfd, devfd, devname, subsystem, devtype);
-                                                if (r < 0)
-                                                        return EXIT_FAILURE;
-                                        }
-
-                                        if (modalias) {
-                                                r = module_load(modalias);
-                                                if (r < 0)
-                                                        return EXIT_FAILURE;
-                                        }
-                                }
-
-                                continue;
-                        }
-
-                        if (ev.data.fd == m->fd_signal && ev.events & EPOLLIN) {
-                                struct signalfd_siginfo fdsi;
-                                ssize_t size;
-
-                                size = read(m->fd_signal, &fdsi, sizeof(struct signalfd_siginfo));
-                                if (size != sizeof(struct signalfd_siginfo))
-                                        continue;
-
-                                if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT)
-                                        break;
-                        }
-                }
-        }
+        r = manager_run(m);
+        if (r < 0)
+                return EXIT_FAILURE;
 
         return EXIT_SUCCESS;
 }
