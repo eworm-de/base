@@ -143,9 +143,10 @@ static int manager_handle_uevent(Manager *m) {
         _c_cleanup_(c_freep) char *devtype = NULL;
         _c_cleanup_(c_freep) char *devname = NULL;
         _c_cleanup_(c_freep) char *modalias = NULL;
+        uint64_t seqnum;
         int r;
 
-        r = uevent_receive(m->fd_uevent, &action, &subsystem, &devtype, &devname, &modalias);
+        r = uevent_receive(m->fd_uevent, &action, &subsystem, &devtype, &devname, &modalias, &seqnum);
         if (r < 0)
                 return r;
 

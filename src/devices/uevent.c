@@ -53,7 +53,7 @@ int uevent_connect(void) {
 }
 
 int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
-                           char **devname, char **modalias) {
+                           char **devname, char **modalias, uint64_t *seqnum) {
         struct msghdr smsg = {};
         struct iovec iov = {};
         struct sockaddr_nl nl = {};
@@ -68,6 +68,7 @@ int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
         _c_cleanup_(c_freep) char *dt = NULL;
         _c_cleanup_(c_freep) char *dn = NULL;
         _c_cleanup_(c_freep) char *ma = NULL;
+        uint64_t sn = 0;
         int i;
 
         iov.iov_base = buf;
@@ -149,10 +150,15 @@ int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
                         ma = strdup(value);
                         if (!ma)
                                 return -ENOMEM;
+                } else if (strcmp(key, "SEQNUM") == 0) {
+                        errno = 0;
+                        sn = strtoull(value, NULL, 10);
+                        if (errno != 0)
+                                return -errno;
                 }
         }
 
-        if (!ac || !ss)
+        if (!ac || !ss || !sn)
                 return -EBADMSG;
 
         if (action) {
@@ -179,6 +185,9 @@ int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
                 *modalias = ma;
                 ma = NULL;
         }
+
+        if (seqnum)
+                *seqnum = sn;
 
         return 0;
 }

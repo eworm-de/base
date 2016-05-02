@@ -18,4 +18,4 @@
 
 int uevent_connect(void);
 int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
-                           char **devname, char **modalias);
+                           char **devname, char **modalias, uint64_t *seqnum);
