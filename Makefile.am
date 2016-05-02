@@ -134,14 +134,14 @@ org_bus1_devices_SOURCES = \
 org_bus1_devices_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
-	$(CAP_LIBS) \
+	$(CAP_CFLAGS) \
 	$(KMOD_CFLAGS) \
 	-pthread
 
 org_bus1_devices_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
-	$(CAP_CFLAGS) \
+	$(CAP_LIBS) \
 	$(KMOD_LIBS)
 
 # ------------------------------------------------------------------------------
