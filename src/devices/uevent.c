@@ -22,11 +22,139 @@
 
 #include <org.bus1/c-macro.h>
 
+#include "sysfs.h"
 #include "uevent.h"
 
 enum {
         UEVENT_BROADCAST_KERNEL = 1,
 };
+
+struct uevent_subscription {
+        uint64_t seqnum;
+        struct uevent_subscription *previous;
+        struct uevent_subscription *next;
+        int (*cb)(void *userdata);
+        void *userdata;
+};
+
+void uevent_subscription_unlink(struct uevent_subscriptions *uss,
+                                struct uevent_subscription *us) {
+
+        assert(uss);
+
+        if (!us)
+                return;
+
+        if (uss->head == us)
+                uss->head = us->next;
+        if (uss->tail == us)
+                uss->tail = us->previous;
+
+        if (us->previous)
+                us->previous->next = us->next;
+        if (us->next)
+                us->next->previous = us->previous;
+}
+
+struct uevent_subscription *uevent_subscription_free(struct uevent_subscription *us) {
+        if (!us)
+                return NULL;
+
+        assert(!us->previous);
+        assert(!us->next);
+
+        free(us);
+
+        return NULL;
+}
+
+int uevent_subscriptions_init(struct uevent_subscriptions *uss, int sysfd) {
+        int r;
+
+        assert(uss);
+
+        r = sysfs_get_seqnum(sysfd, &uss->seqnum);
+        if (r < 0)
+                return r;
+
+        uss->head = NULL;
+        uss->tail = NULL;
+
+        return 0;
+}
+
+void uevent_subscriptions_destroy(struct uevent_subscriptions *uss) {
+        assert(uss);
+        assert(!uss->head);
+        assert(!uss->tail);
+}
+
+int uevent_sysfs_sync(struct uevent_subscriptions *uss,
+                      int sysfd,
+                      struct uevent_subscription **usd,
+                      int (*cb)(void *userdata),
+                      void *userdata) {
+        struct uevent_subscription *us;
+        uint64_t seqnum;
+        int r;
+
+        assert(uss);
+
+        r = sysfs_get_seqnum(sysfd, &seqnum);
+        if (r < 0)
+                return r;
+
+        if (seqnum < uss->seqnum)
+                return -EIO;
+        else if (seqnum == uss->seqnum) {
+                r = cb(userdata);
+                if (r < 0)
+                        return r;
+
+                *usd = NULL;
+
+                return r;
+        }
+
+        us = malloc(sizeof(*us));
+        if (!us)
+                return -ENOMEM;
+
+        us->seqnum = seqnum;
+        us->cb = cb;
+        us->userdata = userdata;
+        us->next = NULL;
+        us->previous = uss->tail;
+        uss->tail = us;
+        if (!uss->head)
+                uss->head = us;
+
+        *usd = us;
+
+        return 0;
+}
+
+int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seqnum) {
+        struct uevent_subscription *us;
+        int r;
+
+        assert(uss);
+
+        uss->seqnum = seqnum;
+
+        while((us = uss->head) && us->seqnum <= seqnum) {
+                uevent_subscription_unlink(uss, us);
+                r = us->cb(us->userdata);
+                if (r < 0)
+                        return r;
+        }
+
+        return 0;
+}
+
+int uevent_subscriptions_dispatch_all(struct uevent_subscriptions *uss) {
+        return uevent_subscriptions_dispatch(uss, (uint64_t)-1);
+}
 
 int uevent_connect(void) {
         int sk;

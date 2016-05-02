@@ -18,6 +18,8 @@
 
 #include <sys/epoll.h>
 
+#include "uevent.h"
+
 typedef struct {
         int fd_uevent;
         int fd_signal;
@@ -26,6 +28,8 @@ typedef struct {
         struct epoll_event ep_signal;
         int sysfd;
         int devfd;
+        struct uevent_subscriptions uevent_subscriptions;
+        struct uevent_subscription *subscription_settle;
 } Manager;
 
 Manager *manager_free(Manager *m);

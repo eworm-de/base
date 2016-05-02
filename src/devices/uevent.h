@@ -16,6 +16,28 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+struct uevent_subscription;
+
+struct uevent_subscriptions {
+        struct uevent_subscription *head;
+        struct uevent_subscription *tail;
+        uint64_t seqnum;
+};
+
+void uevent_subscription_unlink(struct uevent_subscriptions *uss,
+                                struct uevent_subscription *us);
+struct uevent_subscription *uevent_subscription_free(struct uevent_subscription *us);
+int uevent_sysfs_sync(struct uevent_subscriptions *uss,
+                      int sysfd,
+                      struct uevent_subscription **us,
+                      int (*cb)(void *userdata),
+                      void *userdata);
+int uevent_subscriptions_init(struct uevent_subscriptions *uss, int sysfd);
+void uevent_subscriptions_destroy(struct uevent_subscriptions *uss);
+
+int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seqnum);
+int uevent_subscriptions_dispatch_all(struct uevent_subscriptions *uss);
+
 int uevent_connect(void);
 int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
                            char **devname, char **modalias, uint64_t *seqnum);
