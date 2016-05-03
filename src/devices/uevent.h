@@ -16,6 +16,17 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+enum {
+        UEVENT_ACTION_ADD,
+        UEVENT_ACTION_CHANGE,
+        UEVENT_ACTION_REMOVE,
+        UEVENT_ACTION_MOVE,
+        UEVENT_ACTION_ONLINE,
+        UEVENT_ACTION_OFFLINE,
+};
+
+typedef struct Manager Manager;
+struct device;
 struct uevent_subscription;
 
 struct uevent_subscriptions {
@@ -39,5 +50,6 @@ int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seq
 int uevent_subscriptions_dispatch_all(struct uevent_subscriptions *uss);
 
 int uevent_connect(void);
-int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
-                           char **devname, char **modalias, uint64_t *seqnum);
+int uevent_receive(Manager *m, struct device **devicep, int *actionp, uint64_t *seqnum);
+
+int uevent_action_from_string(const char *action);

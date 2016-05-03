@@ -22,6 +22,7 @@
 
 #include <org.bus1/c-macro.h>
 
+#include "device.h"
 #include "sysfs.h"
 #include "uevent.h"
 
@@ -180,39 +181,39 @@ int uevent_connect(void) {
         return sk;
 }
 
-int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
-                           char **devname, char **modalias, uint64_t *seqnum) {
-        struct msghdr smsg = {};
-        struct iovec iov = {};
-        struct sockaddr_nl nl = {};
-        char cred_msg[CMSG_SPACE(sizeof(struct ucred))];
-        struct cmsghdr *cmsg;
-        struct ucred *cred;
+int uevent_receive(Manager *m, struct device **devicep, int *actionp, uint64_t *seqnump) {
+        struct device *device;
         char buf[4096];
         ssize_t buflen;
-        const char *s;
-        _c_cleanup_(c_freep) char *ac = NULL;
-        _c_cleanup_(c_freep) char *ss = NULL;
-        _c_cleanup_(c_freep) char *dt = NULL;
-        _c_cleanup_(c_freep) char *dn = NULL;
-        _c_cleanup_(c_freep) char *ma = NULL;
-        uint64_t sn = 0;
-        int i;
+        struct iovec iov = {
+                .iov_base = buf,
+                .iov_len = sizeof(buf),
+        };
+        char cred_msg[CMSG_SPACE(sizeof(struct ucred))];
+        struct sockaddr_nl nl = {
+                .nl_family = AF_NETLINK,
+                .nl_groups = UEVENT_BROADCAST_KERNEL,
+        };
+        struct msghdr smsg = {
+                .msg_iov = &iov,
+                .msg_iovlen = 1,
+                .msg_control = cred_msg,
+                .msg_controllen = sizeof(cred_msg),
+                .msg_name = &nl,
+                .msg_namelen = sizeof(nl),
+        };
+        struct cmsghdr *cmsg;
+        struct ucred *cred;
+        char *payload;
+        uint64_t seqnum;
+        int r, action;
 
-        iov.iov_base = buf;
-        iov.iov_len = sizeof(buf);
-        smsg.msg_iov = &iov;
-        smsg.msg_iovlen = 1;
+        assert(m);
+        assert(devicep);
+        assert(actionp);
+        assert(seqnump);
 
-        smsg.msg_control = cred_msg;
-        smsg.msg_controllen = sizeof(cred_msg);
-
-        nl.nl_family = AF_NETLINK;
-        nl.nl_groups = UEVENT_BROADCAST_KERNEL;
-        smsg.msg_name = &nl;
-        smsg.msg_namelen = sizeof(nl);
-
-        buflen = recvmsg(sk, &smsg, 0);
+        buflen = recvmsg(m->fd_uevent, &smsg, 0);
         if (buflen < 32 || (smsg.msg_flags & MSG_TRUNC))
                 return -EBADMSG;
 
@@ -230,92 +231,44 @@ int uevent_receive(int sk, char **action, char **subsystem, char **devtype,
         if (cred->uid != 0)
                 return -EIO;
 
+        /* make sure the buf is null terminated */
+        if (buf[buflen - 1] != '\0')
+                return -EBADMSG;
+
         /* skip header */
-        s = memchr(buf, '\0', buflen);
-        if (!s)
+        payload = memchr(buf, '\0', buflen);
+        if (!payload)
                 return -EBADMSG;
-        i = s + 1 - buf;
-
-        while (i < buflen) {
-                char *key;
-                const char *end;
-                char *value;
-
-                key = (char*)&buf[i];
-                end = memchr(key, '\0', buflen - i);
-                if (!end)
-                        return -EINVAL;
-                i += end - key + 1;
-
-                value = strchr(key, '=');
-                if (!value)
-                        return -EINVAL;
-
-                *value = '\0';
-                value++;
-
-                if (strcmp(key, "ACTION") == 0) {
-                        ac = strdup(value);
-                        if (!ac)
-                                return -ENOMEM;
-                } else if (strcmp(key, "SUBSYSTEM") == 0) {
-                        free(ss);
-                        ss = strdup(value);
-                        if (!ss)
-                                return -ENOMEM;
-                } else if (strcmp(key, "DEVTYPE") == 0) {
-                        free(dt);
-                        dt = strdup(value);
-                        if (!dt)
-                                return -ENOMEM;
-                } else if (strcmp(key, "DEVNAME") == 0) {
-                        free(dn);
-                        dn = strdup(value);
-                        if (!dn)
-                                return -ENOMEM;
-                } else if (strcmp(key, "MODALIAS") == 0) {
-                        free(ma);
-                        ma = strdup(value);
-                        if (!ma)
-                                return -ENOMEM;
-                } else if (strcmp(key, "SEQNUM") == 0) {
-                        errno = 0;
-                        sn = strtoull(value, NULL, 10);
-                        if (errno != 0)
-                                return -errno;
-                }
-        }
-
-        if (!ac || !ss || !sn)
+        payload ++;
+        buflen -= payload - buf;
+        if (buflen <= 0)
                 return -EBADMSG;
 
-        if (action) {
-                *action = ac;
-                ac = NULL;
-        }
+        /* Pass null-delimited key-value pairs, guaranteed to be
+         * null-terminated. */
+        r = device_from_nulstr(m, &device, &action, &seqnum, payload, buflen);
+        if (r < 0)
+                return r;
 
-        if (subsystem) {
-                *subsystem = ss;
-                ss = NULL;
-        }
-
-        if (devtype) {
-                *devtype = dt;
-                 dt = NULL;
-        }
-
-        if (devname) {
-                *devname = dn;
-                dn = NULL;
-        }
-
-        if (modalias) {
-                *modalias = ma;
-                ma = NULL;
-        }
-
-        if (seqnum)
-                *seqnum = sn;
-
+        *devicep = device;
+        *actionp = action;
+        *seqnump = seqnum;
         return 0;
+}
+
+int uevent_action_from_string(const char *action) {
+        assert(action);
+
+        if (strcmp(action, "change") == 0)
+                return UEVENT_ACTION_CHANGE;
+        else if (strcmp(action, "add") == 0)
+                return UEVENT_ACTION_ADD;
+        else if (strcmp(action, "remove") == 0)
+                return UEVENT_ACTION_REMOVE;
+        else if (strcmp(action, "online") == 0)
+                return UEVENT_ACTION_ONLINE;
+        else if (strcmp(action, "offline") == 0)
+                return UEVENT_ACTION_OFFLINE;
+
+        return -EBADMSG;
 }

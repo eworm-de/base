@@ -131,12 +131,15 @@ org_bus1_devices_SOURCES = \
 	src/devices/manager.c \
 	src/devices/module.h \
 	src/devices/module.c \
-	src/devices/main.c
+	src/devices/main.c \
+	src/devices/device.h \
+	src/devices/device.c
 
 org_bus1_devices_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
 	$(CAP_CFLAGS) \
+	$(CRBTREE_CFLAGS) \
 	$(KMOD_CFLAGS) \
 	-pthread
 
@@ -144,6 +147,7 @@ org_bus1_devices_LDADD = \
 	libshared.a \
 	$(BUS1_LIBS) \
 	$(CAP_LIBS) \
+	$(CRBTREE_LIBS) \
 	$(KMOD_LIBS)
 
 # ------------------------------------------------------------------------------

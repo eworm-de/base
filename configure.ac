@@ -110,10 +110,19 @@ AS_IF([test "$enable_static" = "yes"], [
         BUS1_LIBS="-L../libbus1 -lbus1"
         AC_SUBST(BUS1_CFLAGS)
         AC_SUBST(BUS1_LIBS)
+
+        CRBTREE_CFLAGS="-I../c-rbtree/src"
+        CRBTREE_LIBS="-L../c-rbtree -lcrbtree"
+        AC_SUBST(BUS1_CFLAGS)
+        AC_SUBST(BUS1_LIBS)
 ], [
         PKG_CHECK_MODULES(BUS1, [libbus1],
                 [AC_DEFINE(HAVE_BUS1, 1, [Define if libbus1 is available])],
                 AC_MSG_ERROR([*** libbus1 library not found]))
+
+        PKG_CHECK_MODULES(CRBTREE, [c-rbtree],
+                [AC_DEFINE(HAVE_CRBTREE, 1, [Define if c-rbtree is available])],
+                AC_MSG_ERROR([*** c-rbtree library not found]))
 ])
 
 PKG_CHECK_MODULES(CAP, [libcap],

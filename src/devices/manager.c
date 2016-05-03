@@ -25,6 +25,7 @@
 #include <org.bus1/c-macro.h>
 #include <org.bus1/b1-identity.h>
 
+#include "device.h"
 #include "manager.h"
 #include "module.h"
 #include "permissions.h"
@@ -32,11 +33,21 @@
 #include "uevent.h"
 
 Manager *manager_free(Manager *m) {
+        CRBNode *n;
+
         c_close(m->fd_ep);
         c_close(m->fd_uevent);
         c_close(m->fd_signal);
         uevent_subscription_unlink(&m->uevent_subscriptions, m->subscription_settle);
         uevent_subscription_free(m->subscription_settle);
+
+        while ((n = c_rbtree_first(&m->devices))) {
+                struct device *device = c_container_of(n, struct device, rb);
+
+                c_rbtree_remove(&m->devices, n);
+                device_free(device);
+        }
+
         uevent_subscriptions_destroy(&m->uevent_subscriptions);
         free(m);
 
@@ -127,7 +138,16 @@ int manager_new(Manager **manager) {
 static int sysfs_cb(int sysfd, const char *devpath, const char *subsystem,
                     const char *devtype, int devfd, const char *devname,
                     const char *modalias, void *userdata) {
+        Manager *manager = userdata;
+        struct device *device;
         int r;
+
+        assert(manager);
+
+        r = device_add(manager, &device, devpath, subsystem, devtype, devname,
+                       modalias);
+        if (r < 0)
+                return r;
 
         if (devname) {
                 r = permissions_apply(sysfd, devfd, devname, subsystem, devtype);
@@ -150,6 +170,7 @@ static int settle_cb(void *userdata) {
         assert(m);
 
         m->subscription_settle = uevent_subscription_free(m->subscription_settle);
+        m->settled = true;
 
         return 0;
 }
@@ -157,7 +178,7 @@ static int settle_cb(void *userdata) {
 int manager_enumerate(Manager *m) {
         int r;
 
-        r = sysfs_enumerate(m->sysfd, NULL, NULL, m->devfd, sysfs_cb, NULL);
+        r = sysfs_enumerate(m->sysfd, NULL, NULL, m->devfd, sysfs_cb, m);
         if (r < 0)
                 return r;
 
@@ -169,27 +190,24 @@ int manager_enumerate(Manager *m) {
 }
 
 static int manager_handle_uevent(Manager *m) {
-        _c_cleanup_(c_freep) char *action = NULL;
-        _c_cleanup_(c_freep) char *subsystem = NULL;
-        _c_cleanup_(c_freep) char *devtype = NULL;
-        _c_cleanup_(c_freep) char *devname = NULL;
-        _c_cleanup_(c_freep) char *modalias = NULL;
+        struct device *device;
         uint64_t seqnum;
-        int r;
+        int r, action;
 
-        r = uevent_receive(m->fd_uevent, &action, &subsystem, &devtype, &devname, &modalias, &seqnum);
+        r = uevent_receive(m, &device, &action, &seqnum);
         if (r < 0)
                 return r;
 
-        if (action && strcmp(action, "add") == 0) {
-                if (devname) {
-                        r = permissions_apply(m->sysfd, m->devfd, devname, subsystem, devtype);
+        if (action == UEVENT_ACTION_ADD) {
+                if (device->devname) {
+                        r = permissions_apply(m->sysfd, m->devfd, device->devname,
+                                              device->subsystem, device->devtype);
                         if (r < 0)
                                 return r;
                 }
 
-                if (modalias) {
-                        r = module_load(modalias);
+                if (device->modalias) {
+                        r = module_load(device->modalias);
                         if (r < 0)
                                 return r;
                 }

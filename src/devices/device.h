@@ -17,28 +17,23 @@
 ***/
 
 #include <c-rbtree.h>
-#include <sys/epoll.h>
+#include <org.bus1/c-macro.h>
 
-#include "uevent.h"
+#include "manager.h"
 
-typedef struct Manager {
-        int fd_uevent;
-        int fd_signal;
-        int fd_ep;
-        struct epoll_event ep_uevent;
-        struct epoll_event ep_signal;
-        int sysfd;
-        int devfd;
-        struct uevent_subscriptions uevent_subscriptions;
-        struct uevent_subscription *subscription_settle;
-        bool settled;
-        CRBTree devices;
-} Manager;
+struct device {
+        Manager *manager;
+        CRBNode rb;
+        const char *devpath;
+        const char *subsystem;
+        const char *devtype;
+        const char *devname;
+        const char *modalias;
+};
 
-Manager *manager_free(Manager *m);
-int manager_new(Manager **manager);
+int device_from_nulstr(Manager *m, struct device **devicep, int *action, uint64_t *seqnum, char *buf, size_t n_buf);
+struct device *device_free(struct device *device);
 
-int manager_enumerate(Manager *manager);
-int manager_run(Manager *manager);
-
-C_DEFINE_CLEANUP(Manager *, manager_free);
+int device_add(Manager *m, struct device **devicep, const char *devpath,
+               const char *subsystem, const char *devtype,
+               const char *devname, const char *modalias);
