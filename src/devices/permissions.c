@@ -27,7 +27,6 @@
 static const struct permissions {
         const char *subsystem;
         const char *devtype;
-        const char *devname;
         bool (*match)(int sysfd,
                      int devfd,
                      const char *devname,
@@ -40,12 +39,12 @@ static const struct permissions {
         uid_t uid;
         gid_t gid;
 } device_permissions[] = {
-        { "input",        NULL,           NULL, NULL,            0660, BUS1_IDENTITY_INPUT, BUS1_IDENTITY_INPUT },
-        { "sound",        NULL,           NULL, NULL,            0660, BUS1_IDENTITY_AUDIO, BUS1_IDENTITY_AUDIO },
-        { "video4linux",  NULL,           NULL, NULL,            0660, BUS1_IDENTITY_VIDEO, BUS1_IDENTITY_VIDEO },
-        { "block",        NULL,           NULL, NULL,            0660, BUS1_IDENTITY_DISK,  BUS1_IDENTITY_DISK },
-        { "usb",          "usb_device",   NULL, permissions_usb, 0,    0,                   0 },
-        { "usb",          "usb_device",   NULL, NULL,            0660, BUS1_IDENTITY_USB,   BUS1_IDENTITY_USB },
+        { "input",        NULL,           NULL,            0660, BUS1_IDENTITY_INPUT, BUS1_IDENTITY_INPUT },
+        { "sound",        NULL,           NULL,            0660, BUS1_IDENTITY_AUDIO, BUS1_IDENTITY_AUDIO },
+        { "video4linux",  NULL,           NULL,            0660, BUS1_IDENTITY_VIDEO, BUS1_IDENTITY_VIDEO },
+        { "block",        NULL,           NULL,            0660, BUS1_IDENTITY_DISK,  BUS1_IDENTITY_DISK },
+        { "usb",          "usb_device",   permissions_usb, 0,    0,                   0 },
+        { "usb",          "usb_device",   NULL,            0660, BUS1_IDENTITY_USB,   BUS1_IDENTITY_USB },
 };
 
 int permissions_apply(int sysfd,
@@ -64,10 +63,6 @@ int permissions_apply(int sysfd,
 
                 if (devtype && device_permissions[i].devtype)
                         if (strcmp(devtype, device_permissions[i].devtype) != 0)
-                                continue;
-
-                if (devname && device_permissions[i].devname)
-                        if (strcmp(devname, device_permissions[i].devname) != 0)
                                 continue;
 
                 if (device_permissions[i].match && !device_permissions[i].match(sysfd,
