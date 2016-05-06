@@ -9,11 +9,8 @@ mkdir -p ./build/m4/
 autoreconf --force --install --symlink
 cd $oldpwd
 
-if [[ "$1" == "b" ]]; then
+if [[ "$1" == "c" ]]; then
         $topdir/configure --enable-static --prefix=/usr
-        make clean
-elif [[ "$1" = "c" ]]; then
-        $topdir/configure --enable-static
         make clean
 else
         echo
