@@ -20,6 +20,9 @@
 #include <org.bus1/c-macro.h>
 
 #include "manager.h"
+#include "uevent.h"
+
+typedef int (*device_callback_t)(struct device *device, int sysfd, void *userdata);
 
 struct device {
         Manager *manager;
@@ -29,8 +32,13 @@ struct device {
         const char *devtype;
         const char *devname;
         const char *modalias;
+
+        int sysfd;
+        struct uevent_subscription *sysfd_subscription;
+        struct device_slot *sysfd_cb;
 };
 
+int device_call_with_sysfd(struct device *device, struct device_slot **slot, device_callback_t cb, void *userdata);
 int device_from_nulstr(Manager *m, struct device **devicep, int *action, uint64_t *seqnum, char *buf, size_t n_buf);
 struct device *device_free(struct device *device);
 

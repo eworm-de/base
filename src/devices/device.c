@@ -46,9 +46,110 @@ static struct device *device_get_by_devpath(CRBTree *devices, const char *devpat
         return c_container_of(n, struct device, rb);
 }
 
+struct device_slot {
+        struct device *device;
+        struct device_slot *previous;
+        struct device_slot *next;
+        device_callback_t cb;
+        void *userdata;
+};
+
+static struct device_slot *device_slot_free(struct device_slot *slot) {
+        if (!slot)
+                return NULL;
+
+        if (slot->device->sysfd_cb == slot)
+                slot->device->sysfd_cb = slot->next;
+
+        if (slot->next)
+                slot->next->previous = slot->previous;
+
+        if (slot->previous)
+                slot->previous->next = slot->next;
+
+        if (!slot->device->sysfd_cb) {
+                uevent_subscription_unlink(&slot->device->manager->uevent_subscriptions, slot->device->sysfd_subscription);
+                slot->device->sysfd_subscription = uevent_subscription_free(slot->device->sysfd_subscription);
+                c_close(slot->device->sysfd);
+        }
+
+        free(slot);
+
+        return NULL;
+}
+
+static void device_slot_freep(struct device_slot **slotp) {
+        device_slot_free(*slotp);
+}
+
+static int device_slot_new(struct device *device, struct device_slot **slotp,
+                           device_callback_t cb, void *userdata) {
+        struct device_slot *slot;
+
+        slot = malloc(sizeof(*slot));
+        if (!slot)
+                return -ENOMEM;
+
+        slot->cb = cb;
+        slot->userdata = userdata;
+        slot->device = device;
+        slot->next = device->sysfd_cb;
+        slot->previous = NULL;
+        device->sysfd_cb = slot;
+
+        if (slot->next)
+                slot->next->previous = slot;
+
+        return 0;
+}
+
+static int device_sysfd_cb(void *userdata) {
+        struct device *device = userdata;
+
+        assert(device);
+
+        while (device->sysfd_cb) {
+                device->sysfd_cb->cb(device, device->sysfd, device->sysfd_cb->userdata);
+                device_slot_free(device->sysfd_cb);
+        }
+
+        c_close(device->sysfd);
+
+        return 0;
+}
+
+static int device_sysfd_open(struct device *device) {
+        _c_cleanup_(c_closep) int fd = -1;
+        int r;
+
+        fd = openat(device->manager->sysfd, device->devpath, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (fd < 0)
+                return -errno;
+
+        r = uevent_sysfs_sync(&device->manager->uevent_subscriptions, device->manager->sysfd,
+                              &device->sysfd_subscription, device_sysfd_cb, device);
+        if (r < 0)
+                return r;
+
+        device->sysfd = fd;
+        fd = -1;
+
+        return 0;
+}
+
 struct device *device_free(struct device *device) {
         if (!device)
                 return NULL;
+
+        while (device->sysfd_cb) {
+                device->sysfd_cb->cb(device, -ENOENT, device->sysfd_cb->userdata);
+                device_slot_free(device->sysfd_cb);
+        }
+
+        c_close(device->sysfd);
+
+        uevent_subscription_unlink(&device->manager->uevent_subscriptions, device->sysfd_subscription);
+        uevent_subscription_free(device->sysfd_subscription);
 
         free(device);
 
@@ -80,6 +181,9 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
                 return -ENOMEM;
 
         device->manager = m;
+        device->sysfd = -1;
+        device->sysfd_subscription = NULL;
+        device->sysfd_cb = NULL;
         c_rbnode_init(&device->rb);
         device->devpath = memcpy((void*)(device + 1), devpath, n_devpath);
         device->subsystem = memcpy((char*)device->devpath + n_devpath, subsystem, n_subsystem);
@@ -161,27 +265,38 @@ static int device_remove(Manager *m, const char *devpath) {
 }
 
 static int device_move(Manager *m, struct device **devicep, const char *devpath_old, const char *devpath) {
-        _c_cleanup_(device_freep) struct device *device = NULL;
+        _c_cleanup_(device_freep) struct device *device = NULL, *device_old = NULL;
         int r;
 
         /* A MOVE event is empty apart from the DEVPATH change, simply treat
          * this as a REMOVE followed with an ADD containing the same data as the
-         * original device. */
+         * original device. However, if we are in the process of resolving the
+         * DEVPATH, we need to restart that with the new DEVPATH value. */
 
-        device = device_get_by_devpath(&m->devices, devpath);
-        if (!device) {
+        device_old = device_get_by_devpath(&m->devices, devpath_old);
+        if (!device_old) {
                 if (m->settled)
                         return -EIO;
                 else
                         return 0;
         }
 
-        device_unlink(&m->devices, device);
+        device_unlink(&m->devices, device_old);
 
-        r = device_add(m, devicep, device->devpath, device->subsystem, device->devtype,
-                       device->devname, device->modalias);
+        r = device_add(m, &device, device_old->devpath, device_old->subsystem, device_old->devtype,
+                       device_old->devname, device_old->modalias);
         if (r < 0)
                 return r;
+
+        device->sysfd_cb = device_old->sysfd_cb;
+        device_old->sysfd_cb = NULL;
+
+        r = device_sysfd_open(device);
+        if (r < 0)
+                return r;
+
+        *devicep = device;
+        device = NULL;
 
         return 0;
 }
@@ -375,5 +490,28 @@ int device_from_nulstr(Manager *m, struct device **devicep, int *actionp,
         *devicep = device;
         *actionp = action;
         *seqnump = seqnum;
+        return 0;
+}
+
+int device_call_with_sysfd(struct device *device, struct device_slot **slotp,
+                           device_callback_t cb, void *userdata) {
+        _c_cleanup_(device_slot_freep) struct device_slot *slot = NULL;
+        int r;
+
+        r = device_slot_new(device, &slot, cb, userdata);
+        if (r < 0)
+                return r;
+
+        if (device->sysfd < 0) {
+                r = device_sysfd_open(device);
+                if (r < 0)
+                        return r;
+        }
+
+        if (slotp)
+                *slotp = slot;
+
+        slot = NULL;
+
         return 0;
 }
