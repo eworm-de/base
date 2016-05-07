@@ -149,28 +149,34 @@ static int sysfs_cb(int sysfd, const char *devpath, const char *subsystem,
         if (r < 0)
                 return r;
 
-        if (devname) {
-                r = permissions_apply(sysfd, devfd, devname, subsystem, devtype);
-                if (r < 0)
-                        return r;
-        }
-
-        if (modalias) {
-                r = module_load(modalias);
-                if (r < 0)
-                        return r;
-        }
-
         return 0;
 }
 
 static int settle_cb(void *userdata) {
         Manager *m = userdata;
+        int r;
 
         assert(m);
 
         m->subscription_settle = uevent_subscription_free(m->subscription_settle);
         m->settled = true;
+
+        for (CRBNode *n = c_rbtree_first(&m->devices); n; n = c_rbnode_next(n)) {
+                struct device *device = c_container_of(n, struct device, rb);
+
+                if (device->devname) {
+                        r = permissions_apply(m->sysfd, m->devfd, device->devname,
+                                              device->subsystem, device->devtype);
+                        if (r < 0)
+                                return r;
+                }
+
+                if (device->modalias) {
+                        r = module_load(device->modalias);
+                        if (r < 0)
+                                return r;
+                }
+        }
 
         return 0;
 }
@@ -198,7 +204,7 @@ static int manager_handle_uevent(Manager *m) {
         if (r < 0)
                 return r;
 
-        if (action == UEVENT_ACTION_ADD) {
+        if (m->settled && action == UEVENT_ACTION_ADD) {
                 if (device->devname) {
                         r = permissions_apply(m->sysfd, m->devfd, device->devname,
                                               device->subsystem, device->devtype);
