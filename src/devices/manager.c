@@ -124,9 +124,9 @@ int manager_new(Manager **manager) {
        return 0;
 }
 
-static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
-                    int devfd, const char *devname, const char *modalias,
-                    void *userdata) {
+static int sysfs_cb(int sysfd, const char *devpath, const char *subsystem,
+                    const char *devtype, int devfd, const char *devname,
+                    const char *modalias, void *userdata) {
         int r;
 
         if (devname) {

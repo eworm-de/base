@@ -23,9 +23,11 @@
 
 static int enumerate_devices(int sysfd,
                              const char *devicesdir,
+                             bool subdir,
                              const char *devtype,
                              int devfd,
                              int (*cb)(int sysfd,
+                                       const char *devpath,
                                        const char *subsystem,
                                        const char *devtype,
                                        int devfd,
@@ -53,8 +55,10 @@ static int enumerate_devices(int sysfd,
                 int fd;
                 _c_cleanup_(c_fclosep) FILE *f = NULL;
                 char line[4096];
+                const char *prefix;
                 char *s;
                 ssize_t len;
+                _c_cleanup_(c_freep) char *dp = NULL;
                 _c_cleanup_(c_freep) char *ss = NULL;
                 _c_cleanup_(c_freep) char *dt = NULL;
                 _c_cleanup_(c_freep) char *dn = NULL;
@@ -62,6 +66,25 @@ static int enumerate_devices(int sysfd,
 
                 if (d->d_name[0] == '.')
                         continue;
+
+                len = readlinkat(dirfd(dir), d->d_name, line, sizeof(line));
+                if (len < 0)
+                        continue;
+                if (len <= 0 || len == (ssize_t)sizeof(line))
+                        continue;
+                line[len] = '\0';
+
+                if (subdir)
+                        prefix = "../../../";
+                else
+                        prefix = "../../";
+
+                if (strncmp(line, prefix, strlen(prefix) != 0))
+                                continue;
+
+                dp = strdup(line + strlen(prefix));
+                if (!dp)
+                        return -ENOMEM;
 
                 dfd2 = openat(dirfd(dir), d->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
                 if (dfd2 < 0)
@@ -130,7 +153,7 @@ static int enumerate_devices(int sysfd,
                                 continue;
                 }
 
-                r = cb(sysfd, ss, dt, devfd, dn, ma, userdata);
+                r = cb(sysfd, dp, ss, dt, devfd, dn, ma, userdata);
                 if (r < 0 || r == 1)
                         return r;
         }
@@ -145,6 +168,7 @@ static int enumerate_subsystems(int sysfd,
                                 const char *devtype,
                                 int devfd,
                                 int (*cb)(int sysfd,
+                                          const char *devpath,
                                           const char *subsystem,
                                           const char *devtype,
                                           int devfd,
@@ -168,7 +192,7 @@ static int enumerate_subsystems(int sysfd,
                                 return -ENOMEM;
                 }
 
-                return enumerate_devices(sysfd, sd, devtype, devfd, cb, userdata);
+                return enumerate_devices(sysfd, sd, !!subdir, devtype, devfd, cb, userdata);
         }
 
         /* all subsystems at /sys/bus/$SUBSYSTEM or /sys/class/$SUBSYSTEM */
@@ -196,7 +220,7 @@ static int enumerate_subsystems(int sysfd,
                 }
 
                 /* /sys/bus/$SUBSYSTEM/devices or /sys/class/$SUBSYSTEM */
-                r = enumerate_devices(sysfd, sd ?: d->d_name, devtype, devfd, cb, userdata);
+                r = enumerate_devices(sysfd, sd ?: d->d_name, !!subdir, devtype, devfd, cb, userdata);
                 if (r < 0)
                         return r;
         }
@@ -209,6 +233,7 @@ int sysfs_enumerate(int sysfd,
                     const char *devtype,
                     int devfd,
                     int (*cb)(int sysfd,
+                              const char *devpath,
                               const char *subsystem,
                               const char *devtype,
                               int devfd,

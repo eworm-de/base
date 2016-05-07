@@ -226,9 +226,9 @@ static int modules_load(void) {
         return r;
 }
 
-static int sysfs_cb(int sysfd, const char *subsystem, const char *devtype,
-                    int devfd, const char *devname, const char *modalias,
-                    void *userdata) {
+static int sysfs_cb(int sysfd, const char *devpath, const char *subsystem,
+                    const char *devtype, int devfd, const char *devname,
+                    const char *modalias, void *userdata) {
         _c_cleanup_(c_freep) char *device = NULL;
         Manager *m = userdata;
         int r;
