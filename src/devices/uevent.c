@@ -107,15 +107,6 @@ int uevent_sysfs_sync(struct uevent_subscriptions *uss,
 
         if (seqnum < uss->seqnum)
                 return -EIO;
-        else if (seqnum == uss->seqnum) {
-                r = cb(userdata);
-                if (r < 0)
-                        return r;
-
-                *usd = NULL;
-
-                return r;
-        }
 
         us = malloc(sizeof(*us));
         if (!us)
