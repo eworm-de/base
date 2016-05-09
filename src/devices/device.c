@@ -463,12 +463,14 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
         if (r < 0)
                 return r;
 
-        device->sysfd_cb = device_old->sysfd_cb;
-        device_old->sysfd_cb = NULL;
+        if (device_old->sysfd_cb) {
+                device->sysfd_cb = device_old->sysfd_cb;
+                device_old->sysfd_cb = NULL;
 
-        r = device_sysfd_open(device);
-        if (r < 0)
-                return r;
+                r = device_sysfd_open(device);
+                if (r < 0)
+                        return r;
+        }
 
         *devicep = device;
         device = NULL;
