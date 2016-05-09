@@ -89,21 +89,30 @@ int main(int argc, char **argv) {
         if (!log)
                 return EXIT_FAILURE;
 
-        if (manager_new(&m) < 0)
+        r = manager_new(&m);
+        if (r < 0) {
+                kmsg(LOG_ERR, "Failed to create manager object: %s\n", strerror(-r));
                 return EXIT_FAILURE;
+        }
 
         r = privileges_drop(BUS1_IDENTITY_DEVICES, caps, C_ARRAY_SIZE(caps));
-        if (r < 0)
+        if (r < 0) {
+                kmsg(LOG_ERR, "Failed to drop privileges: %s\n", strerror(-r));
                 return EXIT_FAILURE;
+        }
 
         kmsg(LOG_INFO, "Coldplug, adjust /dev permissions and load kernel modules for current devices.");
         r = manager_enumerate(m);
-        if (r < 0)
+        if (r < 0) {
+                kmsg(LOG_ERR, "Failed to enumerate devices: %s\n", strerror(-r));
                 return EXIT_FAILURE;
+        }
 
         r = manager_run(m);
-        if (r < 0)
+        if (r < 0) {
+                kmsg(LOG_ERR, "Mainloop failed: %s\n", strerror(-r));
                 return EXIT_FAILURE;
+        }
 
         return EXIT_SUCCESS;
 }
