@@ -63,12 +63,12 @@ int permissions_match_and_apply(int devfd, struct device *device) {
                 mode_t mode = device_permissions[i].mode;
                 int r;
 
-                if (device->subsystem && device_permissions[i].subsystem)
-                        if (strcmp(device->subsystem, device_permissions[i].subsystem) != 0)
+                if (device_permissions[i].subsystem)
+                        if (strcmp(device->devtype->subsystem->name, device_permissions[i].subsystem) != 0)
                                 continue;
 
-                if (device->devtype && device_permissions[i].devtype)
-                        if (strcmp(device->devtype, device_permissions[i].devtype) != 0)
+                if (device->devtype->name && device_permissions[i].devtype)
+                        if (strcmp(device->devtype->name, device_permissions[i].devtype) != 0)
                                 continue;
 
                 if (device_permissions[i].match && !device_permissions[i].match(device,

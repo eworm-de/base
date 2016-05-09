@@ -33,6 +33,7 @@ typedef struct Manager {
         struct uevent_subscription *subscription_settle;
         bool settled;
         CRBTree devices;
+        CRBTree subsystems;
 } Manager;
 
 Manager *manager_free(Manager *m);

@@ -22,6 +22,157 @@
 #include "device.h"
 #include "uevent.h"
 
+static struct devtype *devtype_free(struct devtype *devtype) {
+        if (!devtype)
+                return NULL;
+
+        assert(!devtype->devices);
+
+        free(devtype);
+
+        return NULL;
+}
+
+static void devtype_freep(struct devtype **devtypep) {
+        devtype_free(*devtypep);
+}
+
+static int devtype_new(struct subsystem *subsystem, struct devtype **devtypep, const char *name) {
+        _c_cleanup_(devtype_freep) struct devtype *devtype = NULL;
+        size_t n_name;
+
+        assert(subsystem);
+        assert(devtypep);
+
+        n_name = name ? strlen(name) + 1 : 0;
+        devtype = malloc(sizeof(*devtype) + n_name);
+        if (!devtype)
+                return -ENOMEM;
+        devtype->subsystem = subsystem;
+        c_rbnode_init(&devtype->rb);
+        devtype->devices = NULL;
+        if (name)
+                devtype->name = memcpy((void*)(devtype + 1), name, n_name);
+        else
+                devtype->name = NULL;
+
+        *devtypep = devtype;
+        devtype = NULL;
+        return 0;
+}
+
+static int devtypes_compare(CRBTree *t, void *k, CRBNode *n) {
+        struct devtype *devtype = c_container_of(n, struct devtype, rb);
+        const char *name = k;
+
+        if (name == devtype->name)
+                return 0;
+
+        if (!name)
+                return -1;
+
+        if (!devtype->name)
+                return 1;
+
+        return strcmp(name, devtype->name);
+}
+
+static int devtype_add(struct subsystem *subsystem, struct devtype **devtypep, const char *name) {
+        struct devtype *devtype;
+        CRBNode **slot, *p;
+        int r;
+
+        assert(subsystem);
+        assert(devtypep);
+
+        slot = c_rbtree_find_slot(&subsystem->devtypes, devtypes_compare, name, &p);
+        if (slot) {
+                r = devtype_new(subsystem, &devtype, name);
+                if (r < 0)
+                        return r;
+
+                c_rbtree_add(&subsystem->devtypes, p, slot, &devtype->rb);
+        } else
+                devtype = c_container_of(p, struct devtype, rb);
+
+        *devtypep = devtype;
+
+        return 0;
+}
+
+struct subsystem *subsystem_free(struct subsystem *subsystem) {
+        CRBNode *n;
+
+        if (!subsystem)
+                return NULL;
+
+        while ((n = c_rbtree_first(&subsystem->devtypes))) {
+                struct devtype *devtype = c_container_of(n, struct devtype, rb);
+
+                c_rbtree_remove(&subsystem->devtypes, n);
+                devtype_free(devtype);
+        }
+
+        free(subsystem);
+
+        return NULL;
+}
+
+static void subsystem_freep(struct subsystem **subsystemp) {
+        subsystem_free(*subsystemp);
+}
+
+static int subsystem_new(Manager *manager, struct subsystem **subsystemp, const char *name) {
+        _c_cleanup_(subsystem_freep) struct subsystem *subsystem = NULL;
+        size_t n_name;
+
+        assert(subsystemp);
+        assert(name);
+
+        n_name = strlen(name) + 1;
+        subsystem = malloc(sizeof(*subsystem) + n_name);
+        if (!subsystem)
+                return -ENOMEM;
+        subsystem->manager = manager;
+        c_rbnode_init(&subsystem->rb);
+        subsystem->devtypes = (CRBTree){};
+        subsystem->name = memcpy((void*)(subsystem + 1), name, n_name);
+
+        *subsystemp = subsystem;
+        subsystem = NULL;
+        return 0;
+}
+
+static int subsystems_compare(CRBTree *t, void *k, CRBNode *n) {
+        struct subsystem *subsystem = c_container_of(n, struct subsystem, rb);
+        const char *name = k;
+
+        return strcmp(name, subsystem->name);
+}
+
+static int subsystem_add(Manager *m, struct subsystem **subsystemp, const char *name) {
+        struct subsystem *subsystem;
+        CRBNode **slot, *p;
+        int r;
+
+        assert(m);
+        assert(subsystemp);
+
+        slot = c_rbtree_find_slot(&m->subsystems, subsystems_compare, name, &p);
+        if (slot) {
+                r = subsystem_new(m, &subsystem, name);
+                if (r < 0)
+                        return r;
+
+                c_rbtree_add(&m->subsystems, p, slot, &subsystem->rb);
+        } else
+                subsystem = c_container_of(p, struct subsystem, rb);
+
+        *subsystemp = subsystem;
+
+        return 0;
+}
+
 static int devices_compare(CRBTree *t, void *k, CRBNode *n) {
         struct device *device = c_container_of(n, struct device, rb);
         const char *devpath = k;
@@ -29,8 +180,23 @@ static int devices_compare(CRBTree *t, void *k, CRBNode *n) {
         return strcmp(devpath, device->devpath);
 }
 
-static void device_unlink(CRBTree *devices, struct device *device) {
-        c_rbtree_remove(devices, &device->rb);
+void device_unlink(struct device *device) {
+        if (!device)
+                return;
+
+        c_rbtree_remove(&device->manager->devices, &device->rb);
+
+        if (device->devtype->devices == device)
+                device->devtype->devices = device->next_by_devtype;
+
+        if (device->previous_by_devtype)
+                device->previous_by_devtype->next_by_devtype = device->next_by_devtype;
+
+        if (device->next_by_devtype)
+                device->next_by_devtype->previous_by_devtype = device->previous_by_devtype;
+
+        device->previous_by_devtype = NULL;
+        device->next_by_devtype = NULL;
 }
 
 static struct device *device_get_by_devpath(CRBTree *devices, const char *devpath) {
@@ -161,22 +327,18 @@ static void device_freep(struct device **devicep) {
 }
 
 static int device_new(Manager *m, struct device **devicep, const char *devpath,
-                      const char *subsystem, const char *devtype,
-                      const char *devname, const char *modalias) {
+                      struct devtype *devtype, const char *devname, const char *modalias) {
         _c_cleanup_(device_freep) struct device *device = NULL;
-        size_t n_devpath, n_subsystem, n_devtype, n_devname, n_modalias;
+        size_t n_devpath, n_devname, n_modalias;
 
         assert(devicep);
         assert(devpath);
-        assert(subsystem);
+        assert(devtype);
 
         n_devpath = strlen(devpath) + 1;
-        n_subsystem = strlen(subsystem) + 1;
-        n_devtype = devtype ? strlen(devtype) + 1 : 0;
         n_devname = devname ? strlen(devname) + 1 : 0;
         n_modalias = modalias ? strlen(modalias) + 1 : 0;
-        device = malloc(sizeof(*device) + n_devpath + n_subsystem +
-                        n_devtype + n_devname + n_modalias);
+        device = malloc(sizeof(*device) + n_devpath + n_devname + n_modalias);
         if (!device)
                 return -ENOMEM;
 
@@ -185,14 +347,13 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
         device->sysfd_subscription = NULL;
         device->sysfd_cb = NULL;
         c_rbnode_init(&device->rb);
+        device->previous_by_devtype = NULL;
+        device->next_by_devtype = NULL;
+        device->devtype = devtype;
         device->devpath = memcpy((void*)(device + 1), devpath, n_devpath);
-        device->subsystem = memcpy((char*)device->devpath + n_devpath, subsystem, n_subsystem);
-        device->devtype = memcpy((char*)device->subsystem + n_subsystem, devtype, n_devtype);
-        device->devname = memcpy((char*)device->devtype + n_devtype, devname, n_devname);
+        device->devname = memcpy((char*)device->devpath + n_devpath, devname, n_devname);
         device->modalias = memcpy((char*)device->devname + n_devname, modalias, n_modalias);
 
-        if (!devtype)
-                device->devtype = NULL;
         if (!devname)
                 device->devname = NULL;
         if (!modalias)
@@ -218,8 +379,10 @@ static int device_change(Manager *m, struct device **devicep, const char *devpat
 }
 
 int device_add(Manager *m, struct device **devicep, const char *devpath,
-               const char *subsystem, const char *devtype,
+               const char *subsystem_name, const char *devtype_name,
                const char *devname, const char *modalias) {
+        struct subsystem *subsystem;
+        struct devtype *devtype;
         struct device *device;
         CRBNode **slot, *p;
         int r;
@@ -231,14 +394,26 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
                 else
                         /* This can happen if an ADD event races /sys enumeration, let
                          * the uevent be authoritative and treat it like a CHANGE. */
-                        return device_change(m, devicep, devpath, subsystem, devtype, devname, modalias);
+                        return device_change(m, devicep, devpath, subsystem_name, devtype_name, devname, modalias);
         }
 
-        r = device_new(m, &device, devpath, subsystem, devtype, devname, modalias);
+        r = subsystem_add(m, &subsystem, subsystem_name);
+        if (r < 0)
+                return r;
+
+        r = devtype_add(subsystem, &devtype, devtype_name);
+        if (r < 0)
+                return r;
+
+        r = device_new(m, &device, devpath, devtype, devname, modalias);
         if (r < 0)
                 return r;
 
         c_rbtree_add(&m->devices, p, slot, &device->rb);
+        device->next_by_devtype = devtype->devices;
+        if (devtype->devices)
+                devtype->devices->previous_by_devtype = device;
+        devtype->devices = device;
 
         *devicep = device;
 
@@ -258,7 +433,7 @@ static int device_remove(Manager *m, const char *devpath) {
                         return 0;
         }
 
-        device_unlink(&m->devices, device);
+        device_unlink(device);
         device_free(device);
 
         return 0;
@@ -281,9 +456,9 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
                         return 0;
         }
 
-        device_unlink(&m->devices, device_old);
+        device_unlink(device_old);
 
-        r = device_add(m, &device, device_old->devpath, device_old->subsystem, device_old->devtype,
+        r = device_add(m, &device, device_old->devpath, device_old->devtype->subsystem->name, device_old->devtype->name,
                        device_old->devname, device_old->modalias);
         if (r < 0)
                 return r;

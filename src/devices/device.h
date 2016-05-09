@@ -26,10 +26,14 @@ typedef int (*device_callback_t)(struct device *device, int sysfd, void *userdat
 
 struct device {
         Manager *manager;
+
         CRBNode rb;
         const char *devpath;
-        const char *subsystem;
-        const char *devtype;
+
+        struct devtype *devtype;
+        struct device *previous_by_devtype;
+        struct device *next_by_devtype;
+
         const char *devname;
         const char *modalias;
 
@@ -38,10 +42,29 @@ struct device {
         struct device_slot *sysfd_cb;
 };
 
+struct subsystem {
+        Manager *manager;
+        const char *name;
+        CRBNode rb;
+
+        CRBTree devtypes;
+};
+
+struct devtype {
+        struct subsystem *subsystem;
+        const char *name;
+        CRBNode rb;
+
+        struct device *devices;
+};
+
 int device_call_with_sysfd(struct device *device, struct device_slot **slot, device_callback_t cb, void *userdata);
 int device_from_nulstr(Manager *m, struct device **devicep, int *action, uint64_t *seqnum, char *buf, size_t n_buf);
+void device_unlink(struct device *device);
 struct device *device_free(struct device *device);
 
 int device_add(Manager *m, struct device **devicep, const char *devpath,
                const char *subsystem, const char *devtype,
                const char *devname, const char *modalias);
+
+struct subsystem *subsystem_free(struct subsystem *subsystem);

@@ -44,8 +44,15 @@ Manager *manager_free(Manager *m) {
         while ((n = c_rbtree_first(&m->devices))) {
                 struct device *device = c_container_of(n, struct device, rb);
 
-                c_rbtree_remove(&m->devices, n);
+                device_unlink(device);
                 device_free(device);
+        }
+
+        while ((n = c_rbtree_first(&m->subsystems))) {
+                struct subsystem *subsystem = c_container_of(n, struct subsystem, rb);
+
+                c_rbtree_remove(&m->subsystems, n);
+                subsystem_free(subsystem);
         }
 
         uevent_subscriptions_destroy(&m->uevent_subscriptions);
