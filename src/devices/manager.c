@@ -165,8 +165,7 @@ static int settle_cb(void *userdata) {
                 struct device *device = c_container_of(n, struct device, rb);
 
                 if (device->devname) {
-                        r = permissions_apply(m->sysfd, m->devfd, device->devname,
-                                              device->subsystem, device->devtype);
+                        r = permissions_match_and_apply(m->devfd, device);
                         if (r < 0)
                                 return r;
                 }
@@ -206,8 +205,7 @@ static int manager_handle_uevent(Manager *m) {
 
         if (m->settled && action == UEVENT_ACTION_ADD) {
                 if (device->devname) {
-                        r = permissions_apply(m->sysfd, m->devfd, device->devname,
-                                              device->subsystem, device->devtype);
+                        r = permissions_match_and_apply(m->devfd, device);
                         if (r < 0)
                                 return r;
                 }

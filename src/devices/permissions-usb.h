@@ -16,11 +16,10 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-bool permissions_usb(int sysfd,
+#include "device.h"
+
+bool permissions_usb(struct device *device,
                      int devfd,
-                     const char *devname,
-                     const char *subsystem,
-                     const char *devtype,
                      mode_t *modep,
                      uid_t *uidp,
                      gid_t *gidp);

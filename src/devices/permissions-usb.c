@@ -22,6 +22,7 @@
 #include <org.bus1/c-macro.h>
 
 #include "permissions-usb.h"
+#include "permissions.h"
 
 static const struct {
         uint8_t class;
@@ -74,42 +75,31 @@ struct usb_descriptor {
         };
 } _c_packed_;
 
-bool permissions_usb(int sysfd,
-                     int devfd,
-                     const char *devname,
-                     const char *subsystem,
-                     const char *devtype,
-                     mode_t *modep,
-                     uid_t *uidp,
-                     gid_t *gidp) {
-        struct stat st;
-        _c_cleanup_(c_freep) char *descriptor = NULL;
+static int permissions_usb_apply(struct device *device, int sysfd, void *userdata) {
         _c_cleanup_(c_closep) int fd = -1;
+        int devfd = *(int*)userdata;
         uint8_t buf[0xffff];
         ssize_t n;
         struct usb_descriptor *desc;
+        mode_t mode;
+        uid_t uid;
+        gid_t gid;
 
-        if (fstatat(devfd, devname, &st, 0) < 0)
-                return false;
+        if (sysfd < 0)
+                return 0;
 
-        if (!S_ISCHR(st.st_mode))
-                return false;
-
-        if (asprintf(&descriptor, "dev/char/%d:%d/descriptors", major(st.st_rdev), minor(st.st_rdev)) < 0)
-                return false;
-
-        fd = openat(sysfd, descriptor, O_RDONLY|O_NONBLOCK|O_CLOEXEC);
+        fd = openat(sysfd, "descriptors", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
         if (fd < 0)
-                return false;
+                return -errno;
 
         n = read(fd, buf, sizeof(buf));
         if (n < 3 || n == sizeof(buf))
-                return false;
+                return -EIO;
 
         for (ssize_t o = 0; o < n;) {
                 desc = (struct usb_descriptor *)(buf + o);
                 if (desc->header.bLength < 3)
-                        return false;
+                        return -EIO;
 
                 o += desc->header.bLength;
 
@@ -119,11 +109,22 @@ bool permissions_usb(int sysfd,
                 if (match_usb_class(desc->interface.bInterfaceClass,
                                     desc->interface.bInterfaceSubClass,
                                     desc->interface.bInterfaceProtocol,
-                                    modep,
-                                    uidp,
-                                    gidp))
-                        return true;
+                                    &mode,
+                                    &uid,
+                                    &gid)) {
+                        return permissions_apply(devfd, device->devname, mode, uid, gid);
+                }
         }
+
+        return 0;
+}
+
+bool permissions_usb(struct device *device,
+                     int devfd,
+                     mode_t *modep,
+                     uid_t *uidp,
+                     gid_t *gidp) {
+        (void) device_call_with_sysfd(device, NULL, permissions_usb_apply, &devfd);
 
         return false;
 }
