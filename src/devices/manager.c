@@ -188,6 +188,22 @@ static int settle_cb(void *userdata) {
                 }
         }
 
+        for (CRBNode *n = c_rbtree_first(&m->subsystems); n; n = c_rbnode_next(n)) {
+                struct subsystem *subsystem = c_container_of(n, struct subsystem, rb);
+
+                fprintf(stderr, "%s\n", subsystem->name);
+
+                for (CRBNode *k = c_rbtree_first(&subsystem->devtypes); k; k = c_rbnode_next(k)) {
+                        struct devtype *devtype = c_container_of(k, struct devtype, rb);
+
+                        if (devtype->name)
+                                fprintf(stderr, "  %s\n", devtype->name);
+
+                        for (struct device *device = devtype->devices; device; device = device->next_by_devtype)
+                                fprintf(stderr, "    %s\n", device->devpath);
+                }
+        }
+
         return 0;
 }
 

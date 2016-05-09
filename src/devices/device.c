@@ -373,6 +373,9 @@ static int device_change(Manager *m, struct device **devicep, const char *devpat
         if (!device)
                 return -EIO;
 
+        if (m->settled)
+                fprintf(stderr, "CHANGE: %s\n", devpath);
+
         *devicep = device;
 
         return 0;
@@ -415,6 +418,9 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
                 devtype->devices->previous_by_devtype = device;
         devtype->devices = device;
 
+        if (m->settled)
+                fprintf(stderr, "ADD: %s\n", devpath);
+
         *devicep = device;
 
         return 0;
@@ -435,6 +441,9 @@ static int device_remove(Manager *m, const char *devpath) {
 
         device_unlink(device);
         device_free(device);
+
+        if (m->settled)
+                fprintf(stderr, "REMOVE: %s\n", devpath);
 
         return 0;
 }
@@ -471,6 +480,9 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
                 if (r < 0)
                         return r;
         }
+
+        if (m->settled)
+                fprintf(stderr, "MOVE: %s -> %s\n", devpath_old, devpath);
 
         *devicep = device;
         device = NULL;
