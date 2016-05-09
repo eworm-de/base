@@ -288,7 +288,7 @@ static int device_sysfd_open(struct device *device) {
         _c_cleanup_(c_closep) int fd = -1;
         int r;
 
-        fd = openat(device->manager->sysfd, device->devpath, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        fd = openat(device->manager->devicesfd, device->devpath, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (fd < 0)
                 return -errno;
 
@@ -607,11 +607,12 @@ int device_from_nulstr(Manager *m, struct device **devicep, int *actionp,
         if (buflen < 0)
                 return buflen;
 
-        /* store path relative to /sys, so drop the leading slash */
-        if (devpath[0] != '/')
-                return -EBADMSG;
+        /* Store path relative to /sys/devices/, so drop the prefix. DEVPATHs
+         * with other prefixes (/sys/modules etc) are ignored. */
+        if (strncmp(devpath, "/devices/", strlen("/devices/")) != 0)
+                return -EAGAIN;
 
-        devpath ++;
+        devpath += strlen("/devices/");
 
         buflen = uevent_get_value(buf, buflen, "SUBSYSTEM", &subsystem, &buf);
         if (buflen < 0)
@@ -622,6 +623,12 @@ int device_from_nulstr(Manager *m, struct device **devicep, int *actionp,
                 buflen = uevent_get_value(buf, buflen, "DEVPATH_OLD", &devpath_old, &buf);
                 if (buflen < 0)
                         return buflen;
+
+                /* MOVE only maks sense for real devices */
+                if (strncmp(devpath_old, "/devices/", strlen("/devices/")) != 0)
+                        return -EBADMSG;
+
+                devpath_old += strlen("/devices/");
         }
 
         buflen = uevent_get_last_value(buf, buflen, "SEQNUM", &seqnum);

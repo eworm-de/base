@@ -38,6 +38,9 @@ Manager *manager_free(Manager *m) {
         c_close(m->fd_ep);
         c_close(m->fd_uevent);
         c_close(m->fd_signal);
+        c_close(m->sysfd);
+        c_close(m->devfd);
+        c_close(m->devicesfd);
         uevent_subscription_unlink(&m->uevent_subscriptions, m->subscription_settle);
         uevent_subscription_free(m->subscription_settle);
 
@@ -69,6 +72,7 @@ int manager_new(Manager **manager) {
         _c_cleanup_(c_closep) int fd_ep = -1;
         _c_cleanup_(c_closep) int devfd = -1;
         _c_cleanup_(c_closep) int sysfd = -1;
+        _c_cleanup_(c_closep) int devicesfd = -1;
         int r;
 
         m = calloc(1, sizeof(Manager));
@@ -87,6 +91,10 @@ int manager_new(Manager **manager) {
 
         sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (sysfd < 0)
+                return -errno;
+
+        devicesfd = openat(sysfd, "devices", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (devicesfd < 0)
                 return -errno;
 
         r = uevent_subscriptions_init(&m->uevent_subscriptions, sysfd);
@@ -135,6 +143,9 @@ int manager_new(Manager **manager) {
 
         m->sysfd = sysfd;
         sysfd = -1;
+
+        m->devicesfd = devicesfd;
+        devicesfd = -1;
 
         *manager = m;
         m = NULL;
@@ -298,7 +309,7 @@ int manager_run(Manager *m) {
                 if (n > 0) {
                         if (ev.data.fd == m->fd_uevent && ev.events & EPOLLIN) {
                                 r = manager_handle_uevent(m);
-                                if (r < 0)
+                                if (r < 0 && r != -EAGAIN)
                                         return r;
 
                                 /* process all pending uevents before any signal */

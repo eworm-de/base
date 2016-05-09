@@ -27,6 +27,7 @@ typedef struct Manager {
         int fd_ep;
         struct epoll_event ep_uevent;
         struct epoll_event ep_signal;
+        int devicesfd;
         int sysfd;
         int devfd;
         struct uevent_subscriptions uevent_subscriptions;

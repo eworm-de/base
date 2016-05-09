@@ -75,9 +75,9 @@ static int enumerate_devices(int sysfd,
                 line[len] = '\0';
 
                 if (subdir)
-                        prefix = "../../../";
+                        prefix = "../../../devices/";
                 else
-                        prefix = "../../";
+                        prefix = "../../devices/";
 
                 if (strncmp(line, prefix, strlen(prefix) != 0))
                                 continue;
