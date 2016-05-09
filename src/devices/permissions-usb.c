@@ -77,7 +77,7 @@ struct usb_descriptor {
 
 static int permissions_usb_apply(struct device *device, int sysfd, void *userdata) {
         _c_cleanup_(c_closep) int fd = -1;
-        int devfd = *(int*)userdata;
+        int devfd = (intptr_t)userdata;
         uint8_t buf[0xffff];
         ssize_t n;
         struct usb_descriptor *desc;
@@ -124,7 +124,7 @@ bool permissions_usb(struct device *device,
                      mode_t *modep,
                      uid_t *uidp,
                      gid_t *gidp) {
-        (void) device_call_with_sysfd(device, NULL, permissions_usb_apply, &devfd);
+        (void) device_call_with_sysfd(device, NULL, permissions_usb_apply, (void*)(intptr_t) devfd);
 
         return false;
 }
