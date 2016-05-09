@@ -169,6 +169,10 @@ static int settle_cb(void *userdata) {
                         if (r < 0)
                                 return r;
                 }
+        }
+
+        for (CRBNode *n = c_rbtree_first(&m->devices); n; n = c_rbnode_next(n)) {
+                struct device *device = c_container_of(n, struct device, rb);
 
                 if (device->modalias) {
                         r = module_load(device->modalias);
