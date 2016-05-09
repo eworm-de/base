@@ -51,10 +51,15 @@ void uevent_subscription_unlink(struct uevent_subscriptions *uss,
         if (uss->tail == us)
                 uss->tail = us->previous;
 
-        if (us->previous)
+        if (us->previous) {
                 us->previous->next = us->next;
-        if (us->next)
+                us->previous = NULL;
+        }
+
+        if (us->next) {
                 us->next->previous = us->previous;
+                us->next = NULL;
+        }
 }
 
 struct uevent_subscription *uevent_subscription_free(struct uevent_subscription *us) {
@@ -118,6 +123,8 @@ int uevent_sysfs_sync(struct uevent_subscriptions *uss,
         us->next = NULL;
         us->previous = uss->tail;
         uss->tail = us;
+        if (us->previous)
+                us->previous->next = us;
         if (!uss->head)
                 uss->head = us;
 
@@ -132,7 +139,8 @@ int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seq
 
         assert(uss);
 
-        uss->seqnum = seqnum;
+        if (seqnum != (uint64_t) -1)
+                uss->seqnum = seqnum;
 
         while((us = uss->head) && us->seqnum <= seqnum) {
                 uevent_subscription_unlink(uss, us);
@@ -206,6 +214,7 @@ int uevent_receive(Manager *m, struct device **devicep, int *actionp, uint64_t *
 
         buflen = recvmsg(m->fd_uevent, &smsg, 0);
         if (buflen < 32 || (smsg.msg_flags & MSG_TRUNC))
+                /* XXX: handle ENOBUFS? */
                 return -EBADMSG;
 
         if (nl.nl_groups != UEVENT_BROADCAST_KERNEL)
