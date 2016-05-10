@@ -436,7 +436,7 @@ static int device_remove(Manager *m, const char *devpath) {
         device = device_get_by_devpath(&m->devices, devpath);
         if (!device) {
                 if (m->settled) {
-                        fprintf(stderr, "unexpected ADD: %s\n", devpath);
+                        fprintf(stderr, "unexpected REMOVE: %s\n", devpath);
                         return -EIO;
                         /* The device could be NULL if a REMOVE event races /sys
                          * enumeration, simply drop the event.  */
@@ -465,7 +465,7 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
         device_old = device_get_by_devpath(&m->devices, devpath_old);
         if (!device_old) {
                 if (m->settled) {
-                        fprintf(stderr, "unexpected ADD: %s\n", devpath);
+                        fprintf(stderr, "unexpected MOVE: %s\n", devpath);
                         return -EIO;
                 } else
                         return 0;
