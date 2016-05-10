@@ -263,40 +263,46 @@ static int manager_handle_uevent(Manager *m) {
 }
 
 int manager_run(Manager *m) {
-        struct pollfd pfd = {
-                .fd = m->fd_uevent,
-                .events = EPOLLIN,
-        };
         int r;
+
+        if (m->uevent_subscriptions.head) {
+                struct pollfd pfd = {
+                        .fd = m->fd_uevent,
+                        .events = EPOLLIN,
+                };
+
+                /* If we have subscribers, check if the uevent socket is
+                 * idle before waiting. */
+                for (;;) {
+                        r = poll(&pfd, 1, 0);
+                        if (r < 0) {
+                                if (errno == EINTR)
+                                        continue;
+
+                                return -errno;
+                        } else
+                                break;
+                }
+
+                if (pfd.revents & EPOLLIN) {
+                        /* Pending uevents, so only dispatch subscriptions from
+                         * before any uevents were queued. */
+                        r = uevent_subscriptions_dispatch_idle(&m->uevent_subscriptions);
+                        if (r < 0)
+                                return r;
+                } else {
+                        /* No pending uevents, the next one is
+                         * guaranteed to be higher than all
+                         * subscriptions, so dispatch all now */
+                        r = uevent_subscriptions_dispatch_all(&m->uevent_subscriptions);
+                        if (r < 0)
+                                return r;
+                }
+        }
 
         for (;;) {
                 int n;
                 struct epoll_event ev;
-
-                if (m->uevent_subscriptions.head) {
-                        /* If we have subscribers, check if the uevent socket is
-                         * idle before waiting. */
-                        r = poll(&pfd, 1, 0);
-                        if (r < 0) {
-                                if (errno != EINTR)
-                                        return -errno;
-                        }
-
-                        if (pfd.revents & EPOLLIN) {
-                                /* This would have been caught below, but let's
-                                 * not enter epoll() unneccesarily. */
-                                r = manager_handle_uevent(m);
-                                if (r < 0)
-                                        return r;
-                        } else {
-                                /* No pending uevents, the next one is
-                                 * guaranteed to be higher than all
-                                 * subscriptions, so dispatch all now */
-                                r = uevent_subscriptions_dispatch_all(&m->uevent_subscriptions);
-                                if (r < 0)
-                                        return r;
-                        }
-                }
 
                 n = epoll_wait(m->fd_ep, &ev, 1, -1);
                 if (n < 0) {
@@ -308,12 +314,25 @@ int manager_run(Manager *m) {
 
                 if (n > 0) {
                         if (ev.data.fd == m->fd_uevent && ev.events & EPOLLIN) {
-                                r = manager_handle_uevent(m);
-                                if (r < 0 && r != -EAGAIN)
-                                        return r;
+                                /* process all pending uevents */
+                                for (;;) {
+                                        r = manager_handle_uevent(m);
+                                        if (r == 0)
+                                                break;
+                                        else if (r < 0) {
+                                                if (r == -EAGAIN || r == -EINTR)
+                                                        continue;
 
-                                /* process all pending uevents before any signal */
-                                continue;
+                                                fprintf(stderr, "failed to handle uevent: %s\n", strerror(-r));
+                                        }
+                                }
+
+                                /* No pending uevents, the next one is
+                                 * guaranteed to be higher than all
+                                 * subscriptions, so dispatch all now */
+                                r = uevent_subscriptions_dispatch_all(&m->uevent_subscriptions);
+                                if (r < 0)
+                                        return r;
                         }
 
                         if (ev.data.fd == m->fd_signal && ev.events & EPOLLIN) {
