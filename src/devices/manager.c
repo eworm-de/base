@@ -238,7 +238,7 @@ static int manager_handle_uevent(Manager *m) {
         int r, action;
 
         r = uevent_receive(m, &device, &action, &seqnum);
-        if (r < 0)
+        if (r <= 0)
                 return r;
 
         if (m->settled && action == UEVENT_ACTION_ADD) {

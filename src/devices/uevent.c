@@ -219,7 +219,12 @@ int uevent_receive(Manager *m, struct device **devicep, int *actionp, uint64_t *
         assert(seqnump);
 
         buflen = recvmsg(m->fd_uevent, &smsg, 0);
-        if (buflen < 32 || (smsg.msg_flags & MSG_TRUNC))
+        if (buflen < 0) {
+                if (errno == EAGAIN)
+                        return 0;
+
+                return -errno;
+        } else if (buflen < 32 || (smsg.msg_flags & MSG_TRUNC))
                 /* XXX: handle ENOBUFS? */
                 return -EBADMSG;
 
@@ -259,7 +264,7 @@ int uevent_receive(Manager *m, struct device **devicep, int *actionp, uint64_t *
         *devicep = device;
         *actionp = action;
         *seqnump = seqnum;
-        return 0;
+        return 1;
 }
 
 int uevent_action_from_string(const char *action) {
