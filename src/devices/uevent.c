@@ -139,7 +139,9 @@ int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seq
 
         assert(uss);
 
-        if (seqnum != (uint64_t) -1)
+        if (seqnum == 0)
+                seqnum = uss->seqnum;
+        else if (seqnum != (uint64_t) -1)
                 uss->seqnum = seqnum;
 
         while((us = uss->head) && us->seqnum <= seqnum) {
@@ -154,6 +156,10 @@ int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seq
 
 int uevent_subscriptions_dispatch_all(struct uevent_subscriptions *uss) {
         return uevent_subscriptions_dispatch(uss, (uint64_t)-1);
+}
+
+int uevent_subscriptions_dispatch_idle(struct uevent_subscriptions *uss) {
+        return uevent_subscriptions_dispatch(uss, 0);
 }
 
 int uevent_connect(void) {

@@ -47,6 +47,7 @@ int uevent_subscriptions_init(struct uevent_subscriptions *uss, int sysfd);
 void uevent_subscriptions_destroy(struct uevent_subscriptions *uss);
 
 int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seqnum);
+int uevent_subscriptions_dispatch_idle(struct uevent_subscriptions *uss);
 int uevent_subscriptions_dispatch_all(struct uevent_subscriptions *uss);
 
 int uevent_connect(void);
