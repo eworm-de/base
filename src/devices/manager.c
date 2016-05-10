@@ -324,8 +324,10 @@ int manager_run(Manager *m) {
                                 if (size != sizeof(struct signalfd_siginfo))
                                         continue;
 
-                                if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT)
+                                if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT) {
+                                        fprintf(stderr, "got signal, exiting\n");
                                         return 0;
+                                }
                         }
                 }
         }

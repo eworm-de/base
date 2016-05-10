@@ -370,8 +370,11 @@ static int device_change(Manager *m, struct device **devicep, const char *devpat
         struct device *device;
 
         device = device_get_by_devpath(&m->devices, devpath);
-        if (!device)
+        if (!device) {
+                if (m->settled)
+                        fprintf(stderr, "unexpected CHANGE: %s\n", devpath);
                 return -EIO;
+        }
 
         if (m->settled)
                 fprintf(stderr, "CHANGE: %s\n", devpath);
@@ -392,9 +395,10 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
 
         slot = c_rbtree_find_slot(&m->devices, devices_compare, devpath, &p);
         if (!slot) {
-                if (m->settled)
+                if (m->settled) {
+                        fprintf(stderr, "unexpected ADD: %s\n", devpath);
                         return -EIO;
-                else
+                } else
                         /* This can happen if an ADD event races /sys enumeration, let
                          * the uevent be authoritative and treat it like a CHANGE. */
                         return device_change(m, devicep, devpath, subsystem_name, devtype_name, devname, modalias);
@@ -431,11 +435,12 @@ static int device_remove(Manager *m, const char *devpath) {
 
         device = device_get_by_devpath(&m->devices, devpath);
         if (!device) {
-                if (m->settled)
+                if (m->settled) {
+                        fprintf(stderr, "unexpected ADD: %s\n", devpath);
                         return -EIO;
                         /* The device could be NULL if a REMOVE event races /sys
                          * enumeration, simply drop the event.  */
-                else
+                } else
                         return 0;
         }
 
@@ -459,9 +464,10 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
 
         device_old = device_get_by_devpath(&m->devices, devpath_old);
         if (!device_old) {
-                if (m->settled)
+                if (m->settled) {
+                        fprintf(stderr, "unexpected ADD: %s\n", devpath);
                         return -EIO;
-                else
+                } else
                         return 0;
         }
 
@@ -635,9 +641,12 @@ int device_from_nulstr(Manager *m, struct device **devicep, int *actionp,
         if (buflen < 0)
                 return buflen;
 
-        if ((action == UEVENT_ACTION_REMOVE || action == UEVENT_ACTION_MOVE) && buflen > 0)
+/*
+        if ((action == UEVENT_ACTION_REMOVE || action == UEVENT_ACTION_MOVE) && buflen > 0) {
+                fprintf(stderr, "unexpected data in '%s'\n", action_string);
                 return -EBADMSG;
-
+        }
+*/
         while (buflen > 0) {
                 const char *key, *value;
 
