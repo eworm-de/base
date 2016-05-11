@@ -30,14 +30,6 @@ enum {
         UEVENT_BROADCAST_KERNEL = 1,
 };
 
-struct uevent_subscription {
-        uint64_t seqnum;
-        struct uevent_subscription *previous;
-        struct uevent_subscription *next;
-        int (*cb)(void *userdata);
-        void *userdata;
-};
-
 void uevent_subscription_unlink(struct uevent_subscriptions *uss,
                                 struct uevent_subscription *us) {
 
@@ -62,16 +54,14 @@ void uevent_subscription_unlink(struct uevent_subscriptions *uss,
         }
 }
 
-struct uevent_subscription *uevent_subscription_free(struct uevent_subscription *us) {
+void uevent_subscription_destroy(struct uevent_subscription *us) {
         if (!us)
-                return NULL;
+                return;
 
         assert(!us->previous);
         assert(!us->next);
 
-        free(us);
-
-        return NULL;
+        return;
 }
 
 int uevent_subscriptions_init(struct uevent_subscriptions *uss, int sysfd) {
@@ -97,14 +87,14 @@ void uevent_subscriptions_destroy(struct uevent_subscriptions *uss) {
 
 int uevent_sysfs_sync(struct uevent_subscriptions *uss,
                       int sysfd,
-                      struct uevent_subscription **usd,
+                      struct uevent_subscription *us,
                       int (*cb)(void *userdata),
                       void *userdata) {
-        struct uevent_subscription *us;
         uint64_t seqnum;
         int r;
 
         assert(uss);
+        assert(us);
 
         r = sysfs_get_seqnum(sysfd, &seqnum);
         if (r < 0)
@@ -112,10 +102,6 @@ int uevent_sysfs_sync(struct uevent_subscriptions *uss,
 
         if (seqnum < uss->seqnum)
                 return -EIO;
-
-        us = malloc(sizeof(*us));
-        if (!us)
-                return -ENOMEM;
 
         us->seqnum = seqnum;
         us->cb = cb;
@@ -127,8 +113,6 @@ int uevent_sysfs_sync(struct uevent_subscriptions *uss,
                 us->previous->next = us;
         if (!uss->head)
                 uss->head = us;
-
-        *usd = us;
 
         return 0;
 }

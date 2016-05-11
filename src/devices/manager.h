@@ -31,7 +31,7 @@ typedef struct Manager {
         int sysfd;
         int devfd;
         struct uevent_subscriptions uevent_subscriptions;
-        struct uevent_subscription *subscription_settle;
+        struct uevent_subscription subscription_settle;
         bool settled;
         CRBTree devices;
         CRBTree subsystems;

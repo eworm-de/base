@@ -38,7 +38,7 @@ struct device {
         const char *modalias;
 
         int sysfd;
-        struct uevent_subscription *sysfd_subscription;
+        struct uevent_subscription sysfd_subscription;
         struct device_slot *sysfd_cb;
 };
 

@@ -234,8 +234,8 @@ static struct device_slot *device_slot_free(struct device_slot *slot) {
                 slot->previous->next = slot->next;
 
         if (!slot->device->sysfd_cb) {
-                uevent_subscription_unlink(&slot->device->manager->uevent_subscriptions, slot->device->sysfd_subscription);
-                slot->device->sysfd_subscription = uevent_subscription_free(slot->device->sysfd_subscription);
+                uevent_subscription_unlink(&slot->device->manager->uevent_subscriptions, &slot->device->sysfd_subscription);
+                uevent_subscription_destroy(&slot->device->sysfd_subscription);
                 c_close(slot->device->sysfd);
         }
 
@@ -314,8 +314,8 @@ struct device *device_free(struct device *device) {
 
         c_close(device->sysfd);
 
-        uevent_subscription_unlink(&device->manager->uevent_subscriptions, device->sysfd_subscription);
-        uevent_subscription_free(device->sysfd_subscription);
+        uevent_subscription_unlink(&device->manager->uevent_subscriptions, &device->sysfd_subscription);
+        uevent_subscription_destroy(&device->sysfd_subscription);
 
         free(device);
 
@@ -344,7 +344,7 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
 
         device->manager = m;
         device->sysfd = -1;
-        device->sysfd_subscription = NULL;
+        device->sysfd_subscription = (struct uevent_subscription) {};
         device->sysfd_cb = NULL;
         c_rbnode_init(&device->rb);
         device->previous_by_devtype = NULL;

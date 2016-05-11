@@ -41,8 +41,6 @@ Manager *manager_free(Manager *m) {
         c_close(m->sysfd);
         c_close(m->devfd);
         c_close(m->devicesfd);
-        uevent_subscription_unlink(&m->uevent_subscriptions, m->subscription_settle);
-        uevent_subscription_free(m->subscription_settle);
 
         while ((n = c_rbtree_first(&m->devices))) {
                 struct device *device = c_container_of(n, struct device, rb);
@@ -58,6 +56,8 @@ Manager *manager_free(Manager *m) {
                 subsystem_free(subsystem);
         }
 
+        uevent_subscription_unlink(&m->uevent_subscriptions, &m->subscription_settle);
+        uevent_subscription_destroy(&m->subscription_settle);
         uevent_subscriptions_destroy(&m->uevent_subscriptions);
         free(m);
 
@@ -176,7 +176,7 @@ static int settle_cb(void *userdata) {
 
         assert(m);
 
-        m->subscription_settle = uevent_subscription_free(m->subscription_settle);
+        uevent_subscription_destroy(&m->subscription_settle);
         m->settled = true;
 
         for (CRBNode *n = c_rbtree_first(&m->devices); n; n = c_rbnode_next(n)) {

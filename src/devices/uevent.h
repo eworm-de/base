@@ -27,7 +27,14 @@ enum {
 
 typedef struct Manager Manager;
 struct device;
-struct uevent_subscription;
+
+struct uevent_subscription {
+        uint64_t seqnum;
+        struct uevent_subscription *previous;
+        struct uevent_subscription *next;
+        int (*cb)(void *userdata);
+        void *userdata;
+};
 
 struct uevent_subscriptions {
         struct uevent_subscription *head;
@@ -37,10 +44,10 @@ struct uevent_subscriptions {
 
 void uevent_subscription_unlink(struct uevent_subscriptions *uss,
                                 struct uevent_subscription *us);
-struct uevent_subscription *uevent_subscription_free(struct uevent_subscription *us);
+void uevent_subscription_destroy(struct uevent_subscription *us);
 int uevent_sysfs_sync(struct uevent_subscriptions *uss,
                       int sysfd,
-                      struct uevent_subscription **us,
+                      struct uevent_subscription *us,
                       int (*cb)(void *userdata),
                       void *userdata);
 int uevent_subscriptions_init(struct uevent_subscriptions *uss, int sysfd);
