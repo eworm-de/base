@@ -17,14 +17,9 @@
 ***/
 
 int sysfs_enumerate(int sysfd,
-                    const char *subsystem,
-                    const char *devtype,
-                    int devfd,
-                    int (*cb)(int sysfd,
-                              const char *devpath,
+                    int (*cb)(const char *devpath,
                               const char *subsystem,
                               const char *devtype,
-                              int devfd,
                               const char *devname,
                               const char *modalias,
                               void *userdata),

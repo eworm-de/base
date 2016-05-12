@@ -226,12 +226,18 @@ static int modules_load(void) {
         return r;
 }
 
-static int sysfs_cb(int sysfd, const char *devpath, const char *subsystem,
-                    const char *devtype, int devfd, const char *devname,
+static int sysfs_cb(const char *devpath, const char *subsystem,
+                    const char *devtype, const char *devname,
                     const char *modalias, void *userdata) {
         _c_cleanup_(c_freep) char *device = NULL;
         Manager *m = userdata;
         int r;
+
+        if (strcmp(subsystem, "block") != 0)
+                return 0;
+
+        if (strcmp(devtype, "disk") != 0)
+                return 0;
 
         if (asprintf(&device, "/dev/%s", devname) < 0)
                 return -ENOMEM;
@@ -310,7 +316,7 @@ static int manager_run(Manager *m) {
                 if (m->device_boot)
                         r = access(m->device_boot, R_OK) == 0 && access(m->device_data, R_OK) == 0;
                 else
-                        r = sysfs_enumerate(sysfd, "block", "disk", -1, sysfs_cb, m);
+                        r = sysfs_enumerate(sysfd, sysfs_cb, m);
                 if (r < 0)
                         return r;
                 if (r == 1)

@@ -153,8 +153,8 @@ int manager_new(Manager **manager) {
        return 0;
 }
 
-static int sysfs_cb(int sysfd, const char *devpath, const char *subsystem,
-                    const char *devtype, int devfd, const char *devname,
+static int sysfs_cb(const char *devpath, const char *subsystem,
+                    const char *devtype, const char *devname,
                     const char *modalias, void *userdata) {
         Manager *manager = userdata;
         struct device *device;
@@ -221,7 +221,7 @@ static int settle_cb(void *userdata) {
 int manager_enumerate(Manager *m) {
         int r;
 
-        r = sysfs_enumerate(m->sysfd, NULL, NULL, m->devfd, sysfs_cb, m);
+        r = sysfs_enumerate(m->sysfd, sysfs_cb, m);
         if (r < 0)
                 return r;
 

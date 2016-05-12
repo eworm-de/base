@@ -45,16 +45,115 @@ static ssize_t uevent_get_key_value(char *buf, size_t n_buf, const char **keyp, 
         return n_buf - (end - buf);
 }
 
+static int enumerate_device(int sysfd,
+                            const char *sysname,
+                            bool subdir,
+                            int (*cb)(const char *devpath,
+                                      const char *subsystem,
+                                      const char *devtype,
+                                      const char *devname,
+                                      const char *modalias,
+                                      void *userdata),
+                            void *userdata) {
+        _c_cleanup_(c_closep) int dfd = -1;
+        _c_cleanup_(c_closep) int fd = -1;
+        char buf[4096];
+        ssize_t buflen = sizeof(buf);
+        char *bufp = buf;
+        const char *prefix;
+        ssize_t len;
+        const char *dp = NULL, *ss = NULL, *dt = NULL, *dn = NULL, *ma = NULL;
+        int r;
+
+        len = readlinkat(sysfd, sysname, buf, buflen);
+        if (len < 0)
+                return 0;
+        if (len <= 0 || len == buflen)
+                return 0;
+        bufp[len] = '\0';
+
+        if (subdir)
+                prefix = "../../../devices/";
+        else
+                prefix = "../../devices/";
+
+        if (strncmp(bufp, prefix, strlen(prefix) != 0))
+                        return 0;
+
+        dp = bufp + strlen(prefix);
+        bufp += len + 1;
+        buflen -= len + 1;
+
+        dfd = openat(sysfd, sysname, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+        if (dfd < 0)
+                return 0;
+
+        len = readlinkat(dfd, "subsystem", bufp, buflen);
+        if (len < 0)
+                return 0;
+        if (len <= 0 || len == buflen)
+                return 0;
+        bufp[len] = '\0';
+
+        ss = strrchr(bufp, '/');
+        if (!ss)
+                return 0;
+        ss ++;
+        bufp += len + 1;
+        buflen -= len + 1;
+
+        fd = openat(dfd, "uevent", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
+        if (fd < 0)
+                return 0;
+
+        for (;;) {
+                errno = 0;
+                len = read(fd, bufp, buflen);
+                if (len < 0 || len == buflen) {
+                        if (errno == EINTR)
+                                continue;
+                        return -errno ?: -EIO;
+                } else {
+                        buflen = len;
+                        break;
+                }
+        }
+
+        while (buflen > 0) {
+                const char *key, *value;
+
+                /* some broken drivers add another newline */
+                if (*bufp == '\n') {
+                        bufp ++;
+                        buflen --;
+                        continue;
+                }
+
+                buflen = uevent_get_key_value(bufp, buflen, &key, &value, &bufp);
+                if (buflen < 0)
+                        return buflen;
+
+                if (strcmp(key, "DEVTYPE") == 0)
+                        dt = value;
+                else if (strcmp(key, "DEVNAME") == 0)
+                        dn = value;
+                else if (strcmp(key, "MODALIAS") == 0)
+                        ma = value;
+        }
+
+        r = cb(dp, ss, dt, dn, ma, userdata);
+        if (r < 0 || r == 1)
+                return r;
+
+        return 0;
+}
+
 static int enumerate_devices(int sysfd,
                              const char *devicesdir,
-                             bool subdir,
-                             const char *devtype,
-                             int devfd,
-                             int (*cb)(int sysfd,
-                                       const char *devpath,
+                             const char *subdir,
+                             int (*cb)(const char *devpath,
                                        const char *subsystem,
                                        const char *devtype,
-                                       int devfd,
                                        const char *devname,
                                        const char *modalias,
                                        void *userdata),
@@ -67,6 +166,17 @@ static int enumerate_devices(int sysfd,
         if (dfd < 0)
                 return -errno;
 
+        if (subdir) {
+                int dfd_subdir;
+
+                dfd_subdir = openat(dfd, subdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
+                if (dfd_subdir < 0)
+                        return -errno;
+
+                close(dfd);
+                dfd = dfd_subdir;
+        }
+
         dir = fdopendir(dfd);
         if (!dir)
                 return -errno;
@@ -75,100 +185,11 @@ static int enumerate_devices(int sysfd,
 
         /* /sys/bus/$SUBSYSTEM/devices/$DEVICE, /sys/class/$SUBSYSTEM/$DEVICE */
         for (struct dirent *d = readdir(dir); d; d = readdir(dir)) {
-                _c_cleanup_(c_closep) int dfd2 = -1;
-                int fd;
-                _c_cleanup_(c_fclosep) FILE *f = NULL;
-                char buf[4096];
-                ssize_t buflen = sizeof(buf);
-                char *bufp = buf;
-                const char *prefix;
-                char *s;
-                ssize_t len;
-                const char *dp = NULL, *ss = NULL, *dt = NULL, *dn = NULL, *ma = NULL;
-
                 if (d->d_name[0] == '.')
                         continue;
 
-                len = readlinkat(dirfd(dir), d->d_name, buf, buflen);
-                if (len < 0)
-                        continue;
-                if (len <= 0 || len == buflen)
-                        continue;
-                bufp[len] = '\0';
-
-                if (subdir)
-                        prefix = "../../../devices/";
-                else
-                        prefix = "../../devices/";
-
-                if (strncmp(bufp, prefix, strlen(prefix) != 0))
-                                continue;
-
-                dp = bufp + strlen(prefix);
-                bufp += len + 1;
-                buflen -= len + 1;
-
-                dfd2 = openat(dirfd(dir), d->d_name, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
-                if (dfd2 < 0)
-                        continue;
-
-                len = readlinkat(dfd2, "subsystem", bufp, buflen);
-                if (len < 0)
-                        continue;
-                if (len <= 0 || len == buflen)
-                        continue;
-                bufp[len] = '\0';
-
-                s = strrchr(bufp, '/');
-                if (!s)
-                        continue;
-                ss = s + 1;
-                bufp += len + 1;
-                buflen -= len + 1;
-
-                fd = openat(dfd2, "uevent", O_RDONLY|O_NONBLOCK|O_CLOEXEC);
-                if (fd < 0)
-                        continue;
-
-                f = fdopen(fd, "re");
-                if (!f)
-                        continue;
-
-                len = fread(bufp, buflen, 1, f);
-                if (ferror(f))
-                        return -EIO;
-
-                while (len > 0) {
-                        const char *key, *value;
-
-                        /* some broken drivers add another newline */
-                        if (*bufp == '\n') {
-                                bufp ++;
-                                len --;
-                                continue;
-                        }
-
-                        len = uevent_get_key_value(bufp, len, &key, &value, &bufp);
-                        if (len < 0)
-                                return len;
-
-                        if (strcmp(key, "DEVTYPE") == 0)
-                                dt = value;
-                        else if (strcmp(key, "DEVNAME") == 0)
-                                dn = value;
-                        else if (strcmp(key, "MODALIAS") == 0)
-                                ma = value;
-                }
-
-                if (devtype) {
-                        if (!dt)
-                                continue;
-                        if (strcmp(devtype, dt) != 0)
-                                continue;
-                }
-
-                r = cb(sysfd, dp, ss, dt, devfd, dn, ma, userdata);
-                if (r < 0 || r == 1)
+                r = enumerate_device(dirfd(dir), d->d_name, !!subdir, cb, userdata);
+                if (r < 0)
                         return r;
         }
 
@@ -177,15 +198,10 @@ static int enumerate_devices(int sysfd,
 
 static int enumerate_subsystems(int sysfd,
                                 const char *subsystemsdir,
-                                const char *subsystem,
                                 const char *subdir,
-                                const char *devtype,
-                                int devfd,
-                                int (*cb)(int sysfd,
-                                          const char *devpath,
+                                int (*cb)(const char *devpath,
                                           const char *subsystem,
                                           const char *devtype,
-                                          int devfd,
                                           const char *devname,
                                           const char *modalias,
                                           void *userdata),
@@ -193,21 +209,6 @@ static int enumerate_subsystems(int sysfd,
         _c_cleanup_(c_closep) int dfd = -1;
         _c_cleanup_(c_closedirp) DIR *dir = NULL;
         int r;
-
-        /* specific subsystem */
-        if (subsystem) {
-                _c_cleanup_(c_freep) char *sd = NULL;
-
-                if (subdir) {
-                        if (asprintf(&sd, "%s/%s/%s", subsystemsdir, subsystem, subdir) < 0)
-                                return -ENOMEM;
-                } else {
-                        if (asprintf(&sd, "%s/%s", subsystemsdir, subsystem) < 0)
-                                return -ENOMEM;
-                }
-
-                return enumerate_devices(sysfd, sd, !!subdir, devtype, devfd, cb, userdata);
-        }
 
         /* all subsystems at /sys/bus/$SUBSYSTEM or /sys/class/$SUBSYSTEM */
         dfd = openat(sysfd, subsystemsdir, O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC);
@@ -220,21 +221,11 @@ static int enumerate_subsystems(int sysfd,
         dfd = -1;
 
         for (struct dirent *d = readdir(dir); d; d = readdir(dir)) {
-                _c_cleanup_(c_freep) char *sd = NULL;
-
                 if (d->d_name[0] == '.')
                         continue;
 
-                if (subdir) {
-                        if (asprintf(&sd, "%s/%s/%s", subsystemsdir, d->d_name, subdir) < 0)
-                                return -ENOMEM;
-                } else {
-                        if (asprintf(&sd, "%s/%s", subsystemsdir, d->d_name) < 0)
-                                return -ENOMEM;
-                }
-
                 /* /sys/bus/$SUBSYSTEM/devices or /sys/class/$SUBSYSTEM */
-                r = enumerate_devices(sysfd, sd ?: d->d_name, !!subdir, devtype, devfd, cb, userdata);
+                r = enumerate_devices(dirfd(dir), d->d_name, subdir, cb, userdata);
                 if (r < 0)
                         return r;
         }
@@ -243,14 +234,9 @@ static int enumerate_subsystems(int sysfd,
 }
 
 int sysfs_enumerate(int sysfd,
-                    const char *subsystem,
-                    const char *devtype,
-                    int devfd,
-                    int (*cb)(int sysfd,
-                              const char *devpath,
+                    int (*cb)(const char *devpath,
                               const char *subsystem,
                               const char *devtype,
-                              int devfd,
                               const char *devname,
                               const char *modalias,
                               void *userdata),
@@ -258,12 +244,12 @@ int sysfs_enumerate(int sysfd,
         int r;
 
         /* /sys/bus/$SUBSYSTEM/devices/ */
-        r = enumerate_subsystems(sysfd, "bus", subsystem, "devices", devtype, devfd, cb, userdata);
+        r = enumerate_subsystems(sysfd, "bus", "devices", cb, userdata);
         if (r < 0 && r != -ENOENT)
                 return r;
 
         /* /sys/class/$SUBSYSTEM/ */
-        return enumerate_subsystems(sysfd, "class", subsystem, NULL, devtype, devfd, cb, userdata);
+        return enumerate_subsystems(sysfd, "class", NULL, cb, userdata);
 }
 
 int sysfs_get_seqnum(int sysfd, uint64_t *seqnump) {
