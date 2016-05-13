@@ -41,6 +41,8 @@ Manager *manager_free(Manager *m) {
         c_close(m->sysfd);
         c_close(m->devfd);
         c_close(m->devicesfd);
+        c_close(m->sysbusfd);
+        c_close(m->sysclassfd);
 
         while ((n = c_rbtree_first(&m->devices))) {
                 struct device *device = c_container_of(n, struct device, rb);
@@ -67,12 +69,6 @@ Manager *manager_free(Manager *m) {
 int manager_new(Manager **manager) {
         _c_cleanup_(manager_freep) Manager *m = NULL;
         sigset_t mask;
-        _c_cleanup_(c_closep) int fd_uevent = -1;
-        _c_cleanup_(c_closep) int fd_signal = -1;
-        _c_cleanup_(c_closep) int fd_ep = -1;
-        _c_cleanup_(c_closep) int devfd = -1;
-        _c_cleanup_(c_closep) int sysfd = -1;
-        _c_cleanup_(c_closep) int devicesfd = -1;
         int r;
 
         m = calloc(1, sizeof(Manager));
@@ -84,29 +80,40 @@ int manager_new(Manager **manager) {
         m->fd_ep = -1;
         m->devfd = -1;
         m->sysfd = -1;
+        m->devicesfd = -1;
+        m->sysbusfd = -1;
+        m->sysclassfd = -1;
 
-        devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (devfd < 0)
+        m->devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (m->devfd < 0)
                 return -errno;
 
-        sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (sysfd < 0)
+        m->sysfd = openat(AT_FDCWD, "/sys", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (m->sysfd < 0)
                 return -errno;
 
-        devicesfd = openat(sysfd, "devices", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
-        if (devicesfd < 0)
+        m->devicesfd = openat(m->sysfd, "devices", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (m->devicesfd < 0)
                 return -errno;
 
-        r = uevent_subscriptions_init(&m->uevent_subscriptions, sysfd);
+        m->sysbusfd = openat(m->sysfd, "bus", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (m->sysbusfd < 0)
+                return -errno;
+
+        m->sysclassfd = openat(m->sysfd, "class", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
+        if (m->sysclassfd < 0)
+                return -errno;
+
+        r = uevent_subscriptions_init(&m->uevent_subscriptions, m->sysfd);
         if (r < 0)
                 return r;
 
-        fd_uevent = uevent_connect();
-        if (fd_uevent < 0)
-                return fd_uevent;
+        m->fd_uevent = uevent_connect();
+        if (m->fd_uevent < 0)
+                return m->fd_uevent;
 
         m->ep_uevent.events = EPOLLIN;
-        m->ep_uevent.data.fd = fd_uevent;
+        m->ep_uevent.data.fd = m->fd_uevent;
 
         sigemptyset(&mask);
         sigaddset(&mask, SIGTERM);
@@ -114,38 +121,20 @@ int manager_new(Manager **manager) {
         sigaddset(&mask, SIGCHLD);
         sigprocmask(SIG_BLOCK, &mask, NULL);
 
-        fd_signal = signalfd(-1, &mask, SFD_NONBLOCK|SFD_CLOEXEC);
-        if (fd_signal < 0)
+        m->fd_signal = signalfd(-1, &mask, SFD_NONBLOCK|SFD_CLOEXEC);
+        if (m->fd_signal < 0)
                 return -errno;
 
         m->ep_signal.events = EPOLLIN;
-        m->ep_signal.data.fd = fd_signal;
+        m->ep_signal.data.fd = m->fd_signal;
 
-        fd_ep = epoll_create1(EPOLL_CLOEXEC);
-        if (fd_ep < 0)
+        m->fd_ep = epoll_create1(EPOLL_CLOEXEC);
+        if (m->fd_ep < 0)
                 return -errno;
 
-        if (epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_uevent, &m->ep_uevent) < 0 ||
-            epoll_ctl(fd_ep, EPOLL_CTL_ADD, fd_signal, &m->ep_signal) < 0)
+        if (epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_uevent, &m->ep_uevent) < 0 ||
+            epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_signal, &m->ep_signal) < 0)
                 return -errno;
-
-        m->fd_uevent = fd_uevent;
-        fd_uevent = -1;
-
-        m->fd_signal = fd_signal;
-        fd_signal = -1;
-
-        m->fd_ep = fd_ep;
-        fd_ep = -1;
-
-        m->devfd = devfd;
-        devfd = -1;
-
-        m->sysfd = sysfd;
-        sysfd = -1;
-
-        m->devicesfd = devicesfd;
-        devicesfd = -1;
 
         *manager = m;
         m = NULL;
