@@ -219,7 +219,7 @@ void device_unlink(struct device *device) {
 
         c_rbtree_remove(&device->manager->devices, &device->rb);
 
-        if (device->devtype->devices == device)
+        if (device->devtype && device->devtype->devices == device)
                 device->devtype->devices = device->next_by_devtype;
 
         if (device->previous_by_devtype)
@@ -485,11 +485,11 @@ static int device_remove(Manager *m, const char *devpath) {
                         return 0;
         }
 
-        device_unlink(device);
-        device_free(device);
-
         if (m->settled && device->devtype)
                 fprintf(stderr, "REMOVE: %s\n", devpath);
+
+        device_unlink(device);
+        device_free(device);
 
         return 0;
 }
