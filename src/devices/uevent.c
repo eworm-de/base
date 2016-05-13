@@ -260,6 +260,8 @@ int uevent_action_from_string(const char *action) {
                 return UEVENT_ACTION_ADD;
         else if (strcmp(action, "remove") == 0)
                 return UEVENT_ACTION_REMOVE;
+        else if (strcmp(action, "move") == 0)
+                return UEVENT_ACTION_MOVE;
         else if (strcmp(action, "online") == 0)
                 return UEVENT_ACTION_ONLINE;
         else if (strcmp(action, "offline") == 0)
