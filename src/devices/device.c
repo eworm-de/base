@@ -184,6 +184,7 @@ static int subsystem_add(Manager *m, struct subsystem **subsystemp, const char *
 
         assert(m);
         assert(subsystemp);
+        assert(name);
 
         slot = c_rbtree_find_slot(&m->subsystems, subsystems_compare, name, &p);
         if (slot) {
@@ -239,6 +240,16 @@ static struct device *device_get_by_devpath(CRBTree *devices, const char *devpat
         assert(devpath);
 
         n = c_rbtree_find_node(devices, devices_compare, devpath);
+        if (!n)
+                return NULL;
+
+        return c_container_of(n, struct device, rb);
+}
+
+static struct device *device_get_next_by_devpath(struct device *device) {
+        CRBNode *n;
+
+        n = c_rbnode_next(&device->rb);
         if (!n)
                 return NULL;
 
@@ -364,6 +375,7 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
         _c_cleanup_(device_freep) struct device *device = NULL;
         size_t n_devpath, n_devname, n_modalias;
 
+        assert(m);
         assert(devicep);
         assert(devpath);
 
@@ -427,6 +439,11 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
         CRBNode **slot, *p;
         int r;
 
+        assert(m);
+        assert(devicep);
+        assert(devpath);
+        assert(subsystem_name);
+
         slot = c_rbtree_find_slot(&m->devices, devices_compare, devpath, &p);
         if (!slot) {
                 if (m->settled) {
@@ -463,7 +480,7 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
                 if (device->devtype)
                         fprintf(stderr, "ADD: %s\n", devpath);
                 else
-                        fprintf(stderr, "ADD event suppressed for invalid subsystem '%s: %s\n", subsystem_name, devpath);
+                        fprintf(stderr, "ADD event suppressed for invalid subsystem '%s': %s\n", subsystem_name, devpath);
         }
 
         *devicep = device;
@@ -494,9 +511,57 @@ static int device_remove(Manager *m, const char *devpath) {
         return 0;
 }
 
-static int device_move(Manager *m, struct device **devicep, const char *devpath_old, const char *devpath) {
-        _c_cleanup_(device_freep) struct device *device = NULL, *device_old = NULL;
+static int device_move_one(Manager *m, struct device **devicep, struct device *device_old, const char *devpath) {
+        _c_cleanup_(device_freep) struct device *device = NULL;
+        CRBNode **slot, *p;
         int r;
+
+        assert(m);
+        assert(device_old);
+        assert(devpath);
+
+        slot = c_rbtree_find_slot(&m->devices, devices_compare, devpath, &p);
+        if (!slot) {
+                fprintf(stderr, "unexpected MOVE: %s\n", devpath);
+                return -EIO;
+        }
+
+        r = device_new(m, &device, devpath, device_old->devtype, device_old->devname, device_old->modalias);
+        if (r < 0)
+                return r;
+
+        if (device_old->sysfd_cb) {
+                device->sysfd_cb = device_old->sysfd_cb;
+
+                r = device_sysfd_open(device);
+                if (r < 0)
+                        return r;
+        }
+
+        if (m->settled && device->devtype)
+                fprintf(stderr, "MOVE: %s -> %s\n", device_old->devpath, devpath);
+
+        device_old->sysfd_cb = NULL;
+        device_unlink(device_old);
+        device_free(device_old);
+        c_rbtree_add(&m->devices, p, slot, &device->rb);
+
+        if (devicep)
+                *devicep = device;
+        device = NULL;
+
+        return 0;
+}
+
+
+static int device_move(Manager *m, struct device **devicep, const char *devpath_old, const char *devpath) {
+        _c_cleanup_(device_freep) struct device *device = NULL;
+        struct device *device_old, *subdevice_next;
+        char subdevpath[PATH_MAX];
+        int r;
+
+        /* devpath is guaranteed to fit in PATH_MAX */
+        strcpy(subdevpath, devpath);
 
         /* A MOVE event is empty apart from the DEVPATH change, simply treat
          * this as a REMOVE followed with an ADD containing the same data as the
@@ -512,24 +577,30 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
                         return 0;
         }
 
-        device_unlink(device_old);
+        subdevice_next = device_get_next_by_devpath(device_old);
 
-        r = device_add(m, &device, device_old->devpath, device_old->devtype->subsystem->name, device_old->devtype->name,
-                       device_old->devname, device_old->modalias);
+        r = device_move_one(m, &device, device_old, devpath);
         if (r < 0)
                 return r;
 
-        if (device_old->sysfd_cb) {
-                device->sysfd_cb = device_old->sysfd_cb;
-                device_old->sysfd_cb = NULL;
+        while (subdevice_next) {
+                struct device *subdevice;
 
-                r = device_sysfd_open(device);
+                subdevice = subdevice_next;
+
+                if (strstr(subdevice->devpath, devpath_old) != subdevice->devpath)
+                        /* not a child device */
+                        break;
+
+                /* the new devpath is guaranteed to fit in PATH_MAX */
+                strcpy(subdevpath + strlen(devpath), subdevice->devpath + strlen(devpath_old));
+
+                subdevice_next = device_get_next_by_devpath(subdevice);
+
+                r = device_move_one(m, NULL, subdevice, subdevpath);
                 if (r < 0)
                         return r;
         }
-
-        if (m->settled && device->devtype)
-                fprintf(stderr, "MOVE: %s -> %s\n", devpath_old, devpath);
 
         *devicep = device;
         device = NULL;
