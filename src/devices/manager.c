@@ -306,13 +306,11 @@ int manager_run(Manager *m) {
                                 /* process all pending uevents */
                                 for (;;) {
                                         r = manager_handle_uevent(m);
-                                        if (r == 0)
+                                        if (r == -EAGAIN)
                                                 break;
                                         else if (r < 0) {
-                                                if (r == -EAGAIN || r == -EINTR)
-                                                        continue;
-
-                                                fprintf(stderr, "failed to handle uevent: %s\n", strerror(-r));
+                                                if (r != -EINTR)
+                                                        fprintf(stderr, "failed to handle uevent: %s\n", strerror(-r));
                                         }
                                 }
 

@@ -419,7 +419,7 @@ static int device_change(Manager *m, struct device **devicep, const char *devpat
         if (!device) {
                 if (m->settled)
                         fprintf(stderr, "unexpected CHANGE: %s\n", devpath);
-                return -EIO;
+                return 0;
         }
 
         if (m->settled && device->devtype)
@@ -427,7 +427,7 @@ static int device_change(Manager *m, struct device **devicep, const char *devpat
 
         *devicep = device;
 
-        return 0;
+        return 1;
 }
 
 int device_add(Manager *m, struct device **devicep, const char *devpath,
@@ -448,7 +448,7 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
         if (!slot) {
                 if (m->settled) {
                         fprintf(stderr, "unexpected ADD: %s\n", devpath);
-                        return -EIO;
+                        return 0;
                 } else
                         /* This can happen if an ADD event races /sys enumeration, let
                          * the uevent be authoritative and treat it like a CHANGE. */
@@ -485,7 +485,7 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
 
         *devicep = device;
 
-        return 0;
+        return 1;
 }
 
 static int device_remove(Manager *m, const char *devpath) {
@@ -493,13 +493,13 @@ static int device_remove(Manager *m, const char *devpath) {
 
         device = device_get_by_devpath(&m->devices, devpath);
         if (!device) {
-                if (m->settled) {
+                if (m->settled)
                         fprintf(stderr, "unexpected REMOVE: %s\n", devpath);
-                        return -EIO;
-                        /* The device could be NULL if a REMOVE event races /sys
-                         * enumeration, simply drop the event.  */
-                } else
-                        return 0;
+
+                /* The device could be NULL if a REMOVE event races /sys
+                 * enumeration, simply drop the event.  */
+
+                return 0;
         }
 
         if (m->settled && device->devtype)
@@ -523,7 +523,7 @@ static int device_move_one(Manager *m, struct device **devicep, struct device *d
         slot = c_rbtree_find_slot(&m->devices, devices_compare, devpath, &p);
         if (!slot) {
                 fprintf(stderr, "unexpected MOVE: %s\n", devpath);
-                return -EIO;
+                return 0;
         }
 
         r = device_new(m, &device, devpath, device_old->devtype, device_old->devname, device_old->modalias);
@@ -550,7 +550,7 @@ static int device_move_one(Manager *m, struct device **devicep, struct device *d
                 *devicep = device;
         device = NULL;
 
-        return 0;
+        return 1;
 }
 
 
@@ -570,17 +570,16 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
 
         device_old = device_get_by_devpath(&m->devices, devpath_old);
         if (!device_old) {
-                if (m->settled) {
+                if (m->settled)
                         fprintf(stderr, "unexpected MOVE: %s\n", devpath);
-                        return -EIO;
-                } else
-                        return 0;
+
+                return 0;
         }
 
         subdevice_next = device_get_next_by_devpath(device_old);
 
         r = device_move_one(m, &device, device_old, devpath);
-        if (r < 0)
+        if (r <= 0)
                 return r;
 
         while (subdevice_next) {
@@ -605,7 +604,7 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
         *devicep = device;
         device = NULL;
 
-        return 0;
+        return 1;
 }
 
 static ssize_t uevent_get_value(char *buf, size_t n_buf, const char *key, const char **valuep, char **nextp) {
@@ -728,7 +727,7 @@ int device_from_nulstr(Manager *m, struct device **devicep, int *actionp,
         /* Store path relative to /sys/devices/, so drop the prefix. DEVPATHs
          * with other prefixes (/sys/modules etc) are ignored. */
         if (strncmp(devpath, "/devices/", strlen("/devices/")) != 0)
-                return -EAGAIN;
+                return 0;
 
         devpath += strlen("/devices/");
 
@@ -778,30 +777,31 @@ int device_from_nulstr(Manager *m, struct device **devicep, int *actionp,
         case UEVENT_ACTION_ONLINE:
         case UEVENT_ACTION_OFFLINE:
                 r = device_change(m, &device, devpath, subsystem, devtype, devname, modalias);
-                if (r < 0)
+                if (r <= 0)
                         return r;
                 break;
         case UEVENT_ACTION_ADD:
                 r = device_add(m, &device, devpath, subsystem, devtype, devname, modalias);
-                if (r < 0)
+                if (r <= 0)
                         return r;
                 break;
         case UEVENT_ACTION_REMOVE:
                 r = device_remove(m, devpath);
-                if (r < 0)
+                if (r <= 0)
                         return r;
-                break;
         case UEVENT_ACTION_MOVE:
                 r = device_move(m, &device, devpath_old, devpath);
-                if (r < 0)
+                if (r <= 0)
                         return r;
                 break;
+        default:
+                return -EBADMSG;
         }
 
         *devicep = device;
         *actionp = action;
         *seqnump = seqnum;
-        return 0;
+        return 1;
 }
 
 int device_call_with_sysfd(struct device *device, struct device_slot **slotp,

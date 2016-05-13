@@ -203,12 +203,9 @@ int uevent_receive(Manager *m, struct device **devicep, int *actionp, uint64_t *
         assert(seqnump);
 
         buflen = recvmsg(m->fd_uevent, &smsg, 0);
-        if (buflen < 0) {
-                if (errno == EAGAIN)
-                        return 0;
-
+        if (buflen < 0)
                 return -errno;
-        } else if (buflen < 32 || (smsg.msg_flags & MSG_TRUNC))
+        else if (buflen < 32 || (smsg.msg_flags & MSG_TRUNC))
                 /* XXX: handle ENOBUFS? */
                 return -EBADMSG;
 
@@ -242,7 +239,7 @@ int uevent_receive(Manager *m, struct device **devicep, int *actionp, uint64_t *
         /* Pass null-delimited key-value pairs, guaranteed to be
          * null-terminated. */
         r = device_from_nulstr(m, &device, &action, &seqnum, payload, buflen);
-        if (r < 0)
+        if (r <= 0)
                 return r;
 
         *devicep = device;
