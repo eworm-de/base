@@ -82,8 +82,14 @@ static int devtype_add(struct subsystem *subsystem, struct devtype **devtypep, c
         CRBNode **slot, *p;
         int r;
 
-        assert(subsystem);
         assert(devtypep);
+
+        if (!subsystem) {
+                /* An invalid subsystem was passed in, return the invalid
+                 * devtype, but do not error out. */
+                *devtypep = NULL;
+                return 0;
+        }
 
         slot = c_rbtree_find_slot(&subsystem->devtypes, devtypes_compare, name, &p);
         if (slot) {
@@ -122,12 +128,33 @@ static void subsystem_freep(struct subsystem **subsystemp) {
         subsystem_free(*subsystemp);
 }
 
+static int device_subsystem_is_valid(Manager *m, const char *name) {
+        int r;
+
+        r = faccessat(m->sysbusfd, name, F_OK, AT_SYMLINK_NOFOLLOW);
+        if (r == 0)
+                return 0;
+        else if (r < 0 && errno != ENOENT)
+                return -errno;
+
+        r = faccessat(m->sysclassfd, name, F_OK, AT_SYMLINK_NOFOLLOW);
+        if (r < 0)
+                return -errno;
+
+        return 0;
+}
+
 static int subsystem_new(Manager *manager, struct subsystem **subsystemp, const char *name) {
         _c_cleanup_(subsystem_freep) struct subsystem *subsystem = NULL;
         size_t n_name;
+        int r;
 
         assert(subsystemp);
         assert(name);
+
+        r = device_subsystem_is_valid(manager, name);
+        if (r < 0)
+                return r;
 
         n_name = strlen(name) + 1;
         subsystem = malloc(sizeof(*subsystem) + n_name);
@@ -161,10 +188,16 @@ static int subsystem_add(Manager *m, struct subsystem **subsystemp, const char *
         slot = c_rbtree_find_slot(&m->subsystems, subsystems_compare, name, &p);
         if (slot) {
                 r = subsystem_new(m, &subsystem, name);
-                if (r < 0)
+                if (r == -ENOENT)
+                        /* The given subsystem does not exist (any longer),
+                         * set it to NULL, but do not error out. Either the
+                         * subsystem is truly invalid, or the device being added
+                         * has already been removed. */
+                        subsystem = NULL;
+                else if (r < 0)
                         return r;
-
-                c_rbtree_add(&m->subsystems, p, slot, &subsystem->rb);
+                else
+                        c_rbtree_add(&m->subsystems, p, slot, &subsystem->rb);
         } else
                 subsystem = c_container_of(p, struct subsystem, rb);
 
@@ -333,7 +366,6 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
 
         assert(devicep);
         assert(devpath);
-        assert(devtype);
 
         n_devpath = strlen(devpath) + 1;
         n_devname = devname ? strlen(devname) + 1 : 0;
@@ -349,6 +381,8 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
         c_rbnode_init(&device->rb);
         device->previous_by_devtype = NULL;
         device->next_by_devtype = NULL;
+        /* A NULL devtype indicates that the device should consume events but
+         * not be exposed. */
         device->devtype = devtype;
         device->devpath = memcpy((void*)(device + 1), devpath, n_devpath);
         device->devname = memcpy((char*)device->devpath + n_devpath, devname, n_devname);
@@ -376,7 +410,7 @@ static int device_change(Manager *m, struct device **devicep, const char *devpat
                 return -EIO;
         }
 
-        if (m->settled)
+        if (m->settled && device->devtype)
                 fprintf(stderr, "CHANGE: %s\n", devpath);
 
         *devicep = device;
@@ -417,13 +451,20 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
                 return r;
 
         c_rbtree_add(&m->devices, p, slot, &device->rb);
-        device->next_by_devtype = devtype->devices;
-        if (devtype->devices)
-                devtype->devices->previous_by_devtype = device;
-        devtype->devices = device;
 
-        if (m->settled)
-                fprintf(stderr, "ADD: %s\n", devpath);
+        if (devtype) {
+                device->next_by_devtype = devtype->devices;
+                if (devtype->devices)
+                        devtype->devices->previous_by_devtype = device;
+                devtype->devices = device;
+        }
+
+        if (m->settled) {
+                if (device->devtype)
+                        fprintf(stderr, "ADD: %s\n", devpath);
+                else
+                        fprintf(stderr, "ADD event suppressed for invalid subsystem '%s: %s\n", subsystem_name, devpath);
+        }
 
         *devicep = device;
 
@@ -447,7 +488,7 @@ static int device_remove(Manager *m, const char *devpath) {
         device_unlink(device);
         device_free(device);
 
-        if (m->settled)
+        if (m->settled && device->devtype)
                 fprintf(stderr, "REMOVE: %s\n", devpath);
 
         return 0;
@@ -487,7 +528,7 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
                         return r;
         }
 
-        if (m->settled)
+        if (m->settled && device->devtype)
                 fprintf(stderr, "MOVE: %s -> %s\n", devpath_old, devpath);
 
         *devicep = device;
