@@ -753,10 +753,6 @@ int device_from_nulstr(Manager *m, struct device **devicep, int *actionp,
         if (buflen < 0)
                 return buflen;
 
-        if ((action == UEVENT_ACTION_REMOVE || action == UEVENT_ACTION_MOVE) && buflen > 0) {
-                fprintf(stderr, "unexpected data in '%s': %s\n", action_string, buf);
-        }
-
         while (buflen > 0) {
                 const char *key, *value;
 
