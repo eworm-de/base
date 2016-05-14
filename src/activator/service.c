@@ -26,7 +26,6 @@
 #include <org.bus1/c-sys.h>
 #include "shared/kmsg.h"
 #include "shared/tmpfs-root.h"
-
 #include "service.h"
 
 int service_new(const char *name, Service **servicep) {

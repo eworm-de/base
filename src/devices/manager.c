@@ -27,7 +27,6 @@
 #include "manager.h"
 #include "module.h"
 #include "permissions.h"
-#include "sched.h"
 #include "shared/kmsg.h"
 #include "sysfs.h"
 #include "uevent.h"

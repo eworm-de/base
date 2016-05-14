@@ -30,10 +30,8 @@
 #include <sys/stat.h>
 #include <sys/signalfd.h>
 #include <sys/wait.h>
-
 //FIXME: use bus
 #include "../devices/sysfs.h"
-
 #include "shared/disk-encrypt.h"
 #include "shared/disk-sign.h"
 #include "shared/file.h"
@@ -43,7 +41,6 @@
 #include "shared/process.h"
 #include "shared/tmpfs-root.h"
 #include "shared/uuid.h"
-
 #include "dev.h"
 #include "disk-gpt.h"
 #include "sysctl.h"

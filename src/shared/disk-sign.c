@@ -29,7 +29,6 @@
 #include "file.h"
 #include "missing.h"
 #include "string.h"
-#include "kmsg.h"
 #include "uuid.h"
 
 /* Return opened loop device, to prevent auto-clear before we attach it. */

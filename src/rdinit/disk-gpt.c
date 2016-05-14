@@ -23,7 +23,6 @@
 #include <org.bus1/c-shared.h>
 #include <org.bus1/b1-platform.h>
 #include "shared/uuid.h"
-
 #include "disk-gpt.h"
 
 struct guid {

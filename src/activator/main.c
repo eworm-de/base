@@ -30,7 +30,6 @@
 #include "shared/kmsg.h"
 #include "shared/process.h"
 #include "shared/tmpfs-root.h"
-
 #include "service.h"
 
 typedef struct {
