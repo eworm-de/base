@@ -15,6 +15,7 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <c-macro.h>
 #include <ctype.h>
 #include <signal.h>
 #include <string.h>
@@ -23,9 +24,7 @@
 #include <sys/stat.h>
 #include <sys/signalfd.h>
 #include <sys/wait.h>
-
 #include <org.bus1/b1-platform.h>
-#include <org.bus1/c-macro.h>
 #include <org.bus1/c-shared.h>
 #include <org.bus1/c-sys.h>
 #include "shared/kmsg.h"

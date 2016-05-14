@@ -15,16 +15,14 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <c-macro.h>
 #include <poll.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/prctl.h>
 #include <sys/signalfd.h>
-
-#include <org.bus1/c-macro.h>
 #include <org.bus1/b1-identity.h>
-
 #include "device.h"
 #include "manager.h"
 #include "module.h"

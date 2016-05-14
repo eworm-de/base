@@ -15,13 +15,12 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/c-macro.h>
+#include <c-macro.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
-
 #include "file.h"
 
 int file_get_size(FILE *f, uint64_t *size) {

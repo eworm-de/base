@@ -15,10 +15,8 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <c-macro.h>
 #include <string.h>
-
-#include <org.bus1/c-macro.h>
-
 #include "sysfs.h"
 
 static ssize_t uevent_get_key_value(char *buf, size_t n_buf, const char **keyp, const char **valuep, char **nextp) {

@@ -15,13 +15,11 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <c-macro.h>
 #include <libkmod.h>
 #include <pthread.h>
 #include <string.h>
 #include <sys/prctl.h>
-
-#include <org.bus1/c-macro.h>
-
 #include "module.h"
 
 struct work_item {

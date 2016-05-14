@@ -15,10 +15,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include "sysctl.h"
-
-#include <org.bus1/c-macro.h>
+#include <c-macro.h>
 #include <org.bus1/c-shared.h>
+#include "sysctl.h"
 
 static const struct {
         const char *path;

@@ -15,11 +15,10 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/c-macro.h>
+#include <c-macro.h>
 #include <org.bus1/c-shared.h>
 #include <syslog.h>
 #include <sys/stat.h>
-
 #include "kmsg.h"
 
 static FILE *f;

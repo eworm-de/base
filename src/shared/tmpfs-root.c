@@ -15,11 +15,10 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/c-macro.h>
+#include <c-macro.h>
 #include <org.bus1/c-shared.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
-
 #include "tmpfs-root.h"
 
 int tmpfs_root(const char *rootdir) {

@@ -15,10 +15,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <c-macro.h>
 #include <c-rbtree.h>
-#include <org.bus1/c-macro.h>
 #include <string.h>
-
 #include "device.h"
 #include "shared/kmsg.h"
 #include "uevent.h"

@@ -70,6 +70,7 @@ libshared_a_SOURCES = \
 libshared_a_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
+	$(CSUNDRY_CFLAGS) \
 	$(OPENSSL_CFLAGS)
 
 # ------------------------------------------------------------------------------
@@ -91,7 +92,8 @@ org_bus1_activator_SOURCES = \
 
 org_bus1_activator_CFLAGS = \
 	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
+	$(BUS1_CFLAGS) \
+	$(CSUNDRY_CFLAGS)
 
 org_bus1_activator_LDADD = \
 	libshared.a \
@@ -106,7 +108,8 @@ org_bus1_coredump_SOURCES = \
 
 org_bus1_coredump_CFLAGS = \
 	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
+	$(BUS1_CFLAGS) \
+	$(CSUNDRY_CFLAGS)
 
 org_bus1_coredump_LDADD = \
 	libshared.a \
@@ -138,6 +141,7 @@ org_bus1_devices_CFLAGS = \
 	$(BUS1_CFLAGS) \
 	$(CAP_CFLAGS) \
 	$(CRBTREE_CFLAGS) \
+	$(CSUNDRY_CFLAGS) \
 	$(KMOD_CFLAGS) \
 	-pthread
 
@@ -146,6 +150,7 @@ org_bus1_devices_LDADD = \
 	$(BUS1_LIBS) \
 	$(CAP_LIBS) \
 	$(CRBTREE_LIBS) \
+	$(CSUNDRY_CFLAGS) \
 	$(KMOD_LIBS)
 
 # ------------------------------------------------------------------------------
@@ -165,6 +170,7 @@ org_bus1_diskctl_SOURCES = \
 org_bus1_diskctl_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
+	$(CSUNDRY_CFLAGS) \
 	$(OPENSSL_CFLAGS)
 
 org_bus1_diskctl_LDADD = \
@@ -181,7 +187,8 @@ org_bus1_login_SOURCES = \
 
 org_bus1_login_CFLAGS = \
 	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
+	$(BUS1_CFLAGS) \
+	$(CSUNDRY_CFLAGS)
 
 org_bus1_login_LDADD = \
 	libshared.a \
@@ -196,7 +203,8 @@ org_bus1_init_SOURCES = \
 
 org_bus1_init_CFLAGS = \
 	$(AM_CFLAGS) \
-	$(BUS1_CFLAGS)
+	$(BUS1_CFLAGS) \
+	$(CSUNDRY_CFLAGS)
 
 org_bus1_init_LDADD = \
 	libshared.a \
@@ -223,6 +231,7 @@ org_bus1_rdinit_SOURCES += \
 org_bus1_rdinit_CFLAGS = \
 	$(AM_CFLAGS) \
 	$(BUS1_CFLAGS) \
+	$(CSUNDRY_CFLAGS) \
 	$(KMOD_CFLAGS) \
 	$(OPENSSL_CFLAGS)
 

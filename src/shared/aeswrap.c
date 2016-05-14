@@ -15,10 +15,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <c-macro.h>
 #include <openssl/crypto.h>
 #include <openssl/aes.h>
-
-#include <org.bus1/c-macro.h>
 #include <shared/aeswrap.h>
 #include <shared/string.h>
 

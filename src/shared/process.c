@@ -15,10 +15,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#include <org.bus1/c-macro.h>
+#include <c-macro.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-
 #include "process.h"
 
 int process_reap_children(pid_t *p) {

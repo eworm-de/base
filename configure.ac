@@ -115,6 +115,9 @@ AS_IF([test "$enable_static" = "yes"], [
         CRBTREE_LIBS="-L../c-rbtree -lcrbtree"
         AC_SUBST(BUS1_CFLAGS)
         AC_SUBST(BUS1_LIBS)
+
+        CSUNDRY_CFLAGS="-I../c-sundry/src"
+        AC_SUBST(CSUNDRY_CFLAGS)
 ], [
         PKG_CHECK_MODULES(BUS1, [libbus1],
                 [AC_DEFINE(HAVE_BUS1, 1, [Define if libbus1 is available])],
@@ -123,6 +126,10 @@ AS_IF([test "$enable_static" = "yes"], [
         PKG_CHECK_MODULES(CRBTREE, [c-rbtree],
                 [AC_DEFINE(HAVE_CRBTREE, 1, [Define if c-rbtree is available])],
                 AC_MSG_ERROR([*** c-rbtree library not found]))
+
+        PKG_CHECK_MODULES(CSUNDRY, [c-sundry],
+                [AC_DEFINE(HAVE_CSUNDRY, 1, [Define if c-sundry is available])],
+                AC_MSG_ERROR([*** c-sundry library not found]))
 ])
 
 PKG_CHECK_MODULES(CAP, [libcap],
