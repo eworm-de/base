@@ -88,7 +88,7 @@ static int remount_filesystems(void) {
                         continue;
 
                 /* Devices only. */
-                if (!c_str_prefix(source, "/dev/"))
+                if (!c_string_prefix(source, "/dev/"))
                         continue;
 
                 if (string_has_option(options, "ro"))

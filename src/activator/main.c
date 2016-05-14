@@ -16,7 +16,7 @@
 ***/
 
 #include <c-macro.h>
-#include <c-sys.h>
+#include <c-syscall.h>
 #include <ctype.h>
 #include <signal.h>
 #include <string.h>

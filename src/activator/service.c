@@ -16,7 +16,7 @@
 ***/
 
 #include <c-macro.h>
-#include <c-sys.h>
+#include <c-syscall.h>
 #include <linux/sched.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
@@ -121,7 +121,7 @@ int service_activate(Service *s) {
         if (chmod(datadir, 0770) < 0)
                 return -errno;
 
-        p = c_sys_clone(SIGCHLD|CLONE_NEWNS|CLONE_NEWIPC, NULL);
+        p = c_syscall_clone(SIGCHLD|CLONE_NEWNS|CLONE_NEWIPC, NULL);
         if (p < 0)
                 return -errno;
 
