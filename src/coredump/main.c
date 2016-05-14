@@ -23,7 +23,7 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <org.bus1/b1-identity.h>
-#include <org.bus1/c-shared.h>
+#include <string.h>
 #include "shared/kmsg.h"
 #include "shared/string.h"
 

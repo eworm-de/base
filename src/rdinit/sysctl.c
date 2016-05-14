@@ -16,7 +16,7 @@
 ***/
 
 #include <c-macro.h>
-#include <org.bus1/c-shared.h>
+#include <string.h>
 #include "sysctl.h"
 
 static const struct {

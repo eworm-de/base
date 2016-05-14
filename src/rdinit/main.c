@@ -16,8 +16,8 @@
 ***/
 
 #include <c-macro.h>
+#include <c-usec.h>
 #include <org.bus1/b1-platform.h>
-#include <org.bus1/c-shared.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>

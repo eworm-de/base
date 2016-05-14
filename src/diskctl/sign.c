@@ -18,7 +18,6 @@
 #include <c-macro.h>
 #include <linux/random.h>
 #include <sys/stat.h>
-#include <org.bus1/c-shared.h>
 #include <org.bus1/b1-disk-sign-header.h>
 #include "shared/disk-sign.h"
 #include "shared/file.h"

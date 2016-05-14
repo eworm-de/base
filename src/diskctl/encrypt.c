@@ -16,8 +16,8 @@
 ***/
 
 #include <c-macro.h>
-#include <org.bus1/c-shared.h>
 #include <org.bus1/b1-disk-encrypt-header.h>
+#include <string.h>
 #include "shared/disk-encrypt.h"
 #include "shared/string.h"
 #include "shared/uuid.h"

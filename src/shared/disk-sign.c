@@ -16,10 +16,10 @@
 ***/
 
 #include <c-macro.h>
-#include <org.bus1/c-shared.h>
 #include <linux/dm-ioctl.h>
 #include <linux/loop.h>
 #include <linux/random.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>

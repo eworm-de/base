@@ -20,8 +20,8 @@
 #include <byteswap.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
-#include <org.bus1/c-shared.h>
 #include <org.bus1/b1-platform.h>
+#include <string.h>
 #include "shared/uuid.h"
 #include "disk-gpt.h"
 

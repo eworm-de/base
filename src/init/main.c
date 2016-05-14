@@ -16,6 +16,7 @@
 ***/
 
 #include <c-macro.h>
+#include <c-string.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/epoll.h>
@@ -25,7 +26,6 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <org.bus1/b1-platform.h>
-#include <org.bus1/c-shared.h>
 #include "shared/file.h"
 #include "shared/kmsg.h"
 #include "shared/mount.h"

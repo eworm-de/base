@@ -16,10 +16,10 @@
 ***/
 
 #include <c-macro.h>
-#include <org.bus1/c-shared.h>
 #include <org.bus1/b1-disk-encrypt-header.h>
 #include <linux/dm-ioctl.h>
 #include <linux/random.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 

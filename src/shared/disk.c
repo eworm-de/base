@@ -16,7 +16,6 @@
 ***/
 
 #include <c-macro.h>
-#include <org.bus1/c-shared.h>
 #include <linux/random.h>
 #include <sys/ioctl.h>
 #include "disk.h"
