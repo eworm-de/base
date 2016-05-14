@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "device.h"
+#include "shared/kmsg.h"
 #include "uevent.h"
 
 static struct devtype *devtype_free(struct devtype *devtype) {
@@ -418,12 +419,9 @@ static int device_change(Manager *m, struct device **devicep, const char *devpat
         device = device_get_by_devpath(&m->devices, devpath);
         if (!device) {
                 if (m->settled)
-                        fprintf(stderr, "unexpected CHANGE: %s\n", devpath);
+                        kmsg(LOG_WARNING, "Unexpected CHANGE: %s\n", devpath);
                 return 0;
         }
-
-        if (m->settled && device->devtype)
-                fprintf(stderr, "CHANGE: %s\n", devpath);
 
         *devicep = device;
 
@@ -447,7 +445,7 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
         slot = c_rbtree_find_slot(&m->devices, devices_compare, devpath, &p);
         if (!slot) {
                 if (m->settled) {
-                        fprintf(stderr, "unexpected ADD: %s\n", devpath);
+                        kmsg(LOG_WARNING, "Unexpected ADD: %s\n", devpath);
                         return 0;
                 } else
                         /* This can happen if an ADD event races /sys enumeration, let
@@ -476,12 +474,8 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
                 devtype->devices = device;
         }
 
-        if (m->settled) {
-                if (device->devtype)
-                        fprintf(stderr, "ADD: %s\n", devpath);
-                else
-                        fprintf(stderr, "ADD event suppressed for invalid subsystem '%s': %s\n", subsystem_name, devpath);
-        }
+        if (m->settled && !device->devtype)
+                kmsg(LOG_WARNING, "ADD event suppressed for invalid subsystem '%s': %s\n", subsystem_name, devpath);
 
         *devicep = device;
 
@@ -494,16 +488,13 @@ static int device_remove(Manager *m, const char *devpath) {
         device = device_get_by_devpath(&m->devices, devpath);
         if (!device) {
                 if (m->settled)
-                        fprintf(stderr, "unexpected REMOVE: %s\n", devpath);
+                        kmsg(LOG_WARNING, "Unexpected REMOVE: %s\n", devpath);
 
                 /* The device could be NULL if a REMOVE event races /sys
                  * enumeration, simply drop the event.  */
 
                 return 0;
         }
-
-        if (m->settled && device->devtype)
-                fprintf(stderr, "REMOVE: %s\n", devpath);
 
         device_unlink(device);
         device_free(device);
@@ -522,7 +513,7 @@ static int device_move_one(Manager *m, struct device **devicep, struct device *d
 
         slot = c_rbtree_find_slot(&m->devices, devices_compare, devpath, &p);
         if (!slot) {
-                fprintf(stderr, "unexpected MOVE: %s\n", devpath);
+                kmsg(LOG_WARNING, "Unexpected MOVE: %s -> %s\n", device_old->devpath, devpath);
                 return 0;
         }
 
@@ -537,9 +528,6 @@ static int device_move_one(Manager *m, struct device **devicep, struct device *d
                 if (r < 0)
                         return r;
         }
-
-        if (m->settled && device->devtype)
-                fprintf(stderr, "MOVE: %s -> %s\n", device_old->devpath, devpath);
 
         device_old->sysfd_cb = NULL;
         device_unlink(device_old);
@@ -571,7 +559,7 @@ static int device_move(Manager *m, struct device **devicep, const char *devpath_
         device_old = device_get_by_devpath(&m->devices, devpath_old);
         if (!device_old) {
                 if (m->settled)
-                        fprintf(stderr, "unexpected MOVE: %s\n", devpath);
+                        kmsg(LOG_WARNING, "Unexpected MOVE: %s -> %s\n", devpath_old, devpath);
 
                 return 0;
         }

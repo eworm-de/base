@@ -75,7 +75,6 @@ static int privileges_drop(uid_t uid, const cap_value_t *caps, unsigned int n_ca
 }
 
 int main(int argc, char **argv) {
-        _c_cleanup_(c_fclosep) FILE *log = NULL;
         _c_cleanup_(manager_freep) Manager *m = NULL;
         cap_value_t caps[] = {
                 CAP_CHOWN,
@@ -84,10 +83,6 @@ int main(int argc, char **argv) {
                 CAP_SYS_MODULE,
         };
         int r;
-
-        log = kmsg(0, NULL);
-        if (!log)
-                return EXIT_FAILURE;
 
         r = manager_new(&m);
         if (r < 0) {
@@ -101,7 +96,6 @@ int main(int argc, char **argv) {
                 return EXIT_FAILURE;
         }
 
-        kmsg(LOG_INFO, "Coldplug, adjust /dev permissions and load kernel modules for current devices.");
         r = manager_enumerate(m);
         if (r < 0) {
                 kmsg(LOG_ERR, "Failed to enumerate devices: %s\n", strerror(-r));

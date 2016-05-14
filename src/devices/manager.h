@@ -22,6 +22,7 @@
 #include "uevent.h"
 
 typedef struct Manager {
+        FILE *log;
         int fd_uevent;
         int fd_signal;
         int fd_ep;

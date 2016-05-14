@@ -29,6 +29,7 @@
 #include "manager.h"
 #include "module.h"
 #include "permissions.h"
+#include "shared/kmsg.h"
 #include "sysfs.h"
 #include "uevent.h"
 
@@ -61,6 +62,7 @@ Manager *manager_free(Manager *m) {
         uevent_subscription_unlink(&m->uevent_subscriptions, &m->subscription_settle);
         uevent_subscription_destroy(&m->subscription_settle);
         uevent_subscriptions_destroy(&m->uevent_subscriptions);
+        fclose(m->log);
         free(m);
 
         return NULL;
@@ -83,6 +85,10 @@ int manager_new(Manager **manager) {
         m->devicesfd = -1;
         m->sysbusfd = -1;
         m->sysclassfd = -1;
+
+        m->log = kmsg(0, NULL);
+        if (!m->log)
+                return -errno;
 
         m->devfd = openat(AT_FDCWD, "/dev", O_RDONLY|O_NONBLOCK|O_DIRECTORY|O_CLOEXEC|O_PATH);
         if (m->devfd < 0)
@@ -161,6 +167,7 @@ static int sysfs_cb(const char *devpath, const char *subsystem,
 
 static int settle_cb(void *userdata) {
         Manager *m = userdata;
+        size_t n_devices = 0;
         int r;
 
         assert(m);
@@ -176,39 +183,25 @@ static int settle_cb(void *userdata) {
                         if (r < 0)
                                 return r;
                 }
-        }
-
-        for (CRBNode *n = c_rbtree_first(&m->devices); n; n = c_rbnode_next(n)) {
-                struct device *device = c_container_of(n, struct device, rb);
 
                 if (device->modalias) {
                         r = module_load(device->modalias);
                         if (r < 0)
                                 return r;
                 }
+
+                ++ n_devices;
         }
 
-        for (CRBNode *n = c_rbtree_first(&m->subsystems); n; n = c_rbnode_next(n)) {
-                struct subsystem *subsystem = c_container_of(n, struct subsystem, rb);
-
-                fprintf(stderr, "%s\n", subsystem->name);
-
-                for (CRBNode *k = c_rbtree_first(&subsystem->devtypes); k; k = c_rbnode_next(k)) {
-                        struct devtype *devtype = c_container_of(k, struct devtype, rb);
-
-                        if (devtype->name)
-                                fprintf(stderr, "  %s\n", devtype->name);
-
-                        for (struct device *device = devtype->devices; device; device = device->next_by_devtype)
-                                fprintf(stderr, "    %s\n", device->devpath);
-                }
-        }
+        kmsg(LOG_INFO, "Coldplugged %zu devices.", n_devices);
 
         return 0;
 }
 
 int manager_enumerate(Manager *m) {
         int r;
+
+        kmsg(LOG_INFO, "Coldplug, adjust /dev permissions and load kernel modules for current devices.");
 
         r = sysfs_enumerate(m->sysfd, sysfs_cb, m);
         if (r < 0)
@@ -310,7 +303,7 @@ int manager_run(Manager *m) {
                                                 break;
                                         else if (r < 0) {
                                                 if (r != -EINTR)
-                                                        fprintf(stderr, "failed to handle uevent: %s\n", strerror(-r));
+                                                        kmsg(LOG_WARNING, "Failed to handle uevent: %s\n", strerror(-r));
                                         }
                                 }
 
@@ -330,10 +323,8 @@ int manager_run(Manager *m) {
                                 if (size != sizeof(struct signalfd_siginfo))
                                         continue;
 
-                                if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT) {
-                                        fprintf(stderr, "got signal, exiting\n");
+                                if (fdsi.ssi_signo == SIGTERM || fdsi.ssi_signo == SIGINT)
                                         return 0;
-                                }
                         }
                 }
         }
