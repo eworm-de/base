@@ -125,8 +125,6 @@ org_bus1_devices_SOURCES = \
 	src/devices/sysfs.c \
 	src/devices/permissions.h \
 	src/devices/permissions.c \
-	src/devices/permissions-usb.h \
-	src/devices/permissions-usb.c \
 	src/devices/manager.h \
 	src/devices/manager.c \
 	src/devices/module.h \

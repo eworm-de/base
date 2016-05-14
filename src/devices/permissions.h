@@ -18,5 +18,4 @@
 
 #include "device.h"
 
-int permissions_apply(int devfd, const char *devname, mode_t mode, uid_t uid, gid_t gid);
-int permissions_match_and_apply(int devfd, struct device *device);
+int permissions_apply(int devfd, struct device *device);

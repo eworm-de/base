@@ -22,46 +22,26 @@
 #include <org.bus1/c-macro.h>
 
 #include "permissions.h"
-#include "permissions-usb.h"
 
 static const struct permissions {
         const char *subsystem;
         const char *devtype;
-        bool (*match)(struct device *device,
-                      int devfd,
-                      mode_t *modep,
-                      uid_t *uidp,
-                      gid_t *gidp);
         mode_t mode;
         uid_t uid;
         gid_t gid;
 } device_permissions[] = {
-        { "input",        NULL,           NULL,            0660, BUS1_IDENTITY_INPUT, BUS1_IDENTITY_INPUT },
-        { "sound",        NULL,           NULL,            0660, BUS1_IDENTITY_AUDIO, BUS1_IDENTITY_AUDIO },
-        { "video4linux",  NULL,           NULL,            0660, BUS1_IDENTITY_VIDEO, BUS1_IDENTITY_VIDEO },
-        { "block",        NULL,           NULL,            0660, BUS1_IDENTITY_DISK,  BUS1_IDENTITY_DISK },
-        { "usb",          "usb_device",   permissions_usb, 0,    0,                   0 },
-        { "usb",          "usb_device",   NULL,            0660, BUS1_IDENTITY_USB,   BUS1_IDENTITY_USB },
+        { "input",        NULL,           0660, BUS1_IDENTITY_INPUT, BUS1_IDENTITY_INPUT },
+        { "sound",        NULL,           0660, BUS1_IDENTITY_AUDIO, BUS1_IDENTITY_AUDIO },
+        { "video4linux",  NULL,           0660, BUS1_IDENTITY_VIDEO, BUS1_IDENTITY_VIDEO },
+        { "block",        NULL,           0660, BUS1_IDENTITY_DISK,  BUS1_IDENTITY_DISK },
+        { "usb",          "usb_device",   0660, BUS1_IDENTITY_USB,   BUS1_IDENTITY_USB },
 };
 
-int permissions_apply(int devfd, const char *devname, mode_t mode, uid_t uid, gid_t gid) {
-        if (mode > 0)
-                if (fchmodat(devfd, devname, mode & 07777, 0) < 0)
-                        return -errno;
-
-        if (uid > 0 || gid > 0)
-                if (fchownat(devfd, devname, uid, gid, AT_SYMLINK_NOFOLLOW) < 0)
-                        return -errno;
-
-        return 0;
-}
-
-int permissions_match_and_apply(int devfd, struct device *device) {
+int permissions_apply(int devfd, struct device *device) {
         for (size_t i = 0; i < C_ARRAY_SIZE(device_permissions); i++) {
                 uid_t uid = device_permissions[i].uid;
                 gid_t gid = device_permissions[i].gid;
                 mode_t mode = device_permissions[i].mode;
-                int r;
 
                 if (device_permissions[i].subsystem)
                         if (strcmp(device->devtype->subsystem->name, device_permissions[i].subsystem) != 0)
@@ -71,16 +51,13 @@ int permissions_match_and_apply(int devfd, struct device *device) {
                         if (strcmp(device->devtype->name, device_permissions[i].devtype) != 0)
                                 continue;
 
-                if (device_permissions[i].match && !device_permissions[i].match(device,
-                                                                                devfd,
-                                                                                &mode,
-                                                                                &uid,
-                                                                                &gid))
-                        continue;
+                if (mode > 0)
+                        if (fchmodat(devfd, device->devname, mode & 07777, 0) < 0)
+                                return -errno;
 
-                r = permissions_apply(devfd, device->devname, mode, uid, gid);
-                if (r < 0)
-                        return r;
+                if (uid > 0 || gid > 0)
+                        if (fchownat(devfd, device->devname, uid, gid, AT_SYMLINK_NOFOLLOW) < 0)
+                                return -errno;
 
                 break;
         }
