@@ -16,13 +16,13 @@
 ***/
 
 #include <c-macro.h>
+#include <c-sys.h>
 #include <linux/sched.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <org.bus1/b1-platform.h>
-#include <org.bus1/c-sys.h>
 #include <string.h>
 #include "shared/kmsg.h"
 #include "shared/tmpfs-root.h"
