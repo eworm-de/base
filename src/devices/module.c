@@ -24,13 +24,95 @@
 
 #include "module.h"
 
+struct work_item {
+        struct work_item *previous;
+        struct work_item *next;
+        const char *modalias;
+};
+
+struct work_item *work_item_free(struct work_item *work_item) {
+        if (!work_item)
+                return NULL;
+
+        assert(!work_item->previous);
+        assert(!work_item->next);
+
+        free(work_item);
+
+        return NULL;
+}
+
+static int work_item_new(struct work_item **work_itemp, const char *modalias) {
+        struct work_item *work_item;
+        size_t n_modalias;
+
+        n_modalias = strlen(modalias) + 1;
+        work_item = malloc(sizeof(*work_item) + n_modalias);
+        if (!work_item)
+                return -ENOMEM;
+        work_item->modalias = memcpy((void*)(work_item + 1), modalias, n_modalias);
+
+        work_item->previous = NULL;
+        work_item->next = NULL;
+
+        *work_itemp = work_item;
+
+        return 0;
+}
+
+struct work_item *work_item_pop(Manager *m) {
+        struct work_item *work_item;
+
+        assert(m);
+
+        if (!m->work_items_first) {
+                assert(!m->work_items_last);
+                return NULL;
+        } else
+                assert(m->work_items_last);
+
+        work_item = m->work_items_first;
+
+        assert(!work_item->previous);
+
+        if (work_item->next)
+                work_item->next->previous = NULL;
+        else
+                m->work_items_last = NULL;
+
+        m->work_items_first = work_item->next;
+        work_item->next = NULL;
+
+        return work_item;
+}
+
+static void work_item_push(Manager *m, struct work_item *work_item) {
+        assert(m);
+
+        if (!work_item)
+                return;
+
+        assert(!work_item->previous);
+        assert(!work_item->next);
+
+        if (m->work_items_last) {
+                m->work_items_last->next = work_item;
+                work_item->previous = m->work_items_last;
+        } else
+                m->work_items_first = work_item;
+
+        m->work_items_last = work_item;
+}
+
 static void module_log(void *data, int priority, const char *file, int line, const char *fn, const char *format, va_list args) {}
 
 static void *module_thread(void *p) {
+        Manager *m = p;
         struct kmod_ctx *ctx;
-        _c_cleanup_(c_freep) char *modalias = p;
-        struct kmod_list *list = NULL;
+        struct work_item *work_item = NULL;
         int r;
+
+        assert(m);
 
         prctl(PR_SET_NAME, (unsigned long) "module");
 
@@ -44,51 +126,81 @@ static void *module_thread(void *p) {
         if (r < 0)
                 goto finish;
 
-        r = kmod_module_new_from_lookup(ctx, modalias, &list);
-        if (r < 0)
-                goto finish;
+        pthread_mutex_lock(&m->worker_lock);
+        work_item = work_item_pop(m);
+        if (!work_item)
+                m->n_workers --;
+        pthread_mutex_unlock(&m->worker_lock);
 
-        if (list) {
-                struct kmod_list *l;
+        while (work_item) {
+                struct kmod_list *list = NULL;
 
-                kmod_list_foreach(l, list) {
-                        struct kmod_module *mod;
+                r = kmod_module_new_from_lookup(ctx, work_item->modalias, &list);
+                if (r < 0 && r != -ENOSYS)
+                        goto finish;
 
-                        mod = kmod_module_get_module(l);
-                        kmod_module_probe_insert_module(mod, KMOD_PROBE_APPLY_BLACKLIST|KMOD_PROBE_IGNORE_COMMAND,
-                                                        NULL, NULL, NULL, NULL);
-                        kmod_module_unref(mod);
+                if (list) {
+                        struct kmod_list *l;
+
+                        kmod_list_foreach(l, list) {
+                                struct kmod_module *mod;
+
+                                mod = kmod_module_get_module(l);
+                                kmod_module_probe_insert_module(mod, KMOD_PROBE_APPLY_BLACKLIST|KMOD_PROBE_IGNORE_COMMAND,
+                                                                NULL, NULL, NULL, NULL);
+                                kmod_module_unref(mod);
+                        }
+
+                        kmod_module_unref_list(list);
                 }
 
-                kmod_module_unref_list(list);
+                work_item_free(work_item);
+                pthread_mutex_lock(&m->worker_lock);
+                work_item = work_item_pop(m);
+                if (!work_item)
+                        m->n_workers --;
+                pthread_mutex_unlock(&m->worker_lock);
         }
 
 finish:
         kmod_unref(ctx);
+        work_item_free(work_item);
         return NULL;
 }
 
-int module_load(const char *modalias) {
-        pthread_attr_t a;
-        char *s;
-        pthread_t t;
+int module_load(Manager *m, const char *modalias) {
+        struct work_item *work_item;
         int r;
 
-        r = pthread_attr_init(&a);
-        if (r > 0)
-                return -r;
+        assert(m);
+        assert(modalias);
 
-        r = pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
-        if (r > 0)
-                goto finish;
+        r = work_item_new(&work_item, modalias);
+        if (r < 0)
+                return r;
 
-        s = strdup(modalias);
-        if (!s)
-                return -ENOMEM;
+        pthread_mutex_lock(&m->worker_lock);
+        work_item_push(m, work_item);
+        if (m->n_workers < m->max_workers) {
+                _c_cleanup_(pthread_attr_destroy) pthread_attr_t a;
+                pthread_t t;
 
-        r = pthread_create(&t, &a, module_thread, s);
+                r = pthread_attr_init(&a);
+                assert(r == 0); /* On Linux this cannot fail. */
 
-finish:
-        pthread_attr_destroy(&a);
+                r = pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+                if (r > 0)
+                        goto unlock;
+
+                r = pthread_create(&t, &a, module_thread, m);
+                if (r > 0)
+                        goto unlock;
+
+                m->n_workers ++;
+        }
+
+unlock:
+        pthread_mutex_unlock(&m->worker_lock);
+
         return -r;
 }

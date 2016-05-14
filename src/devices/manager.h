@@ -17,6 +17,7 @@
 ***/
 
 #include <c-rbtree.h>
+#include <pthread.h>
 #include <sys/epoll.h>
 
 #include "uevent.h"
@@ -38,6 +39,11 @@ typedef struct Manager {
         bool settled;
         CRBTree devices;
         CRBTree subsystems;
+        pthread_mutex_t worker_lock;
+        struct work_item *work_items_first;
+        struct work_item *work_items_last;
+        size_t n_workers;
+        size_t max_workers;
 } Manager;
 
 Manager *manager_free(Manager *m);

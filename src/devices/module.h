@@ -16,4 +16,9 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-int module_load(const char *modalias);
+#include "manager.h"
+
+struct work_item *work_item_free(struct work_item *work_item);
+struct work_item *work_item_pop(Manager *m);
+
+int module_load(Manager *m, const char *modalias);

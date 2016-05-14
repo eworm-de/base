@@ -29,12 +29,14 @@
 #include "manager.h"
 #include "module.h"
 #include "permissions.h"
+#include "sched.h"
 #include "shared/kmsg.h"
 #include "sysfs.h"
 #include "uevent.h"
 
 Manager *manager_free(Manager *m) {
         CRBNode *n;
+        struct work_item *w;
 
         c_close(m->fd_ep);
         c_close(m->fd_uevent);
@@ -59,6 +61,13 @@ Manager *manager_free(Manager *m) {
                 subsystem_free(subsystem);
         }
 
+        pthread_mutex_lock(&m->worker_lock);
+        while ((w = work_item_pop(m)))
+                work_item_free(w);
+        pthread_mutex_unlock(&m->worker_lock);
+
+        pthread_mutex_destroy(&m->worker_lock);
+
         uevent_subscription_unlink(&m->uevent_subscriptions, &m->subscription_settle);
         uevent_subscription_destroy(&m->subscription_settle);
         uevent_subscriptions_destroy(&m->uevent_subscriptions);
@@ -66,6 +75,20 @@ Manager *manager_free(Manager *m) {
         free(m);
 
         return NULL;
+}
+
+static size_t manager_get_max_workers(void) {
+        cpu_set_t cpu_set;
+        int r;
+
+        r = sched_getaffinity(0, sizeof(cpu_set), &cpu_set);
+        assert(r >= 0);
+
+        /* Arbitrarily chosen value. This should scale roughly linearly with the
+         * number of CPUs, but allow a few extra threads to avoid (especially on
+         * small systems) all the threads blocking on hardware access (due to
+         * arguably broken modules). */
+        return CPU_COUNT(&cpu_set) + 4;
 }
 
 int manager_new(Manager **manager) {
@@ -142,6 +165,12 @@ int manager_new(Manager **manager) {
             epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_signal, &m->ep_signal) < 0)
                 return -errno;
 
+        pthread_mutex_init(&m->worker_lock, NULL);
+        m->work_items_first = NULL;
+        m->work_items_last = NULL;
+        m->n_workers = 0;
+        m->max_workers = manager_get_max_workers();
+
         *manager = m;
         m = NULL;
 
@@ -185,7 +214,7 @@ static int settle_cb(void *userdata) {
                 }
 
                 if (device->modalias) {
-                        r = module_load(device->modalias);
+                        r = module_load(m, device->modalias);
                         if (r < 0)
                                 return r;
                 }
@@ -231,7 +260,7 @@ static int manager_handle_uevent(Manager *m) {
                 }
 
                 if (device->modalias) {
-                        r = module_load(device->modalias);
+                        r = module_load(m, device->modalias);
                         if (r < 0)
                                 return r;
                 }
