@@ -6,6 +6,7 @@ License:        LGPL2+
 URL:            https://github.com/bus1/base
 Source0:        %{name}.tar.xz
 BuildRequires:  autoconf automake pkgconfig
+BuildRequires:  c-sundry-devel
 BuildRequires:  elfutils-devel
 BuildRequires:  kmod-devel
 BuildRequires:  libbus1-devel
@@ -42,6 +43,9 @@ make %{?_smp_mflags}
 %{_includedir}/org.bus1/*.h
 
 %changelog
+* Sun May 15 2016 <kay@redhat.com> 1-4
+- use c-sundry
+
 * Fri Apr 29 2016 <kay@redhat.com> 1-3
 - rebuild for libbus1 update
 
