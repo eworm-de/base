@@ -6,6 +6,7 @@ License:        LGPL2+
 URL:            https://github.com/bus1/base
 Source0:        %{name}.tar.xz
 BuildRequires:  autoconf automake pkgconfig
+BuildRequires:  c-rbtree-devel
 BuildRequires:  c-sundry-devel
 BuildRequires:  elfutils-devel
 BuildRequires:  kmod-devel
