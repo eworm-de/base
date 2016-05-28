@@ -30,16 +30,14 @@ struct device;
 
 struct uevent_subscription {
         uint64_t seqnum;
-        struct uevent_subscription *previous;
-        struct uevent_subscription *next;
+        CListEntry le;
         int (*cb)(void *userdata);
         void *userdata;
 };
 
 struct uevent_subscriptions {
-        struct uevent_subscription *head;
-        struct uevent_subscription *tail;
         uint64_t seqnum;
+        CList list;
 };
 
 void uevent_subscription_unlink(struct uevent_subscriptions *uss,

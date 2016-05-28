@@ -273,7 +273,7 @@ static int manager_handle_uevent(Manager *m) {
 int manager_run(Manager *m) {
         int r;
 
-        if (m->uevent_subscriptions.head) {
+        if (c_list_first(&m->uevent_subscriptions.list)) {
                 struct pollfd pfd = {
                         .fd = m->fd_uevent,
                         .events = EPOLLIN,

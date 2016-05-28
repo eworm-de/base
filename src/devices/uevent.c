@@ -36,28 +36,15 @@ void uevent_subscription_unlink(struct uevent_subscriptions *uss,
         if (!us)
                 return;
 
-        if (uss->head == us)
-                uss->head = us->next;
-        if (uss->tail == us)
-                uss->tail = us->previous;
-
-        if (us->previous) {
-                us->previous->next = us->next;
-                us->previous = NULL;
-        }
-
-        if (us->next) {
-                us->next->previous = us->previous;
-                us->next = NULL;
-        }
+        c_list_remove(&uss->list, &us->le);
 }
 
 void uevent_subscription_destroy(struct uevent_subscription *us) {
         if (!us)
                 return;
 
-        assert(!us->previous);
-        assert(!us->next);
+        assert(!c_list_entry_prev(&us->le));
+        assert(!c_list_entry_next(&us->le));
 
         return;
 }
@@ -71,16 +58,15 @@ int uevent_subscriptions_init(struct uevent_subscriptions *uss, int sysfd) {
         if (r < 0)
                 return r;
 
-        uss->head = NULL;
-        uss->tail = NULL;
+        c_list_init(&uss->list);
 
         return 0;
 }
 
 void uevent_subscriptions_destroy(struct uevent_subscriptions *uss) {
         assert(uss);
-        assert(!uss->head);
-        assert(!uss->tail);
+        assert(!c_list_first(&uss->list));
+        assert(!c_list_last(&uss->list));
 }
 
 int uevent_sysfs_sync(struct uevent_subscriptions *uss,
@@ -104,18 +90,14 @@ int uevent_sysfs_sync(struct uevent_subscriptions *uss,
         us->seqnum = seqnum;
         us->cb = cb;
         us->userdata = userdata;
-        us->next = NULL;
-        us->previous = uss->tail;
-        uss->tail = us;
-        if (us->previous)
-                us->previous->next = us;
-        if (!uss->head)
-                uss->head = us;
+        c_list_entry_init(&us->le);
+        c_list_append(&uss->list, &us->le);
 
         return 0;
 }
 
 int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seqnum) {
+        CListEntry *le;
         struct uevent_subscription *us;
         int r;
 
@@ -126,7 +108,12 @@ int uevent_subscriptions_dispatch(struct uevent_subscriptions *uss, uint64_t seq
         else if (seqnum != (uint64_t) -1)
                 uss->seqnum = seqnum;
 
-        while((us = uss->head) && us->seqnum <= seqnum) {
+        while ((le = c_list_first(&uss->list))) {
+                us = c_container_of(le, struct uevent_subscription, le);
+
+                if (us->seqnum > seqnum)
+                        break;
+
                 uevent_subscription_unlink(uss, us);
                 r = us->cb(us->userdata);
                 if (r < 0)
