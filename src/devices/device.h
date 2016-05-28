@@ -72,4 +72,7 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
                const char *subsystem, const char *devtype,
                const char *devname, const char *modalias);
 
+int devtype_add(struct subsystem *subsystem, struct devtype **devtypep, const char *name);
+
+int subsystem_add(Manager *m, struct subsystem **subsystemp, const char *name);
 struct subsystem *subsystem_free(struct subsystem *subsystem);

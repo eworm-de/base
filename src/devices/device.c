@@ -77,7 +77,7 @@ static int devtypes_compare(CRBTree *t, void *k, CRBNode *n) {
         return strcmp(name, devtype->name);
 }
 
-static int devtype_add(struct subsystem *subsystem, struct devtype **devtypep, const char *name) {
+int devtype_add(struct subsystem *subsystem, struct devtype **devtypep, const char *name) {
         struct devtype *devtype;
         CRBNode **slot, *p;
         int r;
@@ -177,7 +177,7 @@ static int subsystems_compare(CRBTree *t, void *k, CRBNode *n) {
         return strcmp(name, subsystem->name);
 }
 
-static int subsystem_add(Manager *m, struct subsystem **subsystemp, const char *name) {
+int subsystem_add(Manager *m, struct subsystem **subsystemp, const char *name) {
         struct subsystem *subsystem;
         CRBNode **slot, *p;
         int r;
