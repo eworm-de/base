@@ -39,6 +39,14 @@ void uevent_subscription_unlink(struct uevent_subscriptions *uss,
         c_list_remove(&uss->list, &us->le);
 }
 
+void uevent_subscription_init(struct uevent_subscription *us) {
+        if (!us)
+                return;
+
+        *us = (struct uevent_subscription){};
+        c_list_entry_init(&us->le);
+}
+
 void uevent_subscription_destroy(struct uevent_subscription *us) {
         if (!us)
                 return;

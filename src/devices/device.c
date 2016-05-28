@@ -368,7 +368,7 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
 
         device->manager = m;
         device->sysfd = -1;
-        device->sysfd_subscription = (struct uevent_subscription) {};
+        uevent_subscription_init(&device->sysfd_subscription);
         c_list_init(&device->sysfd_callbacks);
         c_rbnode_init(&device->rb);
         c_list_entry_init(&device->le);

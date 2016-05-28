@@ -43,6 +43,7 @@ struct uevent_subscriptions {
 void uevent_subscription_unlink(struct uevent_subscriptions *uss,
                                 struct uevent_subscription *us);
 void uevent_subscription_destroy(struct uevent_subscription *us);
+void uevent_subscription_init(struct uevent_subscription *us);
 int uevent_sysfs_sync(struct uevent_subscriptions *uss,
                       int sysfd,
                       struct uevent_subscription *us,
