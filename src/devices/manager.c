@@ -164,8 +164,7 @@ int manager_new(Manager **manager) {
                 return -errno;
 
         pthread_mutex_init(&m->worker_lock, NULL);
-        m->work_items_first = NULL;
-        m->work_items_last = NULL;
+        c_list_init(&m->work_items);
         m->n_workers = 0;
         m->max_workers = manager_get_max_workers();
 

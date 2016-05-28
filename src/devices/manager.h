@@ -16,6 +16,7 @@
   along with bus1; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
+#include <c-list.h>
 #include <c-rbtree.h>
 #include <pthread.h>
 #include <sys/epoll.h>
@@ -40,8 +41,7 @@ typedef struct Manager {
         CRBTree devices;
         CRBTree subsystems;
         pthread_mutex_t worker_lock;
-        struct work_item *work_items_first;
-        struct work_item *work_items_last;
+        CList work_items;
         size_t n_workers;
         size_t max_workers;
 } Manager;

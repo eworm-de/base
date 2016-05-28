@@ -23,8 +23,7 @@
 #include "module.h"
 
 struct work_item {
-        struct work_item *previous;
-        struct work_item *next;
+        CListEntry le;
         const char *modalias;
 };
 
@@ -32,8 +31,8 @@ struct work_item *work_item_free(struct work_item *work_item) {
         if (!work_item)
                 return NULL;
 
-        assert(!work_item->previous);
-        assert(!work_item->next);
+        assert(!c_list_entry_prev(&work_item->le));
+        assert(!c_list_entry_next(&work_item->le));
 
         free(work_item);
 
@@ -50,8 +49,7 @@ static int work_item_new(struct work_item **work_itemp, const char *modalias) {
                 return -ENOMEM;
         work_item->modalias = memcpy((void*)(work_item + 1), modalias, n_modalias);
 
-        work_item->previous = NULL;
-        work_item->next = NULL;
+        c_list_entry_init(&work_item->le);
 
         *work_itemp = work_item;
 
@@ -59,29 +57,17 @@ static int work_item_new(struct work_item **work_itemp, const char *modalias) {
 }
 
 struct work_item *work_item_pop(Manager *m) {
-        struct work_item *work_item;
+        CListEntry *first;
 
         assert(m);
 
-        if (!m->work_items_first) {
-                assert(!m->work_items_last);
+        first = c_list_first(&m->work_items);
+        if (!first)
                 return NULL;
-        } else
-                assert(m->work_items_last);
 
-        work_item = m->work_items_first;
+        c_list_remove(&m->work_items, first);
 
-        assert(!work_item->previous);
-
-        if (work_item->next)
-                work_item->next->previous = NULL;
-        else
-                m->work_items_last = NULL;
-
-        m->work_items_first = work_item->next;
-        work_item->next = NULL;
-
-        return work_item;
+        return c_container_of(first, struct work_item, le);
 }
 
 static void work_item_push(Manager *m, struct work_item *work_item) {
@@ -90,16 +76,7 @@ static void work_item_push(Manager *m, struct work_item *work_item) {
         if (!work_item)
                 return;
 
-        assert(!work_item->previous);
-        assert(!work_item->next);
-
-        if (m->work_items_last) {
-                m->work_items_last->next = work_item;
-                work_item->previous = m->work_items_last;
-        } else
-                m->work_items_first = work_item;
-
-        m->work_items_last = work_item;
+        c_list_append(&m->work_items, &work_item->le);
 }
 
 static void module_log(void *data, int priority, const char *file, int line, const char *fn, const char *format, va_list args) {}
