@@ -91,6 +91,8 @@ static size_t manager_get_max_workers(void) {
 
 int manager_new(Manager **manager) {
         _c_cleanup_(manager_freep) Manager *m = NULL;
+        struct epoll_event ep_uevent = { .events = EPOLLIN };
+        struct epoll_event ep_signal = { .events = EPOLLIN };
         sigset_t mask;
         int r;
 
@@ -139,9 +141,6 @@ int manager_new(Manager **manager) {
         if (m->fd_uevent < 0)
                 return m->fd_uevent;
 
-        m->ep_uevent.events = EPOLLIN;
-        m->ep_uevent.data.fd = m->fd_uevent;
-
         sigemptyset(&mask);
         sigaddset(&mask, SIGTERM);
         sigaddset(&mask, SIGINT);
@@ -152,15 +151,15 @@ int manager_new(Manager **manager) {
         if (m->fd_signal < 0)
                 return -errno;
 
-        m->ep_signal.events = EPOLLIN;
-        m->ep_signal.data.fd = m->fd_signal;
-
         m->fd_ep = epoll_create1(EPOLL_CLOEXEC);
         if (m->fd_ep < 0)
                 return -errno;
 
-        if (epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_uevent, &m->ep_uevent) < 0 ||
-            epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_signal, &m->ep_signal) < 0)
+        ep_uevent.data.fd = m->fd_uevent;
+        ep_signal.data.fd = m->fd_signal;
+
+        if (epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_uevent, &ep_uevent) < 0 ||
+            epoll_ctl(m->fd_ep, EPOLL_CTL_ADD, m->fd_signal, &ep_signal) < 0)
                 return -errno;
 
         pthread_mutex_init(&m->worker_lock, NULL);

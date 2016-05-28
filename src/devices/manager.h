@@ -28,8 +28,6 @@ typedef struct Manager {
         int fd_uevent;
         int fd_signal;
         int fd_ep;
-        struct epoll_event ep_uevent;
-        struct epoll_event ep_signal;
         int devicesfd;
         int sysbusfd;
         int sysclassfd;
