@@ -37,7 +37,7 @@ struct device {
 
         int sysfd;
         struct uevent_subscription sysfd_subscription;
-        struct device_slot *sysfd_cb;
+        CList sysfd_callbacks;
 };
 
 struct subsystem {
@@ -54,6 +54,13 @@ struct devtype {
         CRBNode rb;
 
         CList devices;
+};
+
+struct device_slot {
+        struct device *device;
+        CListEntry le;
+        device_callback_t cb;
+        void *userdata;
 };
 
 int device_call_with_sysfd(struct device *device, struct device_slot **slot, device_callback_t cb, void *userdata);

@@ -246,28 +246,13 @@ static struct device *device_get_next_by_devpath(struct device *device) {
         return c_container_of(n, struct device, rb);
 }
 
-struct device_slot {
-        struct device *device;
-        struct device_slot *previous;
-        struct device_slot *next;
-        device_callback_t cb;
-        void *userdata;
-};
-
 static struct device_slot *device_slot_free(struct device_slot *slot) {
         if (!slot)
                 return NULL;
 
-        if (slot->device->sysfd_cb == slot)
-                slot->device->sysfd_cb = slot->next;
+        c_list_remove(&slot->device->sysfd_callbacks, &slot->le);
 
-        if (slot->next)
-                slot->next->previous = slot->previous;
-
-        if (slot->previous)
-                slot->previous->next = slot->next;
-
-        if (!slot->device->sysfd_cb) {
+        if (!c_list_first(&slot->device->sysfd_callbacks)) {
                 uevent_subscription_unlink(&slot->device->manager->uevent_subscriptions, &slot->device->sysfd_subscription);
                 uevent_subscription_destroy(&slot->device->sysfd_subscription);
                 c_close(slot->device->sysfd);
@@ -293,24 +278,24 @@ static int device_slot_new(struct device *device, struct device_slot **slotp,
         slot->cb = cb;
         slot->userdata = userdata;
         slot->device = device;
-        slot->next = device->sysfd_cb;
-        slot->previous = NULL;
-        device->sysfd_cb = slot;
+        c_list_entry_init(&slot->le);
 
-        if (slot->next)
-                slot->next->previous = slot;
+        c_list_prepend(&device->sysfd_callbacks, &slot->le);
 
         return 0;
 }
 
 static int device_sysfd_cb(void *userdata) {
         struct device *device = userdata;
+        CListEntry *le;
 
         assert(device);
 
-        while (device->sysfd_cb) {
-                device->sysfd_cb->cb(device, device->sysfd, device->sysfd_cb->userdata);
-                device_slot_free(device->sysfd_cb);
+        while ((le = c_list_first(&device->sysfd_callbacks))) {
+                struct device_slot *slot = c_container_of(le, struct device_slot, le);
+
+                slot->cb(device, device->sysfd, slot->userdata);
+                device_slot_free(slot);
         }
 
         c_close(device->sysfd);
@@ -338,12 +323,17 @@ static int device_sysfd_open(struct device *device) {
 }
 
 struct device *device_free(struct device *device) {
+        CListEntry *le;
+
         if (!device)
                 return NULL;
 
-        while (device->sysfd_cb) {
-                device->sysfd_cb->cb(device, -ENOENT, device->sysfd_cb->userdata);
-                device_slot_free(device->sysfd_cb);
+        while ((le = c_list_first(&device->sysfd_callbacks))) {
+                struct device_slot *slot = c_container_of(le, struct device_slot, le);
+
+                slot->cb(device, -ENOENT, slot->userdata);
+
+                device_slot_free(slot);
         }
 
         c_close(device->sysfd);
@@ -379,7 +369,7 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
         device->manager = m;
         device->sysfd = -1;
         device->sysfd_subscription = (struct uevent_subscription) {};
-        device->sysfd_cb = NULL;
+        c_list_init(&device->sysfd_callbacks);
         c_rbnode_init(&device->rb);
         c_list_entry_init(&device->le);
         /* A NULL devtype indicates that the device should consume events but
@@ -505,15 +495,15 @@ static int device_move_one(Manager *m, struct device **devicep, struct device *d
         if (r < 0)
                 return r;
 
-        if (device_old->sysfd_cb) {
-                device->sysfd_cb = device_old->sysfd_cb;
+        if (c_list_first(&device_old->sysfd_callbacks)) {
+                device->sysfd_callbacks = device_old->sysfd_callbacks;
+                c_list_init(&device_old->sysfd_callbacks);
 
                 r = device_sysfd_open(device);
                 if (r < 0)
                         return r;
         }
 
-        device_old->sysfd_cb = NULL;
         device_unlink(device_old);
         device_free(device_old);
         c_rbtree_add(&m->devices, p, slot, &device->rb);
