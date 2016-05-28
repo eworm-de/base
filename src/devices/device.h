@@ -29,9 +29,8 @@ struct device {
         CRBNode rb;
         const char *devpath;
 
+        CListEntry le;
         struct devtype *devtype;
-        struct device *previous_by_devtype;
-        struct device *next_by_devtype;
 
         const char *devname;
         const char *modalias;
@@ -54,7 +53,7 @@ struct devtype {
         const char *name;
         CRBNode rb;
 
-        struct device *devices;
+        CList devices;
 };
 
 int device_call_with_sysfd(struct device *device, struct device_slot **slot, device_callback_t cb, void *userdata);

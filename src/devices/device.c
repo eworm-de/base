@@ -26,7 +26,7 @@ static struct devtype *devtype_free(struct devtype *devtype) {
         if (!devtype)
                 return NULL;
 
-        assert(!devtype->devices);
+        assert(!c_list_first(&devtype->devices));
 
         free(devtype);
 
@@ -50,7 +50,7 @@ static int devtype_new(struct subsystem *subsystem, struct devtype **devtypep, c
                 return -ENOMEM;
         devtype->subsystem = subsystem;
         c_rbnode_init(&devtype->rb);
-        devtype->devices = NULL;
+        c_list_init(&devtype->devices);
         if (name)
                 devtype->name = memcpy((void*)(devtype + 1), name, n_name);
         else
@@ -219,18 +219,8 @@ void device_unlink(struct device *device) {
                 return;
 
         c_rbtree_remove(&device->manager->devices, &device->rb);
-
-        if (device->devtype && device->devtype->devices == device)
-                device->devtype->devices = device->next_by_devtype;
-
-        if (device->previous_by_devtype)
-                device->previous_by_devtype->next_by_devtype = device->next_by_devtype;
-
-        if (device->next_by_devtype)
-                device->next_by_devtype->previous_by_devtype = device->previous_by_devtype;
-
-        device->previous_by_devtype = NULL;
-        device->next_by_devtype = NULL;
+        if (device->devtype)
+                c_list_remove(&device->devtype->devices, &device->le);
 }
 
 static struct device *device_get_by_devpath(CRBTree *devices, const char *devpath) {
@@ -391,8 +381,7 @@ static int device_new(Manager *m, struct device **devicep, const char *devpath,
         device->sysfd_subscription = (struct uevent_subscription) {};
         device->sysfd_cb = NULL;
         c_rbnode_init(&device->rb);
-        device->previous_by_devtype = NULL;
-        device->next_by_devtype = NULL;
+        c_list_entry_init(&device->le);
         /* A NULL devtype indicates that the device should consume events but
          * not be exposed. */
         device->devtype = devtype;
@@ -466,12 +455,8 @@ int device_add(Manager *m, struct device **devicep, const char *devpath,
 
         c_rbtree_add(&m->devices, p, slot, &device->rb);
 
-        if (devtype) {
-                device->next_by_devtype = devtype->devices;
-                if (devtype->devices)
-                        devtype->devices->previous_by_devtype = device;
-                devtype->devices = device;
-        }
+        if (devtype)
+                c_list_prepend(&devtype->devices, &device->le);
 
         if (m->settled && !device->devtype)
                 kmsg(LOG_WARNING, "ADD event suppressed for invalid subsystem '%s': %s\n", subsystem_name, devpath);
