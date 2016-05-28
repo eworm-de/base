@@ -68,7 +68,8 @@ Manager *manager_free(Manager *m) {
         uevent_subscription_unlink(&m->uevent_subscriptions, &m->subscription_settle);
         uevent_subscription_destroy(&m->subscription_settle);
         uevent_subscriptions_destroy(&m->uevent_subscriptions);
-        fclose(m->log);
+        if (m->log)
+                fclose(m->log);
         free(m);
 
         return NULL;
