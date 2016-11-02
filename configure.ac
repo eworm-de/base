@@ -105,24 +105,14 @@ AC_SUBST(OUR_LDFLAGS)
 
 AC_ARG_ENABLE(static, AS_HELP_STRING([--enable-static], [enable temporary static library linking]))
 AS_IF([test "$enable_static" = "yes"], [
-        # temporary hack until we do proper shared library linking
-        BUS1_CFLAGS="-I../libbus1/src"
-        BUS1_LIBS="-L../libbus1 -lbus1"
+        CRBTREE_CFLAGS="-I../../c-utils/c-rbtree/src"
+        CRBTREE_LIBS="-L../../c-utils/c-rbtree -lcrbtree"
         AC_SUBST(BUS1_CFLAGS)
         AC_SUBST(BUS1_LIBS)
 
-        CRBTREE_CFLAGS="-I../c-rbtree/src"
-        CRBTREE_LIBS="-L../c-rbtree -lcrbtree"
-        AC_SUBST(BUS1_CFLAGS)
-        AC_SUBST(BUS1_LIBS)
-
-        CSUNDRY_CFLAGS="-I../c-sundry/src"
+        CSUNDRY_CFLAGS="-I../../c-utils/c-sundry/src"
         AC_SUBST(CSUNDRY_CFLAGS)
 ], [
-        PKG_CHECK_MODULES(BUS1, [libbus1],
-                [AC_DEFINE(HAVE_BUS1, 1, [Define if libbus1 is available])],
-                AC_MSG_ERROR([*** libbus1 library not found]))
-
         PKG_CHECK_MODULES(CRBTREE, [c-rbtree],
                 [AC_DEFINE(HAVE_CRBTREE, 1, [Define if c-rbtree is available])],
                 AC_MSG_ERROR([*** c-rbtree library not found]))
