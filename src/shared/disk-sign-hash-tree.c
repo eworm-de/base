@@ -21,6 +21,8 @@
 #include "disk-sign-hash-tree.h"
 #include "file.h"
 
+C_DEFINE_CLEANUP(EVP_MD_CTX *, EVP_MD_CTX_free);
+
 /* Calculate and store hash blocks from n data blocks. */
 static int hash_write(FILE *f_data,
                       FILE *f_hash,
@@ -64,7 +66,7 @@ static int hash_write(FILE *f_data,
                 n_bytes = hash_block_size;
 
                 for (size_t i = 0; i < n_hashes_per_block; i++) {
-                        EVP_MD_CTX mdctx;
+                        _c_cleanup_(EVP_MD_CTX_freep) EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
                         uint8_t md_value[EVP_MAX_MD_SIZE];
                         unsigned int md_len;
 
@@ -74,11 +76,10 @@ static int hash_write(FILE *f_data,
                         if (fread(data_buffer, data_block_size, 1, f_data) != 1)
                                 return -EIO;
 
-                        if (!EVP_DigestInit(&mdctx, md) ||
-                            !EVP_DigestUpdate(&mdctx, salt, salt_size) ||
-                            !EVP_DigestUpdate(&mdctx, data_buffer, data_block_size) ||
-                            !EVP_DigestFinal_ex(&mdctx, md_value, &md_len) ||
-                            !EVP_MD_CTX_cleanup(&mdctx))
+                        if (!EVP_DigestInit(mdctx, md) ||
+                            !EVP_DigestUpdate(mdctx, salt, salt_size) ||
+                            !EVP_DigestUpdate(mdctx, data_buffer, data_block_size) ||
+                            !EVP_DigestFinal_ex(mdctx, md_value, &md_len))
                                 return -EINVAL;
 
                         if (md_len != salt_size)
